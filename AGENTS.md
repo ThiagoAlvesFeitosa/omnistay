@@ -7,6 +7,10 @@ código se organiza e o que nunca fazer.
 arbitrária, ela provavelmente está justificada lá.
 **Princípios inegociáveis:** `.specify/memory/constitution.md`. Em caso de conflito, a
 constituição vence.
+**Ordem de implementação:** `docs/backlog.md` — 24 fatias verticais numeradas, com
+dependências declaradas. **Nunca sugira uma fatia fora dessa ordem**; quando perguntado
+qual funcionalidade especificar em seguida, consulte o backlog e proponha a próxima cuja
+dependência já esteja satisfeita.
 
 ---
 
