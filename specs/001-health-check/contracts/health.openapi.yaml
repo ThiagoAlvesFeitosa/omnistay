@@ -1,0 +1,76 @@
+openapi: 3.1.0
+info:
+  title: OmniStay — Health Check
+  version: 1.0.0
+  description: |
+    Endpoint de verificação de saúde da API e conectividade PostgreSQL.
+    Feature 001-health-check.
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Verifica saúde da aplicação e do banco de dados
+      description: |
+        Público, sem autenticação. Retorna HTTP 200 quando aplicação e banco
+        respondem; HTTP 503 quando o banco está indisponível (aplicação continua no ar).
+      tags:
+        - sistema
+      responses:
+        "200":
+          description: Aplicação e banco disponíveis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponseOk"
+              example:
+                aplicacao: ok
+                banco: ok
+        "503":
+          description: Aplicação no ar, banco indisponível
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponseDegraded"
+              example:
+                aplicacao: ok
+                banco: indisponivel
+
+components:
+  schemas:
+    StatusOk:
+      type: string
+      enum:
+        - ok
+
+    StatusBanco:
+      type: string
+      enum:
+        - ok
+        - indisponivel
+
+    HealthResponseOk:
+      type: object
+      required:
+        - aplicacao
+        - banco
+      properties:
+        aplicacao:
+          $ref: "#/components/schemas/StatusOk"
+        banco:
+          type: string
+          enum:
+            - ok
+
+    HealthResponseDegraded:
+      type: object
+      required:
+        - aplicacao
+        - banco
+      properties:
+        aplicacao:
+          $ref: "#/components/schemas/StatusOk"
+        banco:
+          type: string
+          enum:
+            - indisponivel

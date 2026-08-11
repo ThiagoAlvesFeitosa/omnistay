@@ -1,0 +1,48 @@
+---
+description: Contexto e premissas do OmniStay. Sempre ativo.
+alwaysApply: true
+---
+
+# OmniStay — contexto permanente
+
+Hub conversacional para hotelaria. Hóspede conversa por WhatsApp; recepção opera painel web;
+equipe operacional recebe chamados; gestão consulta indicadores.
+
+## A premissa que governa tudo
+
+**O sistema não se integra ao PMS do hotel.** Roda em paralelo, e o recepcionista é a ponte
+humana. As transições entre fases são disparadas por cliques de funcionários, nunca por
+integração.
+
+É decisão deliberada e é o argumento comercial do produto. **Nunca proponha integração com o
+PMS**, em nenhuma forma: leitura de banco, importação de arquivo, sincronização de reservas
+ou débito automático.
+
+## Stack fixa
+
+Python 3.11+ com FastAPI · PostgreSQL 16 com JSONB · React com TypeScript · pytest · Alembic.
+
+**Não introduza** Redis, Celery, fila externa, cache distribuído, ORM alternativo ou outro
+framework de frontend. Um desenvolvedor, prazo fixo, custo zero — cada peça a mais compete
+com tempo de implementar.
+
+## Vocabulário do domínio
+
+| Termo | Significado |
+| --- | --- |
+| Reserva | Registro com telefone e datas. Nasce antes de existir ficha de hóspede |
+| Solicitação | Entidade única para reclamação, serviço operacional e consumo faturável |
+| Consumo | Especialização de solicitação, com valor e status de lançamento no PMS |
+| Catálogo | Fatos da propriedade. Única fonte que a IA pode afirmar |
+| Pulso | Pesquisa única do segundo dia de estadia |
+| Alert Center | Fila de chamados da equipe operacional, no painel |
+
+**A palavra "extrato" não existe neste produto.** A lista de consumos se chama "pedidos
+feitos pelo chat", em interface, mensagem e código.
+
+## Quando a documentação parecer errada
+
+Ela foi escrita sem execução real. Divergências vão aparecer.
+
+Não contorne em silêncio: sinalize, proponha a correção no artefato correspondente, e só
+então implemente.

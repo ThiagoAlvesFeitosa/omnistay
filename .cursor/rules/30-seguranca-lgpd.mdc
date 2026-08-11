@@ -1,0 +1,97 @@
+---
+description: Segurança do webhook, tratamento de dado pessoal, retenção e segredos.
+alwaysApply: true
+---
+
+# Segurança e proteção de dados
+
+## O webhook é um endereço público
+
+Qualquer pessoa na internet pode enviar requisição para ele. Sem verificação, seria possível
+injetar mensagens falsas e fazer o sistema responder em nome do hotel.
+
+**Obrigatório, antes de processar qualquer coisa:**
+
+- Verificar a assinatura da notificação recebida, recalculando o HMAC sobre o corpo bruto com
+  o segredo da aplicação
+- Comparar em **tempo constante** (`hmac.compare_digest`), nunca com `==` — comparação comum
+  vaza informação pelo tempo de resposta
+- Recusar notificação sem assinatura ou com assinatura inválida, sem processar
+
+Este é o item de segurança mais esquecido em integrações de webhook. Ele não é opcional.
+
+## Dado pessoal em log — nunca
+
+**Conteúdo de mensagem, comentário de avaliação e descrição de solicitação não vão para log,
+em nenhum nível.**
+
+Logs vão para serviços de terceiros, têm retenção própria e são lidos por quem não precisaria
+ver aquilo. O conteúdo é classificado como dado pessoal em conteúdo livre — o titular pode ter
+escrito qualquer coisa ali.
+
+Registre em log: identificadores, intenção classificada, tempo de processamento, código de
+erro. Nunca o texto.
+
+## Minimização
+
+- **Foto de documento não é aceita.** Somente campos digitados. Não implemente recebimento de
+  mídia para documento, em nenhuma hipótese
+- **Idade não é persistida.** É derivada de `data_nascimento` na exibição
+- A primeira mensagem ao hóspede **não revela dados pessoais além do primeiro nome** — o
+  telefone pode ter sido digitado errado e chegar a um terceiro
+
+## Retenção
+
+| Dado | Prazo | Tratamento |
+| --- | --- | --- |
+| Conteúdo de conversa e comentários | 12 meses após o checkout | **Anonimizar**, não apagar a linha |
+| Ficha cadastral do hóspede | 5 anos após a última estadia | Apagar |
+
+Anonimizar em vez de apagar preserva a estatística de volume de atendimento, que não tem nada
+de pessoal. Toda execução do expurgo registra o que foi tratado — sem isso não há como
+demonstrar cumprimento.
+
+## Consentimento é histórico, não campo
+
+`consentimento` recebe **uma linha nova** a cada concessão ou revogação. **Nunca atualize uma
+linha existente.**
+
+O estado atual é a linha mais recente. Um campo booleano responderia "aceita hoje?" mas não
+"aceitava em março?" — que é a pergunta de uma eventual fiscalização.
+
+## Segredos
+
+Configuração por variável de ambiente. O repositório contém `.env.example` com os **nomes**
+das variáveis e nenhum valor.
+
+```
+WHATSAPP_APP_SECRET     verificação da assinatura do webhook
+WHATSAPP_TOKEN          envio de mensagens
+WHATSAPP_VERIFY_TOKEN   registro do webhook
+LLM_API_KEY             provedor de IA
+DATABASE_URL            conexão com o banco
+JWT_SECRET              assinatura das sessões do painel
+```
+
+**Nunca** escreva um segredo em código, em teste, em comentário ou em mensagem de commit. Um
+segredo que entra no histórico do git continua lá depois de removido do arquivo.
+
+## Acesso ao painel
+
+| Perfil | Vê | Sessão |
+| --- | --- | --- |
+| `recepcao` | Reservas, fichas, confirmações, fila do dia | Padrão |
+| `staff` | Apenas chamados atribuídos. **Nunca dados cadastrais de hóspede** | Longa, por dispositivo |
+| `gestor` | Painéis de consulta. **Somente leitura** | Padrão |
+
+A sessão longa do perfil operacional é decisão consciente: quem está com as mãos ocupadas não
+digita senha a cada chamado, e um acesso trabalhoso faz o chamado ser resolvido e não marcado
+— quebrando a confirmação ao hóspede.
+
+A contrapartida é que o perfil operacional **não enxerga dado cadastral nenhum**, e a sessão é
+revogável pela recepção.
+
+## Senhas
+
+Somente hash, com algoritmo de derivação lenta. Nunca em texto legível, nem em log, nem em
+resposta de API, nem em mensagem de erro.

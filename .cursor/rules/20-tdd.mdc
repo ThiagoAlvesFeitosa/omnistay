@@ -1,0 +1,98 @@
+---
+description: Ciclo TDD obrigatório, o que testar em cada camada e os casos que este projeto exige.
+alwaysApply: true
+---
+
+# TDD — o ciclo, sem exceção
+
+Nenhuma linha de código de produção é escrita antes de existir um teste que falhe por sua
+ausência.
+
+```
+1. Escreva o teste
+2. Rode. VEJA FALHAR — e confira que falhou pelo motivo certo
+3. Implemente o mínimo para passar
+4. Rode. Verde
+5. Refatore com o teste verde
+6. Commit
+```
+
+**O passo 2 não é formalidade.** Um teste que passa na primeira execução é suspeito: ou não
+testa o que diz testar, ou a funcionalidade já existia. Nos dois casos, você não sabe se o
+teste funciona.
+
+## O que testar em cada camada
+
+| Camada | O que verificar | Dependências |
+| --- | --- | --- |
+| `service` | Regra de negócio, decisões, caminhos de exceção | Todas falsas |
+| `repository` | Restrições, triggers, consultas | Banco de teste real |
+| Ponta a ponta | O fluxo completo de uma fatia | Portas falsas, banco real |
+
+Teste de `service` que precisa de banco está no lugar errado — ou o serviço está fazendo
+trabalho de repositório.
+
+## Teste não conversa com serviço externo
+
+Use sempre as implementações falsas das portas. Um teste que chama o provedor de IA de
+verdade é lento, instável, gasta cota e falha por motivo alheio ao código.
+
+O `LLMProvider` falso devolve classificação fixa, o que permite verificar que uma reclamação
+técnica com sentimento negativo gera chamado — de forma determinística, sempre.
+
+## Casos que este projeto exige testar
+
+Não são sugestões. São as decisões do projeto, e cada uma precisa de teste próprio:
+
+- **Reenvio do mesmo webhook não gera resposta duplicada**
+- **Falha do provedor de IA escala para humano** em vez de perder a mensagem
+- **Pulso não dispara** com chamado aberto nem com menos de 24h de estadia
+- **Transição de estado inválida é rejeitada pelo banco**, não só pela aplicação
+- **Consumo faturável nasce pendente de lançamento**
+- **Confirmação ao hóspede acontece antes** da criação do chamado
+- **Reenvio da coleta acontece uma única vez**, nunca duas
+- **Resposta parcial da ficha não dispara nova mensagem** ao hóspede
+- **Pergunta fora do catálogo não recebe resposta inventada**
+- **Conteúdo de mensagem não aparece em log**
+
+## Nomes de teste
+
+O nome descreve comportamento e resultado esperado, em português, sem jargão de
+implementação.
+
+```python
+def test_reclamacao_tecnica_negativa_confirma_ao_hospede_antes_de_abrir_chamado(): ...
+def test_webhook_repetido_nao_gera_segunda_resposta(): ...
+def test_pulso_e_suprimido_quando_ha_chamado_aberto(): ...
+```
+
+Um nome que precisa de comentário para ser entendido é nome ruim.
+
+## Estrutura de um teste
+
+Três blocos visíveis, separados por linha em branco: preparar, executar, verificar.
+
+Uma asserção conceitual por teste. Verificar cinco coisas diferentes em um teste significa
+que, quando ele falhar, você não sabe qual delas quebrou.
+
+## Comandos
+
+```bash
+pytest                          # tudo
+pytest testes/unitarios -q      # rápido, durante o ciclo
+pytest -k nome_do_teste         # um só
+pytest --lf                     # só os que falharam da última vez
+```
+
+Durante o ciclo, rode só os unitários — eles precisam ser rápidos o bastante para você rodar
+a cada minuto sem impaciência.
+
+## Quando o agente errar o código
+
+Antes de corrigir à mão, pergunte por que ele errou:
+
+- **Spec ambígua?** Corrija a spec e refaça. É o método funcionando
+- **Regra faltando?** Acrescente a estas regras ou à constituição. O erro vira prevenção
+- **Caso isolado?** Aí sim, corrija à mão
+
+A opção do meio é a que faz o projeto melhorar com o tempo em vez de acumular retrabalho.

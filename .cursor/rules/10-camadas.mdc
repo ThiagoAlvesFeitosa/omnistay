@@ -1,0 +1,74 @@
+---
+description: Organização em camadas, fronteiras entre módulos e as três portas trocáveis.
+globs: ["app/**/*.py", "worker/**/*.py"]
+alwaysApply: false
+---
+
+# Camadas e fronteiras
+
+## Estrutura de cada módulo
+
+```
+router      entrada HTTP. Valida formato, converte, delega. Sem regra de negócio
+service     a regra de negócio. Não conhece HTTP nem SQL
+repository  acesso ao banco. Não conhece regra de negócio
+schema      contratos de entrada e saída (Pydantic)
+model       mapeamento das tabelas (SQLAlchemy)
+```
+
+## Regras sem exceção
+
+- `service` **não** importa nada de `router` e **não** escreve SQL. Precisando de dado, pede
+  ao repositório
+- `router` **não** contém regra de negócio — só tradução de protocolo
+- Um módulo só lê e grava nas tabelas que governa. Para dado de outro módulo, chama o
+  **serviço** daquele módulo, nunca a tabela
+
+Essa disciplina é o que torna o monolito modular em vez de apenas grande. É também o que
+permite testar regra de negócio sem subir servidor nem banco.
+
+## Módulos e suas tabelas
+
+| Módulo | Governa |
+| --- | --- |
+| `propriedade` | `hotel`, `usuario`, `parametro_hotel`, `catalogo_item` |
+| `hospedagem` | `reserva`, `hospede`, `reserva_hospede`, `consentimento` |
+| `conversa` | `mensagem`, `evento_webhook` |
+| `atendimento` | `solicitacao`, `consumo` |
+| `feedback` | `avaliacao` |
+| `mercado` | `concorrente`, `coleta_mercado` |
+
+## As três portas
+
+O domínio depende de interfaces em `app/portas/`, nunca de implementações em
+`app/adaptadores/`.
+
+| Porta | Implementação real | Implementação de teste |
+| --- | --- | --- |
+| `LLMProvider` | modelo em camada gratuita | falso, com resposta determinística |
+| `CatalogoRepository` | catálogo completo do banco | em memória |
+| `MensageriaGateway` | WhatsApp Cloud API | simulada, também usada na apresentação |
+
+Se você está escrevendo `import` de uma biblioteca de terceiros dentro de um `service`, pare:
+provavelmente falta uma porta.
+
+## A divisão API e Worker
+
+**A API nunca faz nada que possa demorar.** Se a operação depende de rede externa ou de IA,
+ela vira uma linha na fila e o worker cuida.
+
+É isso que garante que o webhook responda dentro do prazo do provedor de mensageria. Um
+webhook lento faz o provedor considerar o sistema indisponível e reenviar em cascata.
+
+## Configuração
+
+Tudo por variável de ambiente. Nenhum segredo em código versionado.
+
+**Nenhum número mágico.** Prazo, intervalo e periodicidade vêm de `parametro_hotel`,
+configuráveis por propriedade.
+
+## Multi-tenant
+
+`id_hotel` está nas tabelas de domínio e **é considerado em toda consulta**, mesmo com uma
+única propriedade cadastrada. Consulta que esquece o filtro é defeito, ainda que hoje
+retorne o resultado certo.
