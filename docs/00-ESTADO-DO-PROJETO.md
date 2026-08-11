@@ -1,37 +1,61 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 11/08/2026
+**Atualizado em:** 06/08/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
 
 ---
 
 ## Onde paramos
 
-**Os seis artefatos estão concluídos** e a implementação começou. Duas fatias entregues:
+**Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-- **F0.1 — Esqueleto caminhante:** endpoint de saúde, configuração por variável de ambiente,
-  estrutura de pastas e suíte de testes.
-- **F0.2 — Esquema e migrações:** o esquema do Artefato 4 aplicado num PostgreSQL 16 real, por
-  migração Alembic que executa uma cópia congelada do `04-schema.sql`. As três garantias do
-  Artigo IX têm teste que falha sem a migração e passa depois dela, e um teste de conformidade
-  impede que documento e banco divirjam em qualquer migração futura.
+**Progresso:** 2 de 24 fatias concluídas.
 
-**Próximo passo:** fatia **F0.3 — Perfis e sessão**, cuja dependência (F0.2) está satisfeita.
+| Fatia | Estado |
+| --- | --- |
+| F0.1 Esqueleto caminhante | ✅ Concluída — `GET /health`, 6 testes verdes, commitada |
+| F0.2 Esquema e migrações | ✅ Concluída — revisão `0001` com SQL congelado, teste de inventário nos dois sentidos, commit `c42a6ed` |
+| F0.3 Autenticação e perfis | ⬅️ **Próxima.** Precisa incluir o comando de bootstrap — ver lacunas abaixo |
+| Demais 21 fatias | Pendentes, na ordem de `implementacao/01-backlog-de-fatias.md` |
 
-**Como rodar:** `docker compose up -d`, `.env` a partir do `.env.example`,
-`alembic upgrade head`, `pytest`. A verificação completa da entrega usa
-`EXIGIR_POSTGRES=1 pytest`, que faz a ausência de banco falhar em vez de pular testes.
+**Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
+(`--integration cursor-agent`, scripts PowerShell), constituição carregada em
+`.specify/memory/`, regras em `.cursor/rules/`, documentação copiada para `docs/`.
 
-**Método escolhido:** spec-driven development com GitHub Spec Kit, no Cursor, com TDD
-obrigatório. Os seis artefatos são a especificação de alto nível; o backlog traduz isso em
-fatias que o `/speckit.specify` consome.
+**Método:** spec-driven development com GitHub Spec Kit no Cursor, TDD obrigatório. Ciclo por
+fatia: `/speckit.specify` → `/clarify` → `/plan` → `/tasks` → `/implement` → `pytest` →
+commit.
+
+> **Regra de higiene de contexto:** uma fatia, uma conversa. Ao commitar, abrir conversa nova.
+> O estado mora nos arquivos — spec, plano, tarefas, código e este documento —, nunca no
+> histórico da conversa.
 
 **Para a próxima entrega**, além da implementação: a implantação em nuvem, que o ADR-008
 deixou deliberadamente adiada para ser decidida contra um sistema funcionando.
 
-## Arquivos nesta pasta
+## Decisões tomadas durante a implementação
 
-| Arquivo | Conteúdo |
+Registradas aqui porque não constam dos seis artefatos originais.
+
+| Tema | Decisão | Origem |
+| --- | --- | --- |
+| Versão do Python | **3.14** na máquina, com `requires-python = ">=3.11"`. Risco conhecido: bibliotecas podem não ter wheel. Se travar, `uv python install 3.12` e recriar a venv | F0.1 |
+| Endpoint de saúde | Falha do banco responde **HTTP 503** com corpo distinguindo aplicação e banco. Não são dois endpoints separados — sem orquestrador, seria complexidade sem problema (Artigo XI) | F0.1 |
+| Prazo de resposta na falha | **3 segundos**, não 2. O cliente PostgreSQL eleva qualquer `connect_timeout` menor que 2 para 2 | F0.1 |
+| Container do banco | Reutilizado o `omnistay-db` existente, com usuário `postgres`. Verificação da subida limpa (`docker compose down -v` + `up`) virou tarefa da F0.2 | F0.1 |
+| Credenciais em arquivo versionado | `testes/conftest.py` trazia URL com senha embutida, herdada da F0.1. Removida na F0.2: sem valor padrão, a suíte exige `DATABASE_URL` do ambiente e falha alto se ausente. `.env.example` registra as chaves **sem valor** | F0.2 |
+| Fonte do esquema | ~~A migração executa o próprio `docs/04-schema.sql`~~ **Superada no planejamento da F0.2.** Migração precisa ser imutável: uma revisão que lê um arquivo mutável muda de significado a cada edição e deixa de ser reprodutível. A revisão inicial carrega **cópia congelada** em `alembic/versions/sql/`; `docs/04-schema.sql` segue como documento vivo; a equivalência é garantida por teste, não por disciplina | F0.2 |
+| Verificação do esquema | Teste que compara o inventário do banco migrado com as estruturas do documento, **nos dois sentidos** — para detectar migração futura que altere o banco sem atualizar o arquivo | F0.2 |
+
+## Onde ficam os arquivos
+
+**Fonte única dos documentos: `omnistay/docs/`**, dentro do repositório. Nada de cópia
+fora dali — foi assim que o `04-schema.sql` divergiu antes.
+
+Na raiz da pasta do projeto sobraram apenas os que não são documentação de engenharia:
+os `.docx` de entrega, `diagramas/`, `gerar_bmc_v2.py` e `implementacao/`.
+
+| Arquivo em `omnistay/docs/` | Conteúdo |
 | --- | --- |
 | `01-mapa-de-processos.md` | Artefato 1 v1.1 — cinco processos, catálogo de dez eventos, fluxos de exceção |
 | `02-jornada-do-usuario.md` | Artefato 2 v1.1 — personas, trilhas do hóspede e do recepcionista, as-is/to-be, análise crítica |
@@ -108,6 +132,31 @@ visível, mas não a eliminam. Isso é assumido no documento.
 | Preços (hipótese) | Essencial R$ 249 · Padrão R$ 449 · Avançado R$ 849, com franquia de mensagens |
 | Comissão sobre serviços | Reduzida de 20% para 8% da receita — depende de lançamento manual no PMS |
 | Dados como ativo | **Não** se apoia no conteúdo das conversas. O ativo é o catálogo da propriedade |
+
+## Catálogo e preços — desenho a fechar antes da F2.1
+
+**Problema.** `catalogo_item` guarda `conteudo` como texto livre. Isso serve bem para horário,
+regra e programação, mas não para item vendável: não dá para alterar um preço sem reescrever o
+bloco, e a IA teria de extrair o número do texto corrido. Como `consumo.valor_praticado` alimenta
+a cobrança, um erro de leitura vira hóspede informado de um preço e cobrado de outro — justamente
+o risco que a F3.7 marca como o de consequência financeira.
+
+**Desenho proposto — a IA nunca escreve preço.** Ela identifica *qual* item foi pedido; o sistema
+lê o preço no banco e monta a mensagem. Modelo que não emite número não erra número.
+
+| Mecanismo | Para que serve |
+| --- | --- |
+| Item vendável em linha própria, com preço em coluna | Recepção edita um campo, sem reescrever texto |
+| Cada item leva **identificador** no prompt; a IA devolve o id, não o nome | Elimina confusão por sinônimo, apelido ou grafia |
+| Preço consultado no banco **depois** da identificação | Mensagem ao hóspede e `consumo` leem a mesma fonte no mesmo instante |
+| Prompt montado na hora a partir das linhas ativas | Nenhuma cópia intermediária pode ficar velha |
+| Remoção é desativação (`ativo = FALSE`) | Pedido antigo continua íntegro; `valor_praticado` já é retrato do momento |
+
+**Compatível com o que está fechado.** "Catálogo inteiro no prompt" continua valendo — a diferença
+é que o texto passa a ser *gerado* a partir das linhas, em vez de digitado.
+
+**Custo:** uma tabela e uma tela a mais na F2.1. **Decidir antes da F2.1**, porque muda o esquema —
+e mudança de esquema depois da F0.2 exige revisão nova de migração.
 
 ## Categorias de mensagem do WhatsApp — referência rápida
 
@@ -188,12 +237,28 @@ Resolvidas pelo Artefato 6:
 - [x] ~~Contradições entre o Canvas e a arquitetura~~ Seis corrigidas, com registro de
       alterações no próprio documento
 
+Lacunas encontradas no backlog (agosto/2026) — nenhuma tem fatia dedicada:
+
+- [ ] **Não há como criar o primeiro hotel nem o primeiro usuário.** A F0.3 exige login no
+      painel; o painel é o único lugar que cadastra usuário; usuário exige hotel. Ovo e galinha.
+      Resolver com **comando de bootstrap** (script, não tela) que cria hotel, gestor inicial e os
+      `parametro_hotel` com valores padrão. Entra como tarefa da **F0.3**, não como fatia nova
+- [ ] **`parametro_hotel` é lido por três fatias e escrito por nenhuma.** F1.2 e F1.4 leem
+      `horas_ate_reenvio` e `horas_corte_antes_checkin`; F5.2 lê a periodicidade. Nenhuma permite
+      alterar. Aceitável no MVP (semeado no bootstrap, alterado por SQL), desde que seja escolha
+      registrada e não esquecimento
+- [ ] **Fechar o desenho de catálogo e preços** — ver seção própria acima. Prazo: antes da F2.1
+
 Ainda abertas:
 
-- [x] ~~**Executar o `04-schema.sql` num PostgreSQL real**~~ Feito na fatia F0.2, num
-      PostgreSQL 16. Duas divergências apareceram e foram corrigidas no documento: o
-      `BEGIN`/`COMMIT` interno, que fecharia a transação da migração antes do registro de
-      versão, e a versão declarada do SGBD, que era `14+` sem nunca ter sido verificada
+- [x] ~~**Executar o `04-schema.sql` num PostgreSQL real**~~ Feito na F0.2. O documento agora é
+      aplicado a cada execução da suíte, num banco descartável, e comparado com o banco migrado
+- [ ] **Ruído de fim de linha no repositório** — 18 arquivos aparecem modificados só por CRLF/LF
+      (`git diff --ignore-all-space` volta vazio). Resolver com `.gitattributes` contendo
+      `* text=auto eol=lf`, senão todo diff futuro vem poluído
+- [x] ~~**Duas cópias dos documentos**~~ Resolvido: os sete artefatos viviam na raiz e em
+      `omnistay/docs/`, e o `04-schema.sql` da raiz já estava desatualizado (sem as correções da
+      F0.2). As cópias da raiz foram apagadas. **`omnistay/docs/` é a fonte única**, versionada
 - [ ] **Confirmar junto à Meta a tarifação das mensagens dentro da janela a partir de
       01/10/2026** — as margens do cenário B do Canvas dependem disso
 - [ ] Definir os **valores** dos parâmetros com o hotel (horas de reenvio, janela de corte,
