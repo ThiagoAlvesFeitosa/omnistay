@@ -69,6 +69,13 @@ trivial.
 **Depende de:** F0.1.
 **Referência:** Artefato 4 completo, `04-schema.sql`.
 
+**Status: concluída.** O esquema foi aplicado num PostgreSQL 16 real pela migração
+`0001_esquema_inicial`, que executa uma cópia congelada do `04-schema.sql`. Duas divergências
+apareceram na execução e foram corrigidas no documento: o `BEGIN`/`COMMIT` interno, que fecharia
+a transação da migração antes do registro de versão, e a versão declarada do SGBD. Um teste de
+conformidade compara, a cada execução da suíte, o banco migrado com o documento — inclusive o
+corpo da função de transição — para que nenhuma migração futura possa fazê-los divergir.
+
 > **Atenção:** esta é a primeira execução real do DDL. A verificação feita na documentação
 > foi estrutural. **Erros aqui são esperados e são informação** — corrija o `04-schema.sql`
 > junto, para documento e banco não divergirem.

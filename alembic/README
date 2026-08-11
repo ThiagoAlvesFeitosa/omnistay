@@ -1,1 +1,40 @@
-Generic single-database configuration.
+Migracoes do OmniStay — configuracao de banco unico.
+
+A URL de conexao nunca fica em alembic.ini: vem de DATABASE_URL, lida em env.py. O env.py
+tambem verifica a versao minima do servidor antes de qualquer comando de esquema.
+
+
+A revisao inicial
+-----------------
+
+`versions/0001_esquema_inicial.py` nao descreve o esquema: ela aplica
+`versions/sql/0001_esquema_inicial.sql`, copia congelada de `docs/04-schema.sql` no
+momento em que a revisao foi criada.
+
+Esse arquivo companheiro e imutavel. Editar SQL ja aplicado em ambiente duravel faria o
+banco de quem migrou antes divergir do banco de quem migrar depois, sem nada apontar a
+diferenca.
+
+
+Como fazer uma migracao nova
+----------------------------
+
+1. Escreva a revisao com a alteracao (ALTER TABLE, novo indice, nova trigger).
+2. Atualize `docs/04-schema.sql` para descrever o esquema completo resultante — ele
+   descreve sempre o estado atual, nao o historico.
+3. Rode `pytest testes/integracao/test_conformidade_do_esquema.py`. A verificacao sobe
+   dois bancos limpos, aplica as migracoes em um e o documento no outro, e falha se os
+   dois nao terminarem identicos. E ela que impede documento e banco de divergirem.
+
+Nao edite `versions/sql/0001_esquema_inicial.sql` em nenhuma dessas etapas.
+
+
+Comandos
+--------
+
+    alembic upgrade head     aplica o que falta
+    alembic current          mostra a revisao corrente do banco
+    alembic history          lista as revisoes
+
+Reversao nao e suportada: `downgrade()` da revisao inicial levanta erro, porque reverter a
+criacao do esquema equivale a descartar o banco.

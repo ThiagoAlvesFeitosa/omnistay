@@ -1,18 +1,26 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 06/08/2026
+**Atualizado em:** 11/08/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
 
 ---
 
 ## Onde paramos
 
-**Os seis artefatos estão concluídos**, e a **preparação da implementação também**. A pasta
-`implementacao/` tem o kit completo para começar a programar: guia de setup, constituição,
-backlog de 24 fatias verticais e as regras do Cursor.
+**Os seis artefatos estão concluídos** e a implementação começou. Duas fatias entregues:
 
-**Próximo passo:** seguir o `implementacao/00-GUIA-DE-SETUP.md`, passo a passo, e fazer o
-primeiro ciclo com a fatia F0.1 para calibrar o ambiente.
+- **F0.1 — Esqueleto caminhante:** endpoint de saúde, configuração por variável de ambiente,
+  estrutura de pastas e suíte de testes.
+- **F0.2 — Esquema e migrações:** o esquema do Artefato 4 aplicado num PostgreSQL 16 real, por
+  migração Alembic que executa uma cópia congelada do `04-schema.sql`. As três garantias do
+  Artigo IX têm teste que falha sem a migração e passa depois dela, e um teste de conformidade
+  impede que documento e banco divirjam em qualquer migração futura.
+
+**Próximo passo:** fatia **F0.3 — Perfis e sessão**, cuja dependência (F0.2) está satisfeita.
+
+**Como rodar:** `docker compose up -d`, `.env` a partir do `.env.example`,
+`alembic upgrade head`, `pytest`. A verificação completa da entrega usa
+`EXIGIR_POSTGRES=1 pytest`, que faz a ausência de banco falhar em vez de pular testes.
 
 **Método escolhido:** spec-driven development com GitHub Spec Kit, no Cursor, com TDD
 obrigatório. Os seis artefatos são a especificação de alto nível; o backlog traduz isso em
@@ -182,8 +190,10 @@ Resolvidas pelo Artefato 6:
 
 Ainda abertas:
 
-- [ ] **Executar o `04-schema.sql` num PostgreSQL real** — a verificação feita foi
-      estrutural, não uma execução. Fazer isso antes de iniciar a implementação
+- [x] ~~**Executar o `04-schema.sql` num PostgreSQL real**~~ Feito na fatia F0.2, num
+      PostgreSQL 16. Duas divergências apareceram e foram corrigidas no documento: o
+      `BEGIN`/`COMMIT` interno, que fecharia a transação da migração antes do registro de
+      versão, e a versão declarada do SGBD, que era `14+` sem nunca ter sido verificada
 - [ ] **Confirmar junto à Meta a tarifação das mensagens dentro da janela a partir de
       01/10/2026** — as margens do cenário B do Canvas dependem disso
 - [ ] Definir os **valores** dos parâmetros com o hotel (horas de reenvio, janela de corte,

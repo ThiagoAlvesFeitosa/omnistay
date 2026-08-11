@@ -1,16 +1,20 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
+from sqlalchemy import engine_from_config, text
 from sqlalchemy import pool
 
 from alembic import context
 
+from app.comum.versao_do_banco import exigir_versao_minima
 from app.config import obter_configuracao
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-config.set_main_option("sqlalchemy.url", obter_configuracao().database_url)
+# Quem chama pode fixar a URL (os testes apontam para bancos descartaveis); sem isso,
+# vale a configuracao da aplicacao.
+if not config.get_main_option("sqlalchemy.url", None):
+    config.set_main_option("sqlalchemy.url", obter_configuracao().database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -65,6 +69,18 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+
+    # Antes de qualquer comando de esquema: um servidor abaixo do minimo falharia no meio
+    # da migracao, com mensagem obscura, em vez de recusar de saida.
+    #
+    # A checagem usa conexao propria de proposito. Consultar pela conexao da migracao
+    # abriria a transacao antes do Alembic, e nesse caso ele deixa de comitar por conta
+    # propria — o esquema seria criado e desfeito no fechamento da conexao.
+    with connectable.connect() as conexao_de_verificacao:
+        versao = conexao_de_verificacao.execute(
+            text("SELECT current_setting('server_version_num')")
+        ).scalar()
+        exigir_versao_minima(int(versao))
 
     with connectable.connect() as connection:
         context.configure(

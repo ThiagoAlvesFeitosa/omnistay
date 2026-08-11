@@ -1,6 +1,7 @@
 ---
-description: Segurança do webhook, tratamento de dado pessoal, retenção e segredos.
-alwaysApply: true
+description: Segurança do webhook, tratamento de dado pessoal, retenção e segredos. Consulte ao escrever qualquer código que receba requisição externa, grave dado de hóspede, escreva log ou trate autenticação.
+globs: ["app/**/*.py", "worker/**/*.py", "testes/**/*.py", "specs/**/*.md"]
+alwaysApply: false
 ---
 
 # Segurança e proteção de dados

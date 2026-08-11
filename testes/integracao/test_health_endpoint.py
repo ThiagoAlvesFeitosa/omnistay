@@ -1,13 +1,6 @@
 import pytest
 
-from testes.conftest import postgres_disponivel
-
-URL_PORTA_FECHADA = "postgresql+psycopg2://postgres:omnistay@localhost:59999/omnistay"
-
-exige_postgres = pytest.mark.skipif(
-    not postgres_disponivel(),
-    reason="PostgreSQL nao esta acessivel via DATABASE_URL",
-)
+URL_PORTA_FECHADA = "postgresql+psycopg2://usuario:senha@localhost:59999/omnistay"
 
 
 @pytest.fixture
@@ -23,7 +16,7 @@ def banco_indisponivel(monkeypatch):
     obter_engine.cache_clear()
 
 
-@exige_postgres
+@pytest.mark.postgres
 def test_banco_disponivel_retorna_200(cliente):
     resposta = cliente.get("/health")
 
