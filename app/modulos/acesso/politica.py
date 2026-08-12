@@ -12,6 +12,7 @@ OPERACOES: Final[dict[str, frozenset[str]]] = {
     "alterar_ficha_de_hospede": frozenset({"recepcao"}),
     "alterar_reserva": frozenset({"recepcao"}),
     "confirmar_fase_da_reserva": frozenset({"recepcao"}),
+    "ler_fila_do_dia": frozenset({"recepcao"}),
     "ler_solicitacao_atribuida": frozenset({"recepcao", "staff", "gestor"}),
     "resolver_solicitacao": frozenset({"recepcao", "staff"}),
     "lancar_consumo": frozenset({"recepcao"}),

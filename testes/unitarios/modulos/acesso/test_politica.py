@@ -12,6 +12,7 @@ OPERACOES_ESPERADAS = {
     "alterar_ficha_de_hospede": {"recepcao"},
     "alterar_reserva": {"recepcao"},
     "confirmar_fase_da_reserva": {"recepcao"},
+    "ler_fila_do_dia": {"recepcao"},
     "ler_solicitacao_atribuida": {"recepcao", "staff", "gestor"},
     "resolver_solicitacao": {"recepcao", "staff"},
     "lancar_consumo": {"recepcao"},
@@ -33,6 +34,18 @@ def test_staff_nao_le_dado_cadastral_de_hospede():
 
 def test_gestor_nao_altera_reserva():
     assert politica.permitido("gestor", "alterar_reserva") is False
+
+
+def test_ler_fila_do_dia_so_recepcao():
+    assert politica.permitido("recepcao", "ler_fila_do_dia") is True
+    assert politica.permitido("staff", "ler_fila_do_dia") is False
+    assert politica.permitido("gestor", "ler_fila_do_dia") is False
+
+
+def test_ler_indicadores_continua_para_recepcao_e_gestor():
+    assert politica.permitido("recepcao", "ler_indicadores") is True
+    assert politica.permitido("gestor", "ler_indicadores") is True
+    assert politica.permitido("staff", "ler_indicadores") is False
 
 
 def test_operacao_desconhecida_e_recusada():

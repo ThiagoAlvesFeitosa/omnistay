@@ -482,6 +482,8 @@ CREATE VIEW vw_fila_do_dia AS
 SELECT r.id_hotel,
        r.id_reserva,
        r.data_checkin_prevista,
+       r.data_checkout_prevista,
+       r.telefone_contato,
        r.status,
        h.nome_completo,
        rh.ficha_completa,
@@ -493,9 +495,11 @@ SELECT r.id_hotel,
          ON rh.id_reserva = r.id_reserva AND rh.titular
   LEFT JOIN hospede h
          ON h.id_hospede = rh.id_hospede
- WHERE r.status NOT IN ('encerrado', 'cancelada');
+ WHERE r.status NOT IN ('encerrado', 'cancelada')
+   AND r.data_checkin_prevista <= CURRENT_DATE;
 
 COMMENT ON VIEW vw_fila_do_dia IS
-    'Alimenta a tela inicial do turno. A coluna chegada_nao_confirmada implementa a '
-    'deteccao de divergencia temporal: o sistema nao sabe que o hospede chegou, mas '
-    'sabe que ele deveria ter chegado.';
+    'Alimenta a tela inicial do turno: check-in previsto ate hoje (chegadas do dia, '
+    'atrasadas e hospedados). Reserva futura fica de fora. A coluna '
+    'chegada_nao_confirmada sinaliza divergencia temporal. Inclui telefone_contato e '
+    'data_checkout_prevista para a fila nominada da recepcao.';

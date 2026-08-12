@@ -21,13 +21,14 @@ lendo ficha cadastral por descuido. Ver [research.md](../research.md) seção 8.
 | `administrar_usuario` | ❌ | ❌ | ✅ | **F0.3** |
 | `ler_dado_cadastral_de_hospede` | ✅ | ❌ | ❌ | F1.3 |
 | `alterar_ficha_de_hospede` | ✅ | ❌ | ❌ | F1.3 |
-| `alterar_reserva` | ✅ | ❌ | ❌ | F1.1 |
+| `alterar_reserva` | ✅ | ❌ | ❌ | **F1.1** |
+| `ler_fila_do_dia` | ✅ | ❌ | ❌ | **F1.1** |
 | `confirmar_fase_da_reserva` | ✅ | ❌ | ❌ | F2.2, F4.1 |
 | `ler_solicitacao_atribuida` | ✅ | ✅ | ✅ | F3.4, F3.5 |
 | `resolver_solicitacao` | ✅ | ✅ | ❌ | F3.6 |
 | `lancar_consumo` | ✅ | ❌ | ❌ | F3.7 |
 | `alterar_catalogo` | ✅ | ❌ | ❌ | F2.1 |
-| `ler_indicadores` | ✅ | ❌ | ✅ | F4.1, F5.3 |
+| `ler_indicadores` | ✅ | ❌ | ✅ | **F1.1** (contagem de chegadas); F4.1, F5.3 |
 
 ---
 

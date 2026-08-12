@@ -140,6 +140,10 @@ autorização, bootstrap e varredura de rotas protegidas.
 **Depende de:** F0.3.
 **Referência:** Artefato 2 R2, Artefato 4 §6.3.
 
+**Status: concluída.** Módulo `hospedagem`, titular provisório na criação, telefone canônico,
+fila nominada só para recepção, contagem de chegadas via `ler_indicadores`, revisão
+`0003_fila_do_dia`. Sem tela React e sem envio WhatsApp (F1.2).
+
 ## F1.2 — Disparar a coleta de dados
 
 **Objetivo:** o hóspede recebe o pedido de cadastro pelo WhatsApp.

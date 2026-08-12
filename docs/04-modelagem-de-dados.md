@@ -326,6 +326,14 @@ erDiagram
 titular, mas a estrutura comporta acompanhantes desde já. Trocar isso depois seria migração
 de esquema, não ajuste de tela.
 
+**Na criação da reserva (F1.1), o titular nasce provisório:** a recepção informa nome e
+telefone; o sistema grava um `hospede` com apenas `nome_completo` e `telefone`, e o vínculo
+em `reserva_hospede` com `titular = true` e `ficha_completa = false`. A ficha completa
+(documento, endereço etc.) chega depois, na interpretação da resposta do hóspede. Telefone
+repetido **sempre** cria um hóspede novo — o número pode ser de duas pessoas (casal, telefone
+de empresa). Se um dia existir histórico “por pessoa”, a consolidação será um passo explícito,
+nunca reaproveitamento silencioso pelo número.
+
 **`mensagem` para `solicitacao` é 1:0..1 opcional.** A maioria das mensagens não gera
 solicitação nenhuma. Quando gera, guardar a origem permite auditar por que um chamado foi
 aberto — informação necessária quando a classificação da IA errar.
