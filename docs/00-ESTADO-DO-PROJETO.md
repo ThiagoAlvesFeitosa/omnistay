@@ -1,6 +1,6 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 06/08/2026
+**Atualizado em:** 12/08/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
 
 ---
@@ -9,14 +9,15 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 2 de 24 fatias concluídas.
+**Progresso:** 3 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
 | F0.1 Esqueleto caminhante | ✅ Concluída — `GET /health`, 6 testes verdes, commitada |
 | F0.2 Esquema e migrações | ✅ Concluída — revisão `0001` com SQL congelado, teste de inventário nos dois sentidos, commit `c42a6ed` |
-| F0.3 Autenticação e perfis | ⬅️ **Próxima.** Precisa incluir o comando de bootstrap — ver lacunas abaixo |
-| Demais 21 fatias | Pendentes, na ordem de `implementacao/01-backlog-de-fatias.md` |
+| F0.3 Autenticação e perfis | ✅ Concluída — bootstrap, sessão opaca em cookie, matriz de perfis, revisão `0002_sessao` |
+| F1.1 Cadastrar reserva | ⬅️ **Próxima** |
+| Demais 20 fatias | Pendentes, na ordem de `docs/backlog.md` |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -46,6 +47,13 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Credenciais em arquivo versionado | `testes/conftest.py` trazia URL com senha embutida, herdada da F0.1. Removida na F0.2: sem valor padrão, a suíte exige `DATABASE_URL` do ambiente e falha alto se ausente. `.env.example` registra as chaves **sem valor** | F0.2 |
 | Fonte do esquema | ~~A migração executa o próprio `docs/04-schema.sql`~~ **Superada no planejamento da F0.2.** Migração precisa ser imutável: uma revisão que lê um arquivo mutável muda de significado a cada edição e deixa de ser reprodutível. A revisão inicial carrega **cópia congelada** em `alembic/versions/sql/`; `docs/04-schema.sql` segue como documento vivo; a equivalência é garantida por teste, não por disciplina | F0.2 |
 | Verificação do esquema | Teste que compara o inventário do banco migrado com as estruturas do documento, **nos dois sentidos** — para detectar migração futura que altere o banco sem atualizar o arquivo | F0.2 |
+| Sessão do painel | Token opaco em cookie `HttpOnly`/`Secure`/`SameSite=Strict`; banco guarda só SHA-256. JWT rejeitado porque não é revogável na requisição seguinte | F0.3 |
+| Derivação de senha | PBKDF2-HMAC-SHA256 com **600.000 iterações** (recomendação OWASP), da biblioteca padrão. Sem bcrypt/Argon2id: são pacotes compilados e o risco de wheel ausente no Python 3.14 está registrado desde a F0.1. Formato autodescritivo (algoritmo + iterações + sal no valor gravado), então elevar o custo ou trocar de algoritmo **não invalida senhas existentes**. Revisitar antes de produção com hóspede real, ou quando `argon2-cffi` tiver wheel para 3.14 | F0.3 |
+| Ataque de tempo no login | E-mail inexistente também paga a derivação, contra hash de referência — resposta com duração igual nos dois casos | F0.3 |
+| Ciclo entre módulos | Apareceu ciclo `acesso.service` ↔ `propriedade.service`. **Regra: ciclo se resolve movendo código, nunca com import local.** Orquestração entre módulos pertence a `app/bootstrap.py`, não a um dos módulos. O valor do monolito modular está em as fronteiras serem reais — primeiro ciclo na 3ª fatia de 24 é aviso, não acidente | F0.3 |
+| Administração de acesso | Gestão cria/desativa usuários; recepção revoga sessões. Autoridade ≠ urgência | F0.3 |
+| Bootstrap | Comando `python -m app.bootstrap` cria hotel, gestor e parâmetros de duração. Sem senha padrão | F0.3 |
+| Módulo `acesso` | Acrescentado aos módulos do monólito; governa `usuario` e `sessao`. Camada ORM `model` permanece vazia | F0.3 |
 
 ## Onde ficam os arquivos
 
@@ -239,17 +247,25 @@ Resolvidas pelo Artefato 6:
 
 Lacunas encontradas no backlog (agosto/2026) — nenhuma tem fatia dedicada:
 
-- [ ] **Não há como criar o primeiro hotel nem o primeiro usuário.** A F0.3 exige login no
-      painel; o painel é o único lugar que cadastra usuário; usuário exige hotel. Ovo e galinha.
-      Resolver com **comando de bootstrap** (script, não tela) que cria hotel, gestor inicial e os
-      `parametro_hotel` com valores padrão. Entra como tarefa da **F0.3**, não como fatia nova
+- [x] ~~**Não há como criar o primeiro hotel nem o primeiro usuário.**~~ Resolvido na F0.3 com
+      comando de bootstrap que cria hotel, gestor inicial e `parametro_hotel` com valores padrão
 - [ ] **`parametro_hotel` é lido por três fatias e escrito por nenhuma.** F1.2 e F1.4 leem
       `horas_ate_reenvio` e `horas_corte_antes_checkin`; F5.2 lê a periodicidade. Nenhuma permite
       alterar. Aceitável no MVP (semeado no bootstrap, alterado por SQL), desde que seja escolha
       registrada e não esquecimento
 - [ ] **Fechar o desenho de catálogo e preços** — ver seção própria acima. Prazo: antes da F2.1
+- [ ] **Contenção de tentativa repetida de senha** — fora da F0.3 de propósito (painel ainda não
+      publicado). Precisa entrar antes de qualquer exposição contínua; a sessão longa do staff
+      amplifica a consequência
 
 Ainda abertas:
+
+- [ ] **Sem limite de tentativas no login (F0.3).** Cada tentativa custa ~0,4 s de CPU pelas
+      600 mil iterações — bom contra força bruta, barato como negação de serviço. Aceitável hoje
+      (painel atrás de túnel, poucos usuários); definir em qual fatia entra
+- [ ] **`SameSite=Strict` quebra acesso por link externo.** Se o Alert Center passar a mandar
+      link para o celular do staff, o primeiro clique cai em tela deslogada. Trocar para `Lax`
+      quando isso acontecer — decisão antecipada, não descoberta
 
 - [x] ~~**Executar o `04-schema.sql` num PostgreSQL real**~~ Feito na F0.2. O documento agora é
       aplicado a cada execução da suíte, num banco descartável, e comparado com o banco migrado

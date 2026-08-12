@@ -1,0 +1,39 @@
+"""Politica de autorizacao: decisao pura, sem HTTP e sem banco."""
+
+from app.modulos.acesso import politica
+
+OPERACOES_ESPERADAS = {
+    "ver_sessao_propria": {"recepcao", "staff", "gestor"},
+    "encerrar_sessao_propria": {"recepcao", "staff", "gestor"},
+    "listar_sessoes": {"recepcao"},
+    "revogar_sessao": {"recepcao"},
+    "administrar_usuario": {"gestor"},
+    "ler_dado_cadastral_de_hospede": {"recepcao"},
+    "alterar_ficha_de_hospede": {"recepcao"},
+    "alterar_reserva": {"recepcao"},
+    "confirmar_fase_da_reserva": {"recepcao"},
+    "ler_solicitacao_atribuida": {"recepcao", "staff", "gestor"},
+    "resolver_solicitacao": {"recepcao", "staff"},
+    "lancar_consumo": {"recepcao"},
+    "alterar_catalogo": {"recepcao"},
+    "ler_indicadores": {"recepcao", "gestor"},
+}
+
+
+def test_matriz_completa_bate_com_o_contrato():
+    assert set(politica.OPERACOES) == set(OPERACOES_ESPERADAS)
+    for operacao, perfis in OPERACOES_ESPERADAS.items():
+        for perfil in ("recepcao", "staff", "gestor"):
+            assert politica.permitido(perfil, operacao) is (perfil in perfis)
+
+
+def test_staff_nao_le_dado_cadastral_de_hospede():
+    assert politica.permitido("staff", "ler_dado_cadastral_de_hospede") is False
+
+
+def test_gestor_nao_altera_reserva():
+    assert politica.permitido("gestor", "alterar_reserva") is False
+
+
+def test_operacao_desconhecida_e_recusada():
+    assert politica.permitido("gestor", "operacao_inventada") is False

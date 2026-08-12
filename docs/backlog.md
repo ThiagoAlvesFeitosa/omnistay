@@ -95,14 +95,26 @@ corpo da função de transição — para que nenhuma migração futura possa fa
 
 - Usuário sem credencial válida não acessa nenhum recurso protegido
 - Perfil operacional recebe recusa ao tentar ler dados cadastrais de hóspede
-- Perfil de gestão recebe recusa ao tentar alterar qualquer dado
+- Perfil de gestão recebe recusa ao tentar alterar qualquer **dado de domínio** — reserva,
+  hóspede, solicitação, consumo e avaliação
 - Sessão do perfil operacional permanece válida por período longo no mesmo dispositivo
 - Sessão pode ser revogada pela recepção
 - Senha nunca é armazenada em texto legível
+- Um comando de bootstrap cria a propriedade inicial, o usuário inicial de gestão e os
+  `parametro_hotel` com valores padrão
 
 **Depende de:** F0.2.
 **Referência:** Artefato 4 §6.2, Artefato 5 §11.2.
 
+> **Correção (11/08/2026).** O critério da gestão dizia "alterar qualquer dado", o que tornava
+> impossível administrar usuários e deixava a fatia sem caminho para criar os perfis de recepção e
+> de operação. Administrar usuário não é dado de domínio: **criar e desativar usuário é da gestão**
+> — autoridade — e **revogar sessão de dispositivo é da recepção** — urgência, que não pode
+> depender do gerente de madrugada. O bootstrap entrou como critério porque, sem ele, o painel
+> exige login, o usuário exige hotel e nada cria o primeiro hotel.
+
+**Status: concluída.** Sessão opaca em cookie, tabela `sessao` (revisão `0002`), matriz de
+autorização, bootstrap e varredura de rotas protegidas.
 ---
 
 # Fase 1 — Pré-chegada (P1)

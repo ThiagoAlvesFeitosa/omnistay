@@ -71,8 +71,12 @@ WHATSAPP_TOKEN          envio de mensagens
 WHATSAPP_VERIFY_TOKEN   registro do webhook
 LLM_API_KEY             provedor de IA
 DATABASE_URL            conexão com o banco
-JWT_SECRET              assinatura das sessões do painel
+BOOTSTRAP_SENHA_INICIAL senha do gestor no comando de bootstrap
+SENHA_ITERACOES         custo da derivação PBKDF2 (padrão 600000)
 ```
+
+A sessão do painel é um token opaco no cookie; o banco guarda só o hash. Não há
+`JWT_SECRET`: JWT não é revogável na requisição seguinte.
 
 **Nunca** escreva um segredo em código, em teste, em comentário ou em mensagem de commit. Um
 segredo que entra no histórico do git continua lá depois de removido do arquivo.
@@ -94,5 +98,7 @@ revogável pela recepção.
 
 ## Senhas
 
-Somente hash, com algoritmo de derivação lenta. Nunca em texto legível, nem em log, nem em
-resposta de API, nem em mensagem de erro.
+Somente hash, com algoritmo de derivação lenta (PBKDF2-HMAC-SHA256). O valor gravado
+carrega algoritmo, iterações e sal na própria linha — elevar o custo depois não invalida
+senhas existentes. Nunca em texto legível, nem em log, nem em resposta de API, nem em
+mensagem de erro.

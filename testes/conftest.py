@@ -14,6 +14,12 @@ from testes.suporte.politica_de_banco import (
 def ambiente_de_teste() -> None:
     os.environ.setdefault("HEALTH_DB_TIMEOUT_SECONDS", "1")
     os.environ.setdefault("LOG_LEVEL", "INFO")
+    # Custo real da derivacao vive na configuracao de producao. Aqui o numero
+    # baixo mantem o ciclo de TDD rapido o bastante para ser rodado a cada minuto.
+    os.environ.setdefault("SENHA_ITERACOES", "1000")
+    from app.config import obter_configuracao
+
+    obter_configuracao.cache_clear()
 
 
 def url_do_banco() -> str | None:
@@ -75,10 +81,39 @@ def limpar_caches_de_configuracao():
 
 
 @pytest.fixture
-def cliente(ambiente_de_teste):
+def cliente(ambiente_de_teste, limpar_caches_de_configuracao):
     from fastapi.testclient import TestClient
 
     from app.main import app
 
-    with TestClient(app) as cliente_de_teste:
+    # Cookie Secure so e reenviado sobre https. Sem isso, todo teste autenticado
+    # falharia por um motivo alheio ao que o teste verifica.
+    with TestClient(app, base_url="https://testserver") as cliente_de_teste:
         yield cliente_de_teste
+
+
+@pytest.fixture
+def ambiente():
+    from testes.suporte.ambiente_de_acesso import ambiente_de_acesso
+
+    with ambiente_de_acesso() as ambiente_montado:
+        yield ambiente_montado
+
+
+@pytest.fixture
+def app_sobre_ambiente(ambiente, limpar_caches_de_configuracao, monkeypatch):
+    """Aplica a aplicacao ao banco descartavel do ambiente de acesso."""
+    import app.database as modulo_banco
+    from app.config import obter_configuracao
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    monkeypatch.setenv("DATABASE_URL", ambiente.url)
+    obter_configuracao.cache_clear()
+    modulo_banco.obter_engine.cache_clear()
+
+    with TestClient(app, base_url="https://testserver") as cliente_de_teste:
+        yield cliente_de_teste, ambiente
+
+    obter_configuracao.cache_clear()
+    modulo_banco.obter_engine.cache_clear()

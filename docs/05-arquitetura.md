@@ -516,8 +516,15 @@ opcional.
 > o perfil `staff` só enxerga chamados, nunca dados cadastrais de hóspede, e a sessão é
 > revogável pelo painel da recepção.
 
-Senhas armazenadas apenas como hash, com algoritmo de derivação lenta. A coluna
-`usuario.senha_hash` do Artefato 4 já registra isso como dado sensível.
+**Como a sessão existe (F0.3):** token opaco de 32 bytes no cookie `omnistay_sessao`
+(`HttpOnly`, `Secure`, `SameSite=Strict`); o banco guarda apenas o SHA-256 do token na
+tabela `sessao`. JWT foi rejeitado porque não é revogável sem lista de revogados — e a
+revogação precisa valer na requisição seguinte. As durações por perfil vivem em
+`parametro_hotel` (`duracao_sessao_*_horas`).
+
+Senhas armazenadas apenas como hash, com algoritmo de derivação lenta
+(PBKDF2-HMAC-SHA256). O valor gravado carrega algoritmo, iterações e sal na própria linha.
+A coluna `usuario.senha_hash` do Artefato 4 já registra isso como dado sensível.
 
 ### 11.3 Segredos e configuração
 
@@ -531,7 +538,11 @@ Configuração por **variável de ambiente**, nunca em código versionado. O rep
 | `WHATSAPP_VERIFY_TOKEN` | Registro do webhook |
 | `LLM_API_KEY` | Provedor de IA |
 | `DATABASE_URL` | Conexão com o banco |
-| `JWT_SECRET` | Assinatura das sessões do painel |
+| `BOOTSTRAP_SENHA_INICIAL` | Senha do gestor criado pelo comando de bootstrap (uma vez) |
+| `SENHA_ITERACOES` | Custo da derivação PBKDF2 (padrão 600000) |
+
+> **Correção (12/08/2026):** `JWT_SECRET` foi removido. Com token opaco não há o que assinar,
+> e JWT não atenderia à revogação imediata exigida no §11.2.
 
 ### 11.4 Dado pessoal em log
 

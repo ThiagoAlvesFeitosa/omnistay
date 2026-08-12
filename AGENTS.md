@@ -50,12 +50,13 @@ projeto tem um desenvolvedor e prazo fixo.
 ```
 app/
 ├── main.py            entrada da API
+├── bootstrap.py       comando de instalação (primeira propriedade e gestor)
 ├── config.py          configuração por variável de ambiente
-├── modulos/           propriedade · hospedagem · conversa · atendimento · feedback · mercado
+├── modulos/           acesso · propriedade · hospedagem · conversa · atendimento · feedback · mercado
 ├── portas/            LLMProvider · CatalogoRepository · MensageriaGateway
 ├── adaptadores/       implementações concretas das portas
 ├── fila/              enfileiramento e consumo
-└── comum/             log, erros, segurança
+└── comum/             log, erros, segurança, relógio, transação
 worker/                consumidor e agendador
 testes/                unitarios · integracao · ponta_a_ponta
 ```
@@ -67,15 +68,19 @@ router      entrada HTTP. Valida formato, converte, delega. Sem regra de negóci
 service     a regra de negócio. Não conhece HTTP nem SQL
 repository  acesso ao banco. Não conhece regra de negócio
 schema      contratos de entrada e saída
-model       mapeamento das tabelas
 ```
+
+A camada `model` (mapeamento ORM das tabelas) **permanece vazia de propósito**: o esquema é
+descrito em `docs/04-schema.sql` e aplicado por migração Alembic. Declarar as tabelas outra vez
+em classes criaria uma terceira descrição a manter em acordo.
 
 **Regras de fronteira, sem exceção:**
 
 - `service` não importa nada de `router` e não escreve SQL
 - `router` não contém regra de negócio, só tradução de protocolo
 - Um módulo só lê e grava nas tabelas que governa; para dado de outro, chama o serviço dele
-
+- O módulo `acesso` governa `usuario` e `sessao`; o módulo `propriedade` governa `hotel` e
+  `parametro_hotel`
 ---
 
 ## As três portas

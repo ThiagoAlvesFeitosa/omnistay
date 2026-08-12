@@ -183,6 +183,7 @@ stateDiagram-v2
 ```mermaid
 erDiagram
     hotel ||--o{ usuario : "emprega"
+    usuario ||--o{ sessao : "autentica"
     hotel ||--o{ parametro_hotel : "configura"
     hotel ||--o{ catalogo_item : "descreve"
     hotel ||--o{ reserva : "recebe"
@@ -214,6 +215,13 @@ erDiagram
         varchar nome
         varchar email UK
         varchar perfil
+    }
+    sessao {
+        bigserial id_sessao PK
+        bigint id_usuario FK
+        char token_hash UK
+        timestamptz expira_em
+        timestamptz revogada_em
     }
     hospede {
         bigserial id_hospede PK
@@ -398,6 +406,18 @@ a seção que fecha a pendência de LGPD arrastada desde o Artefato 1.
 | `perfil` | `VARCHAR(20)` | NOT NULL, CHECK | OP | `recepcao`, `staff`, `gestor` |
 | `ativo` | `BOOLEAN` | NOT NULL, default `true` | OP | Desativação lógica |
 
+**`sessao`** — sessão do painel, uma linha por dispositivo autenticado
+
+| Campo | Tipo | Restrições | Classe | Descrição |
+| --- | --- | --- | --- | --- |
+| `id_sessao` | `BIGSERIAL` | PK | OP | |
+| `id_usuario` | `BIGINT` | FK, NOT NULL | OP | O hotel da sessão vem do usuário, por junção |
+| `token_hash` | `CHAR(64)` | NOT NULL, UNIQUE | Credencial | SHA-256 do token opaco; o token existe só no cookie |
+| `dispositivo` | `VARCHAR(120)` | | DP | Rótulo informado no login ou agente do cliente |
+| `criada_em` | `TIMESTAMPTZ` | NOT NULL, default `now()` | OP | |
+| `expira_em` | `TIMESTAMPTZ` | NOT NULL, CHECK `> criada_em` | OP | Fixado na criação a partir da duração do perfil |
+| `revogada_em` | `TIMESTAMPTZ` | CHECK `>= criada_em` se preenchido | OP | Nulo enquanto ativa |
+
 **`parametro_hotel`** — configuração operacional por propriedade
 
 | Campo | Tipo | Restrições | Classe | Descrição |
@@ -408,7 +428,9 @@ a seção que fecha a pendência de LGPD arrastada desde o Artefato 1.
 | `valor` | `VARCHAR(255)` | NOT NULL | OP | |
 
 Chaves previstas: `horas_ate_reenvio` · `horas_corte_antes_checkin` ·
-`periodicidade_coleta_mercado` · `horas_minimas_para_pulso`.
+`periodicidade_coleta_mercado` · `horas_minimas_para_pulso` ·
+`duracao_sessao_recepcao_horas` · `duracao_sessao_staff_horas` ·
+`duracao_sessao_gestor_horas`.
 
 **Isto resolve três pendências abertas de uma vez.** Os parâmetros que estavam "a definir"
 desde o Artefato 1 deixam de ser constantes no código e passam a ser configuração por
