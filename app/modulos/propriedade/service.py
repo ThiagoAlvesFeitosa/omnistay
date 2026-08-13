@@ -14,6 +14,10 @@ DURACOES_PADRAO = {
     "duracao_sessao_gestor_horas": "12",
 }
 
+PARAMETROS_COLETA_PADRAO = {
+    "tentativas_max_envio_mensagem": "5",
+}
+
 CHAVE_DE_DURACAO_POR_PERFIL = {
     "recepcao": "duracao_sessao_recepcao_horas",
     "staff": "duracao_sessao_staff_horas",
@@ -61,6 +65,11 @@ def criar_instalacao_inicial(
         senha=senha_gestor,
     )
     for chave, valor in DURACOES_PADRAO.items():
+        repositorio.inserir_parametro(conexao, id_hotel, chave, valor)
+    repositorio.inserir_parametro(
+        conexao, id_hotel, "contato_responsavel_dados", telefone_whatsapp
+    )
+    for chave, valor in PARAMETROS_COLETA_PADRAO.items():
         repositorio.inserir_parametro(conexao, id_hotel, chave, valor)
 
     return InstalacaoCriada(id_hotel=id_hotel, email_gestor=email_gestor)

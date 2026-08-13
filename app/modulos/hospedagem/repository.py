@@ -65,7 +65,8 @@ def listar_fila_do_hotel(conexao: Connection, *, id_hotel: int) -> list[dict]:
         text(
             "SELECT id_hotel, id_reserva, data_checkin_prevista,"
             " data_checkout_prevista, telefone_contato, status,"
-            " nome_completo, ficha_completa, chegada_nao_confirmada"
+            " nome_completo, ficha_completa, chegada_nao_confirmada,"
+            " status_envio_coleta"
             " FROM vw_fila_do_dia"
             " WHERE id_hotel = :id_hotel"
             " ORDER BY data_checkin_prevista ASC, id_reserva ASC"

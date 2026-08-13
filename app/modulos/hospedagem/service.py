@@ -5,6 +5,7 @@ from datetime import date
 from typing import Protocol
 
 from app.comum.telefone import TelefoneInvalido, normalizar
+from app.modulos.conversa import service as conversa_service
 from app.modulos.hospedagem import repository as repositorio_padrao
 from app.modulos.hospedagem.schema import ItemFilaDoDia, ReservaResposta
 
@@ -67,6 +68,7 @@ def criar_reserva(
     data_checkin_prevista: date,
     data_checkout_prevista: date,
     repositorio: RepositorioDeHospedagem = repositorio_padrao,
+    agendar_coleta=conversa_service.agendar_coleta_apos_reserva,
 ) -> ReservaCriada:
     nome_limpo = nome.strip()
     telefone_bruto = telefone.strip()
@@ -97,6 +99,12 @@ def criar_reserva(
     repositorio.inserir_vinculo_titular(
         conexao, id_reserva=id_reserva, id_hospede=id_hospede
     )
+    agendar_coleta(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        nome_completo=nome_limpo,
+    )
     return ReservaCriada(
         id_reserva=id_reserva,
         id_hotel=id_hotel,
@@ -125,6 +133,7 @@ def listar_fila_do_dia(
             status=linha["status"],
             ficha_completa=linha.get("ficha_completa"),
             chegada_nao_confirmada=bool(linha["chegada_nao_confirmada"]),
+            status_envio_coleta=linha.get("status_envio_coleta"),
         )
         for linha in linhas
     ]

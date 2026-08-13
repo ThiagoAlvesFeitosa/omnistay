@@ -1,6 +1,6 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 12/08/2026
+**Atualizado em:** 13/08/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
 
 ---
@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 4 de 24 fatias concluídas.
+**Progresso:** 5 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -17,8 +17,9 @@
 | F0.2 Esquema e migrações | ✅ Concluída — revisão `0001` com SQL congelado, teste de inventário nos dois sentidos, commit `c42a6ed` |
 | F0.3 Autenticação e perfis | ✅ Concluída — bootstrap, sessão opaca em cookie, matriz de perfis, revisão `0002_sessao` |
 | F1.1 Cadastrar reserva | ✅ Concluída — módulo `hospedagem`, titular provisório, fila + contagem, revisão `0003_fila_do_dia` |
-| F1.2 Disparar a coleta de dados | ⬅️ **Próxima** |
-| Demais 19 fatias | Pendentes, na ordem de `docs/backlog.md` |
+| F1.2 Disparar a coleta de dados | ✅ Concluída — tabela `trabalho`, módulo `conversa`, `MensageriaGateway` + falsa, worker, revisão `0005_trabalho_e_coleta` |
+| F1.3 Receber e interpretar a ficha | ⬅️ **Próxima** |
+| Demais 18 fatias | Pendentes, na ordem de `docs/backlog.md` |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -61,6 +62,12 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Fila vs contagem | Lista nominada (`ler_fila_do_dia`) só recepção; contagem do dia (`ler_indicadores`) só o número, para recepção e gestão — dado cadastral não trafega para a gestão filtrar no frontend | F1.1 |
 | Visão `vw_fila_do_dia` | Revisão `0003`: `DROP` + `CREATE` com `telefone_contato` e `data_checkout_prevista`. Revisão `0004`: `data_checkin_prevista <= CURRENT_DATE` — reserva futura sai da fila do turno; contagem de chegadas segue com igualdade ao dia corrente | F1.1 |
 | Telefone canônico | Dígitos com prefixo `55`; máscara aceita na entrada. Função pura em `app/comum/telefone.py` | F1.1 |
+| Fila `trabalho` | Tabela no PostgreSQL (Artefato 5); lacuna do `04-schema.sql` fechada na `0005`. Unicidade parcial de `enviar_coleta` por reserva | F1.2 |
+| Independência estrutural | `POST /reservas` grava mensagem pendente + trabalho na mesma TX; worker envia depois via porta | F1.2 |
+| `MensageriaGateway` | Protocolo + `MensageriaFalsa` na suíte; adaptador WhatsApp Cloud existe mas nenhum teste o instancia | F1.2 |
+| Módulo `conversa` | Nasce mínimo: texto da coleta, `mensagem`, espelho de `status_envio`. `hospedagem` só agenda | F1.2 |
+| Contato LGPD | `parametro_hotel.contato_responsavel_dados` (default = telefone do hotel no bootstrap) | F1.2 |
+| Status na fila | `vw_fila_do_dia.status_envio_coleta`; webhook `entregue` fora de escopo | F1.2 |
 
 ## Onde ficam os arquivos
 

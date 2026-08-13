@@ -166,6 +166,11 @@ fila nominada só para recepção, contagem de chegadas via `ler_indicadores`, r
 **Depende de:** F1.1.
 **Referência:** Artefato 1 §3, Artefato 2 F1, Artefato 5 §8.
 
+**Status: concluída.** Tabela `trabalho`, módulo `conversa`, porta `MensageriaGateway` + falsa,
+worker (`python -m worker --uma-passagem`), revisão `0005_trabalho_e_coleta`,
+`status_envio_coleta` na fila do dia. Sem interpretação da resposta (F1.3) e sem lembrete
+(F1.4).
+
 > O último critério existe porque o telefone pode estar errado. A mensagem não pode revelar
 > dados de um hóspede a um desconhecido.
 

@@ -89,11 +89,15 @@ def test_criacao_inicial_grava_propriedade_gestor_e_duracoes():
         "duracao_sessao_recepcao_horas",
         "duracao_sessao_staff_horas",
         "duracao_sessao_gestor_horas",
+        "contato_responsavel_dados",
+        "tentativas_max_envio_mensagem",
     }
     valores = {p["chave"]: p["valor"] for p in propriedade.parametros}
     assert valores["duracao_sessao_recepcao_horas"] == "12"
     assert valores["duracao_sessao_staff_horas"] == "720"
     assert valores["duracao_sessao_gestor_horas"] == "12"
+    assert valores["contato_responsavel_dados"] == "+5511999999999"
+    assert valores["tentativas_max_envio_mensagem"] == "5"
 
 
 def test_criacao_inicial_recusa_quando_ja_existe_propriedade():

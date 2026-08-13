@@ -59,7 +59,24 @@ class Repositorio:
         )
 
 
-def _criar(repo, **kwargs):
+@dataclass
+class Agendador:
+    chamadas: list = field(default_factory=list)
+
+    def __call__(self, conexao, *, id_hotel, id_reserva, nome_completo):
+        self.chamadas.append(
+            {
+                "id_hotel": id_hotel,
+                "id_reserva": id_reserva,
+                "nome_completo": nome_completo,
+            }
+        )
+        return 99
+
+
+def _criar(repo, agendador=None, **kwargs):
+    if agendador is None:
+        agendador = Agendador()
     padrao = {
         "conexao": object(),
         "id_hotel": 10,
@@ -68,14 +85,15 @@ def _criar(repo, **kwargs):
         "data_checkin_prevista": date(2026, 8, 20),
         "data_checkout_prevista": date(2026, 8, 23),
         "repositorio": repo,
+        "agendar_coleta": agendador,
     }
     padrao.update(kwargs)
-    return hospedagem.criar_reserva(**padrao)
+    return hospedagem.criar_reserva(**padrao), agendador
 
 
 def test_criacao_valida_grava_hospede_reserva_e_titular():
     repo = Repositorio()
-    criada = _criar(repo)
+    criada, _ = _criar(repo)
 
     assert criada.status == "aguardando_cadastro"
     assert criada.id_hotel == 10
@@ -93,46 +111,65 @@ def test_criacao_valida_grava_hospede_reserva_e_titular():
     ]
 
 
+def test_criacao_valida_agenda_exatamente_uma_coleta():
+    repo = Repositorio()
+    criada, agendador = _criar(repo)
+    assert len(agendador.chamadas) == 1
+    assert agendador.chamadas[0]["id_reserva"] == criada.id_reserva
+    assert agendador.chamadas[0]["id_hotel"] == 10
+    assert agendador.chamadas[0]["nome_completo"] == "Maria Silva"
+
+
 def test_telefone_repetido_cria_segundo_hospede():
     repo = Repositorio()
-    primeira = _criar(repo, nome="Maria")
-    segunda = _criar(repo, nome="Joao")
+    agendador = Agendador()
+    primeira, _ = _criar(repo, agendador=agendador, nome="Maria")
+    segunda, _ = _criar(repo, agendador=agendador, nome="Joao")
 
     assert primeira.id_reserva != segunda.id_reserva
     assert len(repo.hospedes) == 2
     assert repo.hospedes[0]["id_hospede"] != repo.hospedes[1]["id_hospede"]
     assert repo.hospedes[0]["telefone"] == repo.hospedes[1]["telefone"]
+    assert len(agendador.chamadas) == 2
 
 
 def test_nome_ou_telefone_em_branco_nao_grava():
     repo = Repositorio()
+    agendador = Agendador()
     with pytest.raises(hospedagem.DadosInvalidos):
-        _criar(repo, nome="   ")
+        _criar(repo, agendador=agendador, nome="   ")
     with pytest.raises(hospedagem.DadosInvalidos):
-        _criar(repo, telefone="   ")
+        _criar(repo, agendador=agendador, telefone="   ")
     assert repo.hospedes == []
     assert repo.reservas == []
+    assert agendador.chamadas == []
 
 
 def test_telefone_invalido_nao_grava():
     repo = Repositorio()
+    agendador = Agendador()
     with pytest.raises(hospedagem.DadosInvalidos):
-        _criar(repo, telefone="123")
+        _criar(repo, agendador=agendador, telefone="123")
     assert repo.hospedes == []
+    assert agendador.chamadas == []
 
 
 def test_checkout_nao_posterior_nao_grava():
     repo = Repositorio()
+    agendador = Agendador()
     with pytest.raises(hospedagem.DadosInvalidos):
         _criar(
             repo,
+            agendador=agendador,
             data_checkin_prevista=date(2026, 8, 23),
             data_checkout_prevista=date(2026, 8, 20),
         )
     with pytest.raises(hospedagem.DadosInvalidos):
         _criar(
             repo,
+            agendador=agendador,
             data_checkin_prevista=date(2026, 8, 20),
             data_checkout_prevista=date(2026, 8, 20),
         )
     assert repo.reservas == []
+    assert agendador.chamadas == []

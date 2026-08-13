@@ -83,6 +83,22 @@ def _semear_duracoes(conexao: Connection, id_hotel: int) -> None:
         )
 
 
+def _semear_parametros_coleta(
+    conexao: Connection, id_hotel: int, telefone: str
+) -> None:
+    for chave, valor in (
+        ("contato_responsavel_dados", telefone),
+        ("tentativas_max_envio_mensagem", "5"),
+    ):
+        conexao.execute(
+            text(
+                "INSERT INTO parametro_hotel (id_hotel, chave, valor) "
+                "VALUES (:id_hotel, :chave, :valor)"
+            ),
+            {"id_hotel": id_hotel, "chave": chave, "valor": valor},
+        )
+
+
 def _inserir_usuario(
     conexao: Connection,
     id_hotel: int,
@@ -125,6 +141,7 @@ def _montar_propriedade(
 ) -> PropriedadeDeTeste:
     id_hotel = _inserir_hotel(conexao, nome_hotel, telefone)
     _semear_duracoes(conexao, id_hotel)
+    _semear_parametros_coleta(conexao, id_hotel, telefone)
     usuarios = {
         "gestor": _inserir_usuario(
             conexao,

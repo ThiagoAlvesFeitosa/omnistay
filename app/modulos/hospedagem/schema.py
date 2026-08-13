@@ -31,6 +31,7 @@ class ItemFilaDoDia(BaseModel):
     status: str
     ficha_completa: bool | None
     chegada_nao_confirmada: bool
+    status_envio_coleta: str | None = None
 
 
 class FilaDoDiaResposta(BaseModel):
