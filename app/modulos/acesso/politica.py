@@ -9,6 +9,7 @@ OPERACOES: Final[dict[str, frozenset[str]]] = {
     "revogar_sessao": frozenset({"recepcao"}),
     "administrar_usuario": frozenset({"gestor"}),
     "ler_dado_cadastral_de_hospede": frozenset({"recepcao"}),
+    "ler_ficha_de_hospede": frozenset({"recepcao"}),
     "alterar_ficha_de_hospede": frozenset({"recepcao"}),
     "alterar_reserva": frozenset({"recepcao"}),
     "confirmar_fase_da_reserva": frozenset({"recepcao"}),

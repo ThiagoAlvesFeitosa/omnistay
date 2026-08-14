@@ -9,6 +9,7 @@ from app.modulos.acesso.service import SessaoAtual
 from app.modulos.hospedagem import service as hospedagem
 from app.modulos.hospedagem.schema import (
     ContagemChegadasResposta,
+    FichaTitularResposta,
     FilaDoDiaResposta,
     ReservaEntrada,
     ReservaResposta,
@@ -63,3 +64,22 @@ def chegadas_do_dia(
 ) -> ContagemChegadasResposta:
     quantidade = hospedagem.contar_chegadas_do_dia(conexao, id_hotel=sessao.id_hotel)
     return ContagemChegadasResposta(quantidade=quantidade)
+
+
+@roteador.get("/reservas/{id_reserva}/ficha", response_model=FichaTitularResposta)
+def ler_ficha(
+    id_reserva: int,
+    conexao: Conexao,
+    sessao: Annotated[
+        SessaoAtual, Depends(exigir_operacao("ler_ficha_de_hospede"))
+    ],
+) -> FichaTitularResposta:
+    try:
+        return hospedagem.ler_ficha_titular(
+            conexao, id_hotel=sessao.id_hotel, id_reserva=id_reserva
+        )
+    except hospedagem.DadosInvalidos as erro:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(erro),
+        ) from erro

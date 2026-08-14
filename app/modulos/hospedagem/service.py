@@ -7,7 +7,11 @@ from typing import Protocol
 from app.comum.telefone import TelefoneInvalido, normalizar
 from app.modulos.conversa import service as conversa_service
 from app.modulos.hospedagem import repository as repositorio_padrao
-from app.modulos.hospedagem.schema import ItemFilaDoDia, ReservaResposta
+from app.modulos.hospedagem.schema import (
+    FichaTitularResposta,
+    ItemFilaDoDia,
+    ReservaResposta,
+)
 
 
 class DadosInvalidos(ValueError):
@@ -134,6 +138,7 @@ def listar_fila_do_dia(
             ficha_completa=linha.get("ficha_completa"),
             chegada_nao_confirmada=bool(linha["chegada_nao_confirmada"]),
             status_envio_coleta=linha.get("status_envio_coleta"),
+            estado_cadastro=linha.get("estado_cadastro"),
         )
         for linha in linhas
     ]
@@ -146,3 +151,82 @@ def contar_chegadas_do_dia(
     repositorio: RepositorioDeHospedagem = repositorio_padrao,
 ) -> int:
     return repositorio.contar_chegadas_do_dia(conexao, id_hotel=id_hotel)
+
+
+def consolidar_ficha_titular(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    campos: dict,
+    desfecho: str,
+    repositorio=repositorio_padrao,
+) -> None:
+    from app.comum.log import obter_logger
+
+    logger = obter_logger(__name__)
+    titular = repositorio.ler_titular_da_reserva(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    if titular is None:
+        raise DadosInvalidos("Reserva ou titular nao encontrado.")
+    if titular["status"] != "aguardando_cadastro":
+        logger.info(
+            "consolidacao_ignorada id_reserva=%s status=%s",
+            id_reserva,
+            titular["status"],
+        )
+        return
+
+    limpos = {k: v for k, v in campos.items() if k != "idade"}
+    repositorio.atualizar_hospede_titular(
+        conexao, id_hospede=titular["id_hospede"], campos=limpos
+    )
+    completa = desfecho == "completa"
+    novo_status = "ficha_recebida" if completa else "ficha_parcial"
+    repositorio.marcar_ficha_completa(
+        conexao, id_reserva=id_reserva, completa=completa
+    )
+    repositorio.atualizar_status_reserva(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva, status=novo_status
+    )
+    logger.info(
+        "ficha_consolidada id_reserva=%s id_hospede=%s status=%s campos=%s",
+        id_reserva,
+        titular["id_hospede"],
+        novo_status,
+        len(limpos),
+    )
+
+
+def ler_ficha_titular(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    repositorio=repositorio_padrao,
+) -> FichaTitularResposta:
+    titular = repositorio.ler_titular_da_reserva(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    if titular is None:
+        raise DadosInvalidos("Reserva nao encontrada.")
+    estado = repositorio.estado_cadastro_da_reserva(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    return FichaTitularResposta(
+        id_reserva=titular["id_reserva"],
+        id_hospede=titular["id_hospede"],
+        ficha_completa=bool(titular["ficha_completa"]),
+        status_reserva=titular["status"],
+        estado_cadastro=estado,
+        nome_completo=titular["nome_completo"],
+        profissao=titular.get("profissao"),
+        data_nascimento=titular.get("data_nascimento"),
+        tipo_documento=titular.get("tipo_documento"),
+        numero_documento=titular.get("numero_documento"),
+        endereco=titular.get("endereco"),
+        cep=titular.get("cep"),
+        cidade=titular.get("cidade"),
+        telefone=titular["telefone"],
+    )

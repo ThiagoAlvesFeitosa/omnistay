@@ -671,12 +671,16 @@ dados e acesso direto ao banco — que é exatamente quando o histórico costuma
 **A view `vw_fila_do_dia` já entrega a detecção de divergência temporal.** A coluna
 `chegada_nao_confirmada` compara a data prevista de check-in com o status atual — é a mitigação
 proposta no Artefato 2 §9.1 implementada como dado, não como código de tela. A coluna
-`status_envio_coleta` espelha o `status_envio` da mensagem de coleta (saída) da reserva.
+`status_envio_coleta` espelha o `status_envio` da mensagem de coleta (saída) da reserva. A
+coluna `estado_cadastro` deriva o desfecho operacional (`aguardando`, `completa`, `parcial`,
+`leitura_humana`) a partir do status da reserva e do `classificacao_bruta` da mensagem
+recebida.
 
 **A tabela `trabalho` é a fila durável do Artefato 5.** O cadastro de reserva grava, na mesma
 transação, a mensagem de coleta (`status_envio = pendente`) e um trabalho `enviar_coleta`; o
-worker consome com `FOR UPDATE SKIP LOCKED`. Índice único parcial garante no máximo uma coleta
-por reserva. Payload só com identificadores — sem PII.
+webhook de resposta grava mensagem recebida e um trabalho `interpretar_ficha`. O worker
+consome com `FOR UPDATE SKIP LOCKED`. Índices únicos parciais: uma coleta por reserva e uma
+interpretação por mensagem de entrada. Payload só com identificadores — sem PII.
 
 ### 7.2 Verificação realizada
 

@@ -26,6 +26,7 @@ def test_reserva_aparece_na_fila_do_dia(app_sobre_ambiente):
     assert item["ficha_completa"] is False
     assert item["chegada_nao_confirmada"] is False
     assert item["status_envio_coleta"] == "pendente"
+    assert item["estado_cadastro"] == "aguardando"
 
 
 @pytest.mark.postgres

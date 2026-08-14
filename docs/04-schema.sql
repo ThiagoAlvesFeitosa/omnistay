@@ -300,7 +300,7 @@ CREATE TABLE trabalho (
     processando_desde      TIMESTAMPTZ,
     criado_em              TIMESTAMPTZ  NOT NULL DEFAULT now(),
     atualizado_em          TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    CONSTRAINT ck_trabalho_tipo CHECK (tipo IN ('enviar_coleta')),
+    CONSTRAINT ck_trabalho_tipo CHECK (tipo IN ('enviar_coleta', 'interpretar_ficha')),
     CONSTRAINT ck_trabalho_status CHECK (
         status IN ('pendente', 'processando', 'concluido', 'falha')
     )
@@ -313,6 +313,10 @@ COMMENT ON TABLE trabalho IS
 CREATE UNIQUE INDEX uq_trabalho_enviar_coleta_reserva
     ON trabalho ( ((payload->>'id_reserva')::bigint) )
     WHERE tipo = 'enviar_coleta';
+
+CREATE UNIQUE INDEX uq_trabalho_interpretar_ficha_mensagem
+    ON trabalho ( ((payload->>'id_mensagem')::bigint) )
+    WHERE tipo = 'interpretar_ficha';
 
 CREATE INDEX ix_trabalho_claim
     ON trabalho (status, proxima_tentativa_em)
@@ -522,7 +526,22 @@ SELECT r.id_hotel,
        (r.data_checkin_prevista < CURRENT_DATE
         AND r.status <> 'hospedado'
         AND r.status <> 'cancelada') AS chegada_nao_confirmada,
-       m.status_envio AS status_envio_coleta
+       m.status_envio AS status_envio_coleta,
+       CASE
+           WHEN r.status = 'ficha_recebida' THEN 'completa'
+           WHEN r.status = 'ficha_parcial' THEN 'parcial'
+           WHEN r.status = 'aguardando_cadastro'
+                AND EXISTS (
+                    SELECT 1
+                      FROM mensagem mh
+                     WHERE mh.id_reserva = r.id_reserva
+                       AND mh.direcao = 'recebida'
+                       AND mh.classificacao_bruta->>'desfecho'
+                           IN ('irreconhecivel', 'falha_extrator')
+                ) THEN 'leitura_humana'
+           WHEN r.status = 'aguardando_cadastro' THEN 'aguardando'
+           ELSE r.status
+       END AS estado_cadastro
   FROM reserva r
   LEFT JOIN reserva_hospede rh
          ON rh.id_reserva = r.id_reserva AND rh.titular
@@ -543,4 +562,5 @@ COMMENT ON VIEW vw_fila_do_dia IS
     'Alimenta a tela inicial do turno: check-in previsto ate hoje (chegadas do dia, '
     'atrasadas e hospedados). Reserva futura fica de fora. A coluna '
     'chegada_nao_confirmada sinaliza divergencia temporal. Inclui telefone_contato, '
-    'data_checkout_prevista e status_envio_coleta da mensagem de coleta.';
+    'data_checkout_prevista, status_envio_coleta da mensagem de coleta e '
+    'estado_cadastro (aguardando, completa, parcial, leitura_humana).';

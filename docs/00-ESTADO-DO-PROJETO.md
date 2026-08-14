@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 5 de 24 fatias concluídas.
+**Progresso:** 6 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -18,8 +18,9 @@
 | F0.3 Autenticação e perfis | ✅ Concluída — bootstrap, sessão opaca em cookie, matriz de perfis, revisão `0002_sessao` |
 | F1.1 Cadastrar reserva | ✅ Concluída — módulo `hospedagem`, titular provisório, fila + contagem, revisão `0003_fila_do_dia` |
 | F1.2 Disparar a coleta de dados | ✅ Concluída — tabela `trabalho`, módulo `conversa`, `MensageriaGateway` + falsa, worker, revisão `0005_trabalho_e_coleta` |
-| F1.3 Receber e interpretar a ficha | ⬅️ **Próxima** |
-| Demais 18 fatias | Pendentes, na ordem de `docs/backlog.md` |
+| F1.3 Receber e interpretar a ficha | ✅ Concluída — webhook, `LLMProvider` + falsa, `interpretar_ficha`, `estado_cadastro`, revisão `0006_interpretar_ficha` |
+| F1.4 Controlar o silêncio | ⬅️ **Próxima** |
+| Demais 17 fatias | Pendentes, na ordem de `docs/backlog.md` |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -68,6 +69,11 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Módulo `conversa` | Nasce mínimo: texto da coleta, `mensagem`, espelho de `status_envio`. `hospedagem` só agenda | F1.2 |
 | Contato LGPD | `parametro_hotel.contato_responsavel_dados` (default = telefone do hotel no bootstrap) | F1.2 |
 | Status na fila | `vw_fila_do_dia.status_envio_coleta`; webhook `entregue` fora de escopo | F1.2 |
+| Webhook + interpretação | `POST/GET /webhook` grava evento+mensagem+`interpretar_ficha`; LLM só no worker | F1.3 |
+| `LLMProvider` | Protocolo + `LLMFalso`; domínio sem adaptador concreto | F1.3 |
+| Orquestração | Worker chama `conversa` (extrai) e `hospedagem` (consolida) — sem ciclo de import | F1.3 |
+| `estado_cadastro` | `aguardando` · `completa` · `parcial` · `leitura_humana` na fila do dia | F1.3 |
+| Irreconhecível | Permanece `aguardando_cadastro`; sinal via `classificacao_bruta` | F1.3 |
 
 ## Onde ficam os arquivos
 

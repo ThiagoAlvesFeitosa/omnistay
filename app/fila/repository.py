@@ -7,6 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 TIPO_ENVIAR_COLETA = "enviar_coleta"
+TIPO_INTERPRETAR_FICHA = "interpretar_ficha"
 BLOQUEIO_PROCESSANDO = timedelta(minutes=5)
 
 
@@ -27,6 +28,35 @@ def enfileirar_enviar_coleta(
         {
             "id_hotel": id_hotel,
             "tipo": TIPO_ENVIAR_COLETA,
+            "payload": payload,
+        },
+    ).scalar_one()
+
+
+def enfileirar_interpretar_ficha(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    id_evento: int,
+) -> int:
+    payload = json.dumps(
+        {
+            "id_reserva": id_reserva,
+            "id_mensagem": id_mensagem,
+            "id_evento": id_evento,
+        }
+    )
+    return conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, :tipo, CAST(:payload AS jsonb), 'pendente') "
+            "RETURNING id_trabalho"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "tipo": TIPO_INTERPRETAR_FICHA,
             "payload": payload,
         },
     ).scalar_one()

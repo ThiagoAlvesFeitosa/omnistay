@@ -44,7 +44,8 @@ def atualizar_status_envio(
 def ler_mensagem(conexao: Connection, *, id_mensagem: int) -> dict | None:
     linha = conexao.execute(
         text(
-            "SELECT id_mensagem, id_reserva, direcao, conteudo, status_envio, id_externo"
+            "SELECT id_mensagem, id_reserva, direcao, conteudo, status_envio,"
+            " id_externo, classificacao_bruta"
             " FROM mensagem WHERE id_mensagem = :id"
         ),
         {"id": id_mensagem},
@@ -55,8 +56,10 @@ def ler_mensagem(conexao: Connection, *, id_mensagem: int) -> dict | None:
 def listar_mensagens_da_reserva(conexao: Connection, *, id_reserva: int) -> list[dict]:
     linhas = conexao.execute(
         text(
-            "SELECT id_mensagem, id_reserva, direcao, conteudo, status_envio, id_externo"
-            " FROM mensagem WHERE id_reserva = :id ORDER BY enviada_em ASC, id_mensagem ASC"
+            "SELECT id_mensagem, id_reserva, direcao, conteudo, status_envio,"
+            " id_externo, classificacao_bruta"
+            " FROM mensagem WHERE id_reserva = :id"
+            " ORDER BY enviada_em ASC, id_mensagem ASC"
         ),
         {"id": id_reserva},
     ).mappings().all()
@@ -68,3 +71,82 @@ def ler_telefone_da_reserva(conexao: Connection, *, id_reserva: int) -> str | No
         text("SELECT telefone_contato FROM reserva WHERE id_reserva = :id"),
         {"id": id_reserva},
     ).scalar_one_or_none()
+
+
+def inserir_evento_webhook(
+    conexao: Connection,
+    *,
+    id_externo: str,
+    payload: dict,
+) -> int | None:
+    """Insere evento. Devolve id_evento ou None se id_externo ja existir."""
+    import json
+
+    return conexao.execute(
+        text(
+            "INSERT INTO evento_webhook (id_externo, payload) "
+            "VALUES (:id_externo, CAST(:payload AS jsonb)) "
+            "ON CONFLICT (id_externo) DO NOTHING "
+            "RETURNING id_evento"
+        ),
+        {"id_externo": id_externo, "payload": json.dumps(payload)},
+    ).scalar_one_or_none()
+
+
+def inserir_mensagem_recebida(
+    conexao: Connection,
+    *,
+    id_reserva: int,
+    conteudo: str,
+    id_externo: str | None = None,
+) -> int:
+    return conexao.execute(
+        text(
+            "INSERT INTO mensagem (id_reserva, direcao, conteudo, id_externo) "
+            "VALUES (:id_reserva, 'recebida', :conteudo, :id_externo) "
+            "RETURNING id_mensagem"
+        ),
+        {
+            "id_reserva": id_reserva,
+            "conteudo": conteudo,
+            "id_externo": id_externo,
+        },
+    ).scalar_one()
+
+
+def gravar_classificacao_bruta(
+    conexao: Connection,
+    *,
+    id_mensagem: int,
+    classificacao: dict,
+) -> None:
+    import json
+
+    conexao.execute(
+        text(
+            "UPDATE mensagem SET classificacao_bruta = CAST(:c AS jsonb)"
+            " WHERE id_mensagem = :id"
+        ),
+        {"c": json.dumps(classificacao), "id": id_mensagem},
+    )
+
+
+def resolver_reserva_aguardando_cadastro(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    telefone_contato: str,
+) -> dict | None:
+    linha = conexao.execute(
+        text(
+            "SELECT id_reserva, id_hotel, status, telefone_contato"
+            " FROM reserva"
+            " WHERE id_hotel = :id_hotel"
+            " AND telefone_contato = :telefone"
+            " AND status = 'aguardando_cadastro'"
+            " ORDER BY id_reserva DESC"
+            " LIMIT 1"
+        ),
+        {"id_hotel": id_hotel, "telefone": telefone_contato},
+    ).mappings().first()
+    return dict(linha) if linha else None

@@ -1,12 +1,16 @@
-"""Regras de conversa: agendar coleta e espelhar status de envio."""
+"""Regras de conversa: agendar coleta, receber webhook e extrair ficha."""
 
 from sqlalchemy.engine import Connection
 
 from app.comum.log import obter_logger
+from app.comum.telefone import TelefoneInvalido, normalizar
 from app.fila import service as fila_service
 from app.modulos.conversa import repository as repositorio_padrao
+from app.modulos.conversa.schema import EventoEntrada
 from app.modulos.conversa.texto_coleta import montar_texto_coleta
+from app.modulos.conversa.validacao_ficha import refinar_resultado
 from app.modulos.propriedade import repository as propriedade_repository
+from app.portas.llm import FalhaDeExtracao, LLMProvider, ResultadoExtracao
 from app.portas.mensageria import FalhaDeEnvio, MensageriaGateway
 
 logger = obter_logger(__name__)
@@ -153,7 +157,187 @@ def processar_trabalho_enviar_coleta(
 
 
 def primeiro_nome_do_conteudo_ou_reserva(conteudo: str) -> str:
-    # "Ola, Maria!" no inicio do texto montado
     if conteudo.startswith("Ola, ") and "!" in conteudo:
         return conteudo[len("Ola, ") : conteudo.index("!")]
     return "hospede"
+
+
+def receber_evento_entrada(
+    conexao: Connection,
+    *,
+    evento: EventoEntrada,
+    id_hotel: int,
+    repositorio=repositorio_padrao,
+    enfileirar=fila_service.enfileirar_interpretar_ficha,
+) -> dict:
+    """Grava evento (+ mensagem/trabalho se elegivel). Nao chama LLM."""
+    payload = {
+        "id_externo": evento.id_externo,
+        "tem_texto_utilizavel": evento.tem_texto_utilizavel,
+    }
+    id_evento = repositorio.inserir_evento_webhook(
+        conexao, id_externo=evento.id_externo, payload=payload
+    )
+    if id_evento is None:
+        logger.info("webhook_duplicado id_externo=%s", evento.id_externo)
+        return {"status": "duplicado"}
+
+    if not evento.tem_texto_utilizavel:
+        logger.info(
+            "webhook_sem_texto id_evento=%s id_hotel=%s", id_evento, id_hotel
+        )
+        return {"status": "sem_texto", "id_evento": id_evento}
+
+    try:
+        telefone = normalizar(evento.telefone_origem)
+    except TelefoneInvalido:
+        logger.info("webhook_telefone_invalido id_evento=%s", id_evento)
+        return {"status": "telefone_invalido", "id_evento": id_evento}
+
+    reserva = repositorio.resolver_reserva_aguardando_cadastro(
+        conexao, id_hotel=id_hotel, telefone_contato=telefone
+    )
+    if reserva is None:
+        logger.info(
+            "webhook_sem_reserva id_evento=%s id_hotel=%s", id_evento, id_hotel
+        )
+        return {"status": "sem_reserva", "id_evento": id_evento}
+
+    id_mensagem = repositorio.inserir_mensagem_recebida(
+        conexao,
+        id_reserva=reserva["id_reserva"],
+        conteudo=evento.texto,
+        id_externo=evento.id_mensagem_canal,
+    )
+    id_trabalho = enfileirar(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=reserva["id_reserva"],
+        id_mensagem=id_mensagem,
+        id_evento=id_evento,
+    )
+    logger.info(
+        "webhook_enfileirado id_evento=%s id_mensagem=%s id_trabalho=%s"
+        " id_reserva=%s",
+        id_evento,
+        id_mensagem,
+        id_trabalho,
+        reserva["id_reserva"],
+    )
+    return {
+        "status": "enfileirado",
+        "id_evento": id_evento,
+        "id_mensagem": id_mensagem,
+        "id_trabalho": id_trabalho,
+        "id_reserva": reserva["id_reserva"],
+    }
+
+
+def extrair_campos_via_llm(
+    conexao: Connection,
+    *,
+    id_mensagem: int,
+    llm: LLMProvider,
+    repositorio=repositorio_padrao,
+) -> ResultadoExtracao:
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    if mensagem is None:
+        raise FalhaDeExtracao("mensagem_ausente")
+    bruto = llm.extrair_ficha(mensagem["conteudo"])
+    refinado = refinar_resultado(bruto)
+    classificacao = {
+        "tipo": "extracao_ficha",
+        "desfecho": refinado.desfecho,
+        "campos_reconhecidos": list(refinado.campos_reconhecidos),
+    }
+    repositorio.gravar_classificacao_bruta(
+        conexao, id_mensagem=id_mensagem, classificacao=classificacao
+    )
+    logger.info(
+        "ficha_extraida id_mensagem=%s desfecho=%s campos=%s",
+        id_mensagem,
+        refinado.desfecho,
+        len(refinado.campos_reconhecidos),
+    )
+    return refinado
+
+
+def marcar_falha_extrator(
+    conexao: Connection,
+    *,
+    id_mensagem: int,
+    repositorio=repositorio_padrao,
+) -> None:
+    repositorio.gravar_classificacao_bruta(
+        conexao,
+        id_mensagem=id_mensagem,
+        classificacao={
+            "tipo": "extracao_ficha",
+            "desfecho": "falha_extrator",
+            "campos_reconhecidos": [],
+        },
+    )
+    logger.info("ficha_falha_extrator id_mensagem=%s", id_mensagem)
+
+
+def processar_trabalho_interpretar_ficha(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    llm: LLMProvider,
+    consolidar,
+    repositorio=repositorio_padrao,
+) -> None:
+    """Extrai via LLM e chama consolidar(completa/parcial). Sem import de hospedagem."""
+    from app.fila import repository as fila_repo
+    from app.fila import service as fila_svc
+
+    id_trabalho = trabalho["id_trabalho"]
+    id_hotel = trabalho["id_hotel"]
+    payload = trabalho["payload"]
+    id_mensagem = int(payload["id_mensagem"])
+    id_reserva = int(payload["id_reserva"])
+
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    if mensagem and mensagem.get("classificacao_bruta"):
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        logger.info(
+            "interpretar_ja_concluido id_trabalho=%s id_mensagem=%s",
+            id_trabalho,
+            id_mensagem,
+        )
+        return
+
+    try:
+        resultado = extrair_campos_via_llm(
+            conexao, id_mensagem=id_mensagem, llm=llm, repositorio=repositorio
+        )
+    except FalhaDeExtracao as erro:
+        destino = fila_svc.registrar_falha_de_envio(
+            conexao,
+            id_trabalho=id_trabalho,
+            id_hotel=id_hotel,
+            tentativas_atuais=trabalho["tentativas"],
+            codigo_erro=erro.codigo,
+        )
+        if destino == "falha":
+            marcar_falha_extrator(
+                conexao, id_mensagem=id_mensagem, repositorio=repositorio
+            )
+        logger.info(
+            "interpretar_tentativa_falhou id_trabalho=%s destino=%s codigo=%s",
+            id_trabalho,
+            destino,
+            erro.codigo,
+        )
+        return
+
+    if resultado.desfecho in ("completa", "parcial"):
+        consolidar(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            campos=resultado.campos,
+            desfecho=resultado.desfecho,
+        )
+    fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)

@@ -198,6 +198,10 @@ worker (`python -m worker --uma-passagem`), revisão `0005_trabalho_e_coleta`,
 **Depende de:** F1.2.
 **Referência:** Artefato 2 F1, Artefato 3 §5.1, Artefato 4 §6.3.
 
+**Status: concluída.** Webhook idempotente, `LLMProvider` + falsa, trabalho
+`interpretar_ficha`, consolidação do titular, `estado_cadastro` na fila, revisão
+`0006_interpretar_ficha`. Parcial sem nova mensagem; irreconhecível → leitura humana.
+
 ## F1.4 — Controlar o silêncio
 
 **Objetivo:** quem não responde recebe um único lembrete, e depois é deixado em paz.

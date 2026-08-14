@@ -32,6 +32,7 @@ class ItemFilaDoDia(BaseModel):
     ficha_completa: bool | None
     chegada_nao_confirmada: bool
     status_envio_coleta: str | None = None
+    estado_cadastro: str | None = None
 
 
 class FilaDoDiaResposta(BaseModel):
@@ -40,3 +41,20 @@ class FilaDoDiaResposta(BaseModel):
 
 class ContagemChegadasResposta(BaseModel):
     quantidade: int
+
+
+class FichaTitularResposta(BaseModel):
+    id_reserva: int
+    id_hospede: int
+    ficha_completa: bool
+    status_reserva: str
+    estado_cadastro: str | None
+    nome_completo: str
+    profissao: str | None = None
+    data_nascimento: date | None = None
+    tipo_documento: str | None = None
+    numero_documento: str | None = None
+    endereco: str | None = None
+    cep: str | None = None
+    cidade: str | None = None
+    telefone: str

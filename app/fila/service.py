@@ -27,6 +27,24 @@ def enfileirar_enviar_coleta(
     )
 
 
+def enfileirar_interpretar_ficha(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    id_evento: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    return repositorio.enfileirar_interpretar_ficha(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_mensagem=id_mensagem,
+        id_evento=id_evento,
+    )
+
+
 def tentativas_maximas(
     conexao: Connection,
     *,
