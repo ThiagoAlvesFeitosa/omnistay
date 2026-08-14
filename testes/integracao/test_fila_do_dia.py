@@ -100,3 +100,31 @@ def test_staff_e_gestor_nao_leem_fila_nominada(app_sobre_ambiente):
         cliente.cookies.clear()
         _login(cliente, ambiente.propriedade_a.usuarios[perfil])
         assert cliente.get("/fila-do-dia").status_code == 403
+
+
+@pytest.mark.postgres
+def test_fila_distingue_sem_cadastro_previo(app_sobre_ambiente):
+    from sqlalchemy import text
+
+    from worker.agendador import verificar_cadastros_pendentes
+    from worker.consumidor import processar_uma_passagem_na_engine
+    from app.adaptadores.mensageria_falsa import MensageriaFalsa
+
+    cliente, ambiente = app_sobre_ambiente
+    _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
+    id_reserva = cliente.post("/reservas", json=_corpo_valido()).json()["id_reserva"]
+    processar_uma_passagem_na_engine(ambiente.engine, gateway=MensageriaFalsa())
+    with ambiente.engine.begin() as conexao:
+        verificar_cadastros_pendentes(conexao)
+    item = next(
+        i
+        for i in cliente.get("/fila-do-dia").json()["itens"]
+        if i["id_reserva"] == id_reserva
+    )
+    assert item["estado_cadastro"] == "sem_cadastro_previo"
+    with ambiente.conexao() as conexao:
+        status = conexao.execute(
+            text("SELECT status FROM reserva WHERE id_reserva = :r"),
+            {"r": id_reserva},
+        ).scalar_one()
+    assert status == "sem_cadastro_previo"

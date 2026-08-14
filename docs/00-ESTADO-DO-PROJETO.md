@@ -1,6 +1,6 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 13/08/2026
+**Atualizado em:** 14/08/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
 
 ---
@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 6 de 24 fatias concluídas.
+**Progresso:** 7 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -19,8 +19,9 @@
 | F1.1 Cadastrar reserva | ✅ Concluída — módulo `hospedagem`, titular provisório, fila + contagem, revisão `0003_fila_do_dia` |
 | F1.2 Disparar a coleta de dados | ✅ Concluída — tabela `trabalho`, módulo `conversa`, `MensageriaGateway` + falsa, worker, revisão `0005_trabalho_e_coleta` |
 | F1.3 Receber e interpretar a ficha | ✅ Concluída — webhook, `LLMProvider` + falsa, `interpretar_ficha`, `estado_cadastro`, revisão `0006_interpretar_ficha` |
-| F1.4 Controlar o silêncio | ⬅️ **Próxima** |
-| Demais 17 fatias | Pendentes, na ordem de `docs/backlog.md` |
+| F1.4 Controlar o silêncio | ✅ Concluída — lembrete único, `sem_cadastro_previo`, prazos em `parametro_hotel`, `worker/agendador.py`, revisão `0007_controlar_silencio` |
+| F2.1 Catálogo da propriedade | ⬅️ **Próxima** |
+| Demais 16 fatias | Pendentes, na ordem de `docs/backlog.md` |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -74,6 +75,10 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Orquestração | Worker chama `conversa` (extrai) e `hospedagem` (consolida) — sem ciclo de import | F1.3 |
 | `estado_cadastro` | `aguardando` · `completa` · `parcial` · `leitura_humana` na fila do dia | F1.3 |
 | Irreconhecível | Permanece `aguardando_cadastro`; sinal via `classificacao_bruta` | F1.3 |
+| Agendador de silêncio | Função `verificar_cadastros_pendentes` em `worker/agendador.py`; **sem** APScheduler (Artigo XI). `--verificar-cadastros`; `--uma-passagem` não dispara | F1.4 |
+| Lembrete único | Trabalho `enviar_lembrete` + `reenvio_realizado` + índice único por reserva | F1.4 |
+| t0 do silêncio | `mensagem.enviada_em` atualizado no sucesso do envio | F1.4 |
+| Prazos de silêncio | Bootstrap e `0007` semeiam `horas_ate_reenvio=24` e `horas_corte_antes_checkin=12`; ausência não usa default no verificador | F1.4 |
 
 ## Onde ficam os arquivos
 
@@ -255,7 +260,9 @@ Resolvidas pelo Artefato 5:
 
 - [x] ~~Idempotência dos webhooks~~ Restrição `UNIQUE`, com o fluxo descrito
 - [x] ~~Ordem de chegada das mensagens~~ Não garantida no MVP, com justificativa
-- [x] ~~Mecanismo de agendamento~~ `APScheduler` no worker
+- [x] ~~Mecanismo de agendamento~~ Artefato 5 nomeou APScheduler; a F1.4 entrega o
+      *comportamento* em `worker/agendador.py` sem a biblioteca (Artigo XI). A lib entra
+      quando houver várias tarefas de calendário (pulso, mercado, expurgo)
 - [x] ~~Rotina de expurgo por retenção~~ Tarefa agendada, com anonimização e auditoria
 - [x] ~~Acesso do staff ao Alert Center~~ Sessão longa por dispositivo
 
@@ -269,10 +276,9 @@ Lacunas encontradas no backlog (agosto/2026) — nenhuma tem fatia dedicada:
 
 - [x] ~~**Não há como criar o primeiro hotel nem o primeiro usuário.**~~ Resolvido na F0.3 com
       comando de bootstrap que cria hotel, gestor inicial e `parametro_hotel` com valores padrão
-- [ ] **`parametro_hotel` é lido por três fatias e escrito por nenhuma.** F1.2 e F1.4 leem
-      `horas_ate_reenvio` e `horas_corte_antes_checkin`; F5.2 lê a periodicidade. Nenhuma permite
-      alterar. Aceitável no MVP (semeado no bootstrap, alterado por SQL), desde que seja escolha
-      registrada e não esquecimento
+- [x] ~~**`parametro_hotel` é lido por três fatias e escrito por nenhuma.**~~ F1.4 semeia
+      `horas_ate_reenvio` e `horas_corte_antes_checkin` no bootstrap e na `0007`. Continua
+      **sem tela** de edição (SQL no MVP), escolha registrada
 - [ ] **Fechar o desenho de catálogo e preços** — ver seção própria acima. Prazo: antes da F2.1
 - [ ] **Contenção de tentativa repetida de senha** — fora da F0.3 de propósito (painel ainda não
       publicado). Precisa entrar antes de qualquer exposição contínua; a sessão longa do staff

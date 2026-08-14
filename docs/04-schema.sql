@@ -282,6 +282,9 @@ COMMENT ON COLUMN mensagem.classificacao_bruta IS
     'Saida completa do modelo de IA, para auditoria de classificacao equivocada.';
 COMMENT ON COLUMN mensagem.status_envio IS
     'Torna visivel no painel a falha de entrega — como o telefone digitado errado aparece.';
+COMMENT ON COLUMN mensagem.enviada_em IS
+    'Instante do registro; no sucesso do envio (status enviada) e atualizado para o '
+    'momento em que a mensagem saiu — t0 do silencio da coleta.';
 
 CREATE INDEX ix_mensagem_reserva ON mensagem (id_reserva, enviada_em DESC);
 CREATE INDEX ix_mensagem_classificacao
@@ -300,7 +303,9 @@ CREATE TABLE trabalho (
     processando_desde      TIMESTAMPTZ,
     criado_em              TIMESTAMPTZ  NOT NULL DEFAULT now(),
     atualizado_em          TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    CONSTRAINT ck_trabalho_tipo CHECK (tipo IN ('enviar_coleta', 'interpretar_ficha')),
+    CONSTRAINT ck_trabalho_tipo CHECK (
+        tipo IN ('enviar_coleta', 'interpretar_ficha', 'enviar_lembrete')
+    ),
     CONSTRAINT ck_trabalho_status CHECK (
         status IN ('pendente', 'processando', 'concluido', 'falha')
     )
@@ -317,6 +322,10 @@ CREATE UNIQUE INDEX uq_trabalho_enviar_coleta_reserva
 CREATE UNIQUE INDEX uq_trabalho_interpretar_ficha_mensagem
     ON trabalho ( ((payload->>'id_mensagem')::bigint) )
     WHERE tipo = 'interpretar_ficha';
+
+CREATE UNIQUE INDEX uq_trabalho_enviar_lembrete_reserva
+    ON trabalho ( ((payload->>'id_reserva')::bigint) )
+    WHERE tipo = 'enviar_lembrete';
 
 CREATE INDEX ix_trabalho_claim
     ON trabalho (status, proxima_tentativa_em)
@@ -530,6 +539,7 @@ SELECT r.id_hotel,
        CASE
            WHEN r.status = 'ficha_recebida' THEN 'completa'
            WHEN r.status = 'ficha_parcial' THEN 'parcial'
+           WHEN r.status = 'sem_cadastro_previo' THEN 'sem_cadastro_previo'
            WHEN r.status = 'aguardando_cadastro'
                 AND EXISTS (
                     SELECT 1
@@ -563,4 +573,5 @@ COMMENT ON VIEW vw_fila_do_dia IS
     'atrasadas e hospedados). Reserva futura fica de fora. A coluna '
     'chegada_nao_confirmada sinaliza divergencia temporal. Inclui telefone_contato, '
     'data_checkout_prevista, status_envio_coleta da mensagem de coleta e '
-    'estado_cadastro (aguardando, completa, parcial, leitura_humana).';
+    'estado_cadastro (aguardando, completa, parcial, leitura_humana, '
+    'sem_cadastro_previo).';

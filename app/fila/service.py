@@ -45,6 +45,22 @@ def enfileirar_interpretar_ficha(
     )
 
 
+def enfileirar_enviar_lembrete(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    return repositorio.enfileirar_enviar_lembrete(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_mensagem=id_mensagem,
+    )
+
+
 def tentativas_maximas(
     conexao: Connection,
     *,

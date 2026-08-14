@@ -44,6 +44,10 @@ def processar_uma_passagem(
                 llm=porta_llm,
                 consolidar=hospedagem_service.consolidar_ficha_titular,
             )
+        elif trabalho["tipo"] == "enviar_lembrete":
+            conversa_service.processar_trabalho_enviar_lembrete(
+                conexao, trabalho=trabalho, gateway=gateway
+            )
         else:
             fila_repository.marcar_falha(
                 conexao,

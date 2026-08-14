@@ -8,6 +8,7 @@ from app.fila import service as fila_service
 from app.modulos.conversa import repository as repositorio_padrao
 from app.modulos.conversa.schema import EventoEntrada
 from app.modulos.conversa.texto_coleta import montar_texto_coleta
+from app.modulos.conversa.texto_lembrete import montar_texto_lembrete
 from app.modulos.conversa.validacao_ficha import refinar_resultado
 from app.modulos.propriedade import repository as propriedade_repository
 from app.portas.llm import FalhaDeExtracao, LLMProvider, ResultadoExtracao
@@ -53,6 +54,52 @@ def agendar_coleta_apos_reserva(
     return id_mensagem
 
 
+def agendar_lembrete(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    nome_completo: str,
+    repositorio=repositorio_padrao,
+    enfileirar=fila_service.enfileirar_enviar_lembrete,
+) -> int:
+    texto = montar_texto_lembrete(nome_completo=nome_completo)
+    id_mensagem = repositorio.inserir_mensagem_enviada_pendente(
+        conexao, id_reserva=id_reserva, conteudo=texto
+    )
+    enfileirar(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_mensagem=id_mensagem,
+    )
+    logger.info(
+        "lembrete_agendado id_reserva=%s id_mensagem=%s id_hotel=%s",
+        id_reserva,
+        id_mensagem,
+        id_hotel,
+    )
+    return id_mensagem
+
+
+def tem_mensagem_recebida(
+    conexao: Connection,
+    *,
+    id_reserva: int,
+    repositorio=repositorio_padrao,
+) -> bool:
+    return repositorio.tem_mensagem_recebida(conexao, id_reserva=id_reserva)
+
+
+def instante_coleta_enviada(
+    conexao: Connection,
+    *,
+    id_reserva: int,
+    repositorio=repositorio_padrao,
+):
+    return repositorio.instante_coleta_enviada(conexao, id_reserva=id_reserva)
+
+
 def marcar_envio_sucesso(
     conexao: Connection,
     *,
@@ -92,6 +139,36 @@ def processar_trabalho_enviar_coleta(
     gateway: MensageriaGateway,
     repositorio=repositorio_padrao,
 ) -> None:
+    _processar_trabalho_de_envio(
+        conexao,
+        trabalho=trabalho,
+        enviar=gateway.enviar_coleta,
+        repositorio=repositorio,
+    )
+
+
+def processar_trabalho_enviar_lembrete(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    gateway: MensageriaGateway,
+    repositorio=repositorio_padrao,
+) -> None:
+    _processar_trabalho_de_envio(
+        conexao,
+        trabalho=trabalho,
+        enviar=gateway.enviar_lembrete,
+        repositorio=repositorio,
+    )
+
+
+def _processar_trabalho_de_envio(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    enviar,
+    repositorio=repositorio_padrao,
+) -> None:
     from app.fila import repository as fila_repo
     from app.fila import service as fila_svc
 
@@ -121,7 +198,7 @@ def processar_trabalho_enviar_coleta(
         return
     prenome = primeiro_nome_do_conteudo_ou_reserva(mensagem["conteudo"])
     try:
-        resultado = gateway.enviar_coleta(
+        resultado = enviar(
             telefone_destino=telefone,
             primeiro_nome=prenome,
             corpo=mensagem["conteudo"],
@@ -141,8 +218,9 @@ def processar_trabalho_enviar_coleta(
                 conexao, id_mensagem=id_mensagem, repositorio=repositorio
             )
         logger.info(
-            "coleta_tentativa_falhou id_trabalho=%s destino=%s codigo=%s",
+            "envio_tentativa_falhou id_trabalho=%s tipo=%s destino=%s codigo=%s",
             id_trabalho,
+            trabalho.get("tipo"),
             destino,
             erro.codigo,
         )

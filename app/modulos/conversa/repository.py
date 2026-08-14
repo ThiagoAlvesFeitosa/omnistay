@@ -1,5 +1,7 @@
 """Acesso a mensagem — sem regra de negocio."""
 
+from datetime import UTC, datetime
+
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
@@ -26,7 +28,25 @@ def atualizar_status_envio(
     id_mensagem: int,
     status_envio: str,
     id_externo: str | None = None,
+    agora: datetime | None = None,
 ) -> None:
+    instante = agora or datetime.now(UTC)
+    if status_envio == "enviada":
+        conexao.execute(
+            text(
+                "UPDATE mensagem SET status_envio = :status,"
+                " enviada_em = :agora,"
+                " id_externo = COALESCE(:id_externo, id_externo)"
+                " WHERE id_mensagem = :id"
+            ),
+            {
+                "status": status_envio,
+                "id_externo": id_externo,
+                "id": id_mensagem,
+                "agora": instante,
+            },
+        )
+        return
     conexao.execute(
         text(
             "UPDATE mensagem SET status_envio = :status,"
@@ -150,3 +170,31 @@ def resolver_reserva_aguardando_cadastro(
         {"id_hotel": id_hotel, "telefone": telefone_contato},
     ).mappings().first()
     return dict(linha) if linha else None
+
+
+def instante_coleta_enviada(
+    conexao: Connection, *, id_reserva: int
+) -> datetime | None:
+    return conexao.execute(
+        text(
+            "SELECT enviada_em FROM mensagem"
+            " WHERE id_reserva = :id AND direcao = 'enviada'"
+            " AND status_envio = 'enviada'"
+            " ORDER BY enviada_em ASC, id_mensagem ASC"
+            " LIMIT 1"
+        ),
+        {"id": id_reserva},
+    ).scalar_one_or_none()
+
+
+def tem_mensagem_recebida(conexao: Connection, *, id_reserva: int) -> bool:
+    return bool(
+        conexao.execute(
+            text(
+                "SELECT 1 FROM mensagem"
+                " WHERE id_reserva = :id AND direcao = 'recebida'"
+                " LIMIT 1"
+            ),
+            {"id": id_reserva},
+        ).scalar()
+    )

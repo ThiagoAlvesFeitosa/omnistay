@@ -18,6 +18,11 @@ PARAMETROS_COLETA_PADRAO = {
     "tentativas_max_envio_mensagem": "5",
 }
 
+PARAMETROS_SILENCIO_PADRAO = {
+    "horas_ate_reenvio": "24",
+    "horas_corte_antes_checkin": "12",
+}
+
 CHAVE_DE_DURACAO_POR_PERFIL = {
     "recepcao": "duracao_sessao_recepcao_horas",
     "staff": "duracao_sessao_staff_horas",
@@ -70,6 +75,8 @@ def criar_instalacao_inicial(
         conexao, id_hotel, "contato_responsavel_dados", telefone_whatsapp
     )
     for chave, valor in PARAMETROS_COLETA_PADRAO.items():
+        repositorio.inserir_parametro(conexao, id_hotel, chave, valor)
+    for chave, valor in PARAMETROS_SILENCIO_PADRAO.items():
         repositorio.inserir_parametro(conexao, id_hotel, chave, valor)
 
     return InstalacaoCriada(id_hotel=id_hotel, email_gestor=email_gestor)

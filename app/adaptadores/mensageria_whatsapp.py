@@ -70,3 +70,20 @@ class MensageriaWhatsapp:
         mensagens = dados.get("messages") or []
         id_externo = mensagens[0].get("id") if mensagens else None
         return ResultadoEnvio(id_externo=id_externo)
+
+    def enviar_lembrete(
+        self,
+        *,
+        telefone_destino: str,
+        primeiro_nome: str,
+        corpo: str,
+        id_mensagem: int,
+        id_reserva: int,
+    ) -> ResultadoEnvio:
+        return self.enviar_coleta(
+            telefone_destino=telefone_destino,
+            primeiro_nome=primeiro_nome,
+            corpo=corpo,
+            id_mensagem=id_mensagem,
+            id_reserva=id_reserva,
+        )

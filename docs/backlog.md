@@ -224,6 +224,12 @@ worker (`python -m worker --uma-passagem`), revisão `0005_trabalho_e_coleta`,
 **Depende de:** F1.3.
 **Referência:** Artefato 1 §3.2, Artefato 5 §9.
 
+**Status: concluída.** `worker/agendador.py` (`verificar_cadastros_pendentes`), trabalho
+`enviar_lembrete` com unicidade por reserva, `reenvio_realizado`, status
+`sem_cadastro_previo` na fila, prazos semeados (24 h / 12 h), revisão
+`0007_controlar_silencio`. Sem APScheduler; sem tela de parâmetros; sem clique de check-in
+(F2.2).
+
 ---
 
 # Fase 2 — Chegada (P2)

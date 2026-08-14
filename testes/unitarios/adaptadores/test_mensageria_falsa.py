@@ -20,6 +20,34 @@ def test_sucesso_registra_um_envio():
     assert porta.envios[0]["telefone_destino"] == "5511987654321"
 
 
+def test_lembrete_registra_tipo_distinto_da_coleta():
+    porta = MensageriaFalsa()
+    porta.enviar_lembrete(
+        telefone_destino="5511987654321",
+        primeiro_nome="Maria",
+        corpo="Ola, Maria!",
+        id_mensagem=8,
+        id_reserva=42,
+    )
+    assert porta.envios[0]["tipo"] == "lembrete"
+    assert porta.envios[0]["id_mensagem"] == 8
+
+
+def test_lembrete_modo_falha_levanta_erro_tipado():
+    porta = MensageriaFalsa()
+    porta.falhar_sempre = True
+    with pytest.raises(FalhaDeEnvio) as exc:
+        porta.enviar_lembrete(
+            telefone_destino="5511987654321",
+            primeiro_nome="Maria",
+            corpo="x",
+            id_mensagem=1,
+            id_reserva=1,
+        )
+    assert exc.value.codigo == "mensageria_indisponivel"
+    assert porta.envios == []
+
+
 def test_modo_falha_levanta_erro_tipado():
     porta = MensageriaFalsa()
     porta.falhar_sempre = True

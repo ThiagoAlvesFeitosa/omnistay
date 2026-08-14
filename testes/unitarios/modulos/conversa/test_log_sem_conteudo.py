@@ -60,3 +60,31 @@ def test_receber_evento_loga_so_identificadores(monkeypatch):
     assert "id_mensagem=8" in texto
     assert "segredo pessoal" not in texto
     assert "11987654321" not in texto
+
+
+def test_agendar_lembrete_loga_so_identificadores(monkeypatch):
+    class Repo:
+        def inserir_mensagem_enviada_pendente(self, conexao, *, id_reserva, conteudo):
+            assert "Maria" in conteudo
+            return 4
+
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(conversa.logger, "info", fake_info)
+    conversa.agendar_lembrete(
+        object(),
+        id_hotel=1,
+        id_reserva=42,
+        nome_completo="Maria Silva",
+        repositorio=Repo(),
+        enfileirar=lambda *a, **k: 1,
+    )
+    texto = " ".join(registros)
+    assert "id_reserva=42" in texto
+    assert "id_mensagem=4" in texto
+    assert "Maria" not in texto
+    assert "Silva" not in texto
+    assert "opcional" not in texto

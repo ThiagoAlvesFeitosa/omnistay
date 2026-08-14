@@ -192,3 +192,50 @@ def estado_cadastro_da_reserva(
         ),
         {"id_hotel": id_hotel, "id": id_reserva},
     ).scalar_one_or_none()
+
+
+def listar_reservas_aguardando_cadastro(conexao: Connection) -> list[dict]:
+    linhas = conexao.execute(
+        text(
+            "SELECT r.id_reserva, r.id_hotel, r.data_checkin_prevista,"
+            " r.reenvio_realizado, h.nome_completo"
+            " FROM reserva r"
+            " JOIN reserva_hospede rh"
+            "   ON rh.id_reserva = r.id_reserva AND rh.titular"
+            " JOIN hospede h ON h.id_hospede = rh.id_hospede"
+            " WHERE r.status = 'aguardando_cadastro'"
+            " ORDER BY r.id_reserva ASC"
+        )
+    ).mappings().all()
+    return [dict(linha) for linha in linhas]
+
+
+def marcar_reenvio_realizado(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+) -> None:
+    conexao.execute(
+        text(
+            "UPDATE reserva SET reenvio_realizado = TRUE"
+            " WHERE id_reserva = :id AND id_hotel = :id_hotel"
+        ),
+        {"id": id_reserva, "id_hotel": id_hotel},
+    )
+
+
+def marcar_sem_cadastro_previo(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+) -> None:
+    conexao.execute(
+        text(
+            "UPDATE reserva SET status = 'sem_cadastro_previo'"
+            " WHERE id_reserva = :id AND id_hotel = :id_hotel"
+            " AND status = 'aguardando_cadastro'"
+        ),
+        {"id": id_reserva, "id_hotel": id_hotel},
+    )

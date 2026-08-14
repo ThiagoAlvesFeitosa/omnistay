@@ -230,3 +230,41 @@ def ler_ficha_titular(
         cidade=titular.get("cidade"),
         telefone=titular["telefone"],
     )
+
+
+def listar_reservas_aguardando_cadastro(
+    conexao,
+    repositorio=repositorio_padrao,
+) -> list[dict]:
+    return repositorio.listar_reservas_aguardando_cadastro(conexao)
+
+
+def marcar_reenvio_realizado(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    repositorio=repositorio_padrao,
+) -> None:
+    repositorio.marcar_reenvio_realizado(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+
+
+def marcar_sem_cadastro_previo(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    repositorio=repositorio_padrao,
+) -> None:
+    from app.comum.log import obter_logger
+
+    repositorio.marcar_sem_cadastro_previo(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    obter_logger(__name__).info(
+        "sem_cadastro_marcado id_reserva=%s id_hotel=%s",
+        id_reserva,
+        id_hotel,
+    )

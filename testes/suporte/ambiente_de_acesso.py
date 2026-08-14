@@ -89,6 +89,8 @@ def _semear_parametros_coleta(
     for chave, valor in (
         ("contato_responsavel_dados", telefone),
         ("tentativas_max_envio_mensagem", "5"),
+        ("horas_ate_reenvio", "24"),
+        ("horas_corte_antes_checkin", "12"),
     ):
         conexao.execute(
             text(

@@ -438,7 +438,12 @@ a seção que fecha a pendência de LGPD arrastada desde o Artefato 1.
 Chaves previstas: `horas_ate_reenvio` · `horas_corte_antes_checkin` ·
 `periodicidade_coleta_mercado` · `horas_minimas_para_pulso` ·
 `duracao_sessao_recepcao_horas` · `duracao_sessao_staff_horas` ·
-`duracao_sessao_gestor_horas`.
+`duracao_sessao_gestor_horas` · `contato_responsavel_dados` ·
+`tentativas_max_envio_mensagem`.
+
+A F1.4 **usa** os dois prazos de silêncio: o bootstrap (e a revisão `0007`) semeia
+`horas_ate_reenvio=24` e `horas_corte_antes_checkin=12`. Ausência da chave na verificação
+não assume esses números em código.
 
 **Isto resolve três pendências abertas de uma vez.** Os parâmetros que estavam "a definir"
 desde o Artefato 1 deixam de ser constantes no código e passam a ser configuração por
@@ -492,7 +497,7 @@ dois recebe índice único parcial, ignorando nulos.
 | `data_checkin_prevista` | `DATE` | NOT NULL | OP | |
 | `data_checkout_prevista` | `DATE` | NOT NULL, CHECK > checkin | OP | |
 | `status` | `VARCHAR(30)` | NOT NULL, CHECK | OP | Domínio da máquina de estados da seção 4 |
-| `reenvio_realizado` | `BOOLEAN` | NOT NULL, default `false` | OP | Garante o reenvio **único** |
+| `reenvio_realizado` | `BOOLEAN` | NOT NULL, default `false` | OP | Garante o reenvio **único**. A F1.4 grava `true` na mesma transação que enfileira o lembrete. |
 | `checkin_em` | `TIMESTAMPTZ` | | OP | Momento real, não previsto |
 | `checkout_em` | `TIMESTAMPTZ` | | OP | Momento real |
 
