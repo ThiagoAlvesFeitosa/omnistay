@@ -1,4 +1,8 @@
-"""Fixtures de eixos da taxonomia."""
+"""Fixtures de eixos da taxonomia.
+
+Duvida geral classificada (`desfecho=classificado`) e o gancho da F3.3:
+o worker enfileira `responder_duvida` a partir desses eixos.
+"""
 
 from app.portas.llm import ResultadoClassificacao
 

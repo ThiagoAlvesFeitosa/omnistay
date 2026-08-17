@@ -326,7 +326,8 @@ def test_worker_classifica_mensagem_de_estadia(webhook_estadia):
     assert linha["sentimento"] == "neutro"
     assert linha["urgencia"] == "baixa"
     assert linha["conteudo"] == "wifi caiu"
-    assert linha["classificacao_bruta"]["desfecho"] == "classificado"
+    assert linha["classificacao_bruta"]["desfecho"] == "duvida_nao_coberta"
+    assert linha["classificacao_bruta"]["resposta"] == "aviso"
     assert linha["status_trabalho"] == "concluido"
     assert linha["status_reserva"] == "hospedado"
     assert solicitacoes == 0

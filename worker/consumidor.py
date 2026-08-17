@@ -2,6 +2,7 @@
 
 from sqlalchemy.engine import Connection, Engine
 
+from app.adaptadores.catalogo_banco import CatalogoBanco
 from app.adaptadores.llm_falso import LLMFalso
 from app.adaptadores.mensageria_falsa import MensageriaFalsa
 from app.comum.log import obter_logger
@@ -19,10 +20,12 @@ def processar_uma_passagem(
     *,
     gateway: MensageriaGateway,
     llm: LLMProvider | None = None,
+    catalogo=None,
     limite: int = 100,
 ) -> int:
     """Processa ate `limite` trabalhos elegiveis. Devolve quantos foram claims."""
     porta_llm = llm or LLMFalso()
+    porta_catalogo = catalogo
     processados = 0
     while processados < limite:
         trabalho = fila_repository.reclamar_proximo(conexao)
@@ -56,6 +59,14 @@ def processar_uma_passagem(
             conversa_service.processar_trabalho_classificar_mensagem(
                 conexao, trabalho=trabalho, llm=porta_llm
             )
+        elif trabalho["tipo"] == "responder_duvida":
+            conversa_service.processar_trabalho_responder_duvida(
+                conexao,
+                trabalho=trabalho,
+                llm=porta_llm,
+                catalogo=porta_catalogo or CatalogoBanco(conexao),
+                gateway=gateway,
+            )
         else:
             fila_repository.marcar_falha(
                 conexao,
@@ -72,7 +83,10 @@ def processar_uma_passagem_na_engine(
     *,
     gateway: MensageriaGateway | None = None,
     llm: LLMProvider | None = None,
+    catalogo=None,
 ) -> int:
     porta = gateway or MensageriaFalsa()
     with engine.begin() as conexao:
-        return processar_uma_passagem(conexao, gateway=porta, llm=llm)
+        return processar_uma_passagem(
+            conexao, gateway=porta, llm=llm, catalogo=catalogo
+        )

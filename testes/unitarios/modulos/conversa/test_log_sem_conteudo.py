@@ -274,11 +274,19 @@ def test_classificar_loga_sem_conteudo_nem_bruto(monkeypatch):
     }
     llm = LLMFalso()
     conversa.processar_trabalho_classificar_mensagem(
-        object(), trabalho=trabalho, llm=llm, repositorio=Repo()
+        object(),
+        trabalho=trabalho,
+        llm=llm,
+        repositorio=Repo(),
+        enfileirar_resposta=lambda *a, **k: 1,
     )
     llm.falhar_classificacao = True
     conversa.processar_trabalho_classificar_mensagem(
-        object(), trabalho=trabalho, llm=llm, repositorio=Repo()
+        object(),
+        trabalho=trabalho,
+        llm=llm,
+        repositorio=Repo(),
+        enfileirar_resposta=lambda *a, **k: 1,
     )
     llm.falhar_classificacao = False
     llm.configurar_classificacao(
@@ -290,11 +298,71 @@ def test_classificar_loga_sem_conteudo_nem_bruto(monkeypatch):
         )
     )
     conversa.processar_trabalho_classificar_mensagem(
-        object(), trabalho=trabalho, llm=llm, repositorio=Repo()
+        object(),
+        trabalho=trabalho,
+        llm=llm,
+        repositorio=Repo(),
+        enfileirar_resposta=lambda *a, **k: 1,
     )
     texto = " ".join(registros)
     assert "id_mensagem=8" in texto
     assert "desfecho=" in texto
     assert "segredo da conversa" not in texto
     assert "eco" not in texto
+
+
+def test_responder_duvida_loga_identificadores_sem_conteudo(monkeypatch):
+    from app.adaptadores.llm_falso import LLMFalso
+    from app.portas.llm import ResultadoResposta
+    from testes.suporte.resposta_duvida import resposta_coberta, resposta_nao_coberta
+    from testes.unitarios.modulos.conversa.test_responder_duvida import (
+        RepoResponder,
+        _catalogo_cafe,
+        _processar,
+    )
+
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(conversa.logger, "info", fake_info)
+
+    pergunta = "que horas e o cafe"
+    fato = "7h as 10h"
+    inventado = "piscina olimpica 6h"
+
+    llm_auto = LLMFalso()
+    llm_auto.configurar_resposta(resposta_coberta())
+    _processar(monkeypatch, RepoResponder(), llm_auto, _catalogo_cafe())
+
+    llm_aviso = LLMFalso()
+    llm_aviso.configurar_resposta(resposta_nao_coberta())
+    _processar(monkeypatch, RepoResponder(), llm_aviso, _catalogo_cafe())
+
+    llm_infiel = LLMFalso()
+    llm_infiel.configurar_resposta(
+        ResultadoResposta(
+            coberta=True, texto=inventado, trechos_citados=(inventado,)
+        )
+    )
+    _processar(monkeypatch, RepoResponder(), llm_infiel, _catalogo_cafe())
+
+    llm_cair = LLMFalso()
+    llm_cair.falhar_conversacao = True
+    _processar(monkeypatch, RepoResponder(), llm_cair, _catalogo_cafe())
+
+    texto = " ".join(registros)
+    assert "id_mensagem=8" in texto
+    assert "id_trabalho=5" in texto
+    assert "id_hotel=1" in texto
+    assert "resultado=automatica" in texto
+    assert "resultado=aviso" in texto
+    assert "resultado=nao_fiel" in texto
+    assert "resultado=indisponivel" in texto
+    assert pergunta not in texto
+    assert fato not in texto
+    assert inventado not in texto
+    assert "Cafe da manha" not in texto
+    assert "5511" not in texto
 

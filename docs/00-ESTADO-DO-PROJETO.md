@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 11 de 24 fatias concluídas.
+**Progresso:** 12 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -24,7 +24,8 @@
 | F2.2 Confirmar chegada e dar boas-vindas | ✅ Concluída — clique `POST /reservas/{id}/chegada`, recado curto, slots em `parametro_hotel`, recuperação pela janela de `checkin_em`, revisão `0008_confirmar_chegada` |
 | F3.1 Receber mensagem com segurança | ✅ Concluída — `POST /webhook` reutilizado, HMAC falha-fechada, `classificar_mensagem` pendente sem consumo, revisão `0009_receber_mensagem` |
 | F3.2 Classificar a intenção | ✅ Concluída — worker consome `classificar_mensagem`, taxonomia validada no domínio, `precisa_atendimento_humano` na fila, revisão `0010_classificar_intencao` |
-| Demais 13 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F3.3** (responder dúvida a partir do catálogo). Não há F2.3 no backlog |
+| F3.3 Responder dúvida a partir do catálogo | ✅ Concluída — worker consome `responder_duvida`, resposta fiel ao catálogo ativo do hotel, aviso + `duvida_nao_coberta` na fila, revisão `0011_responder_duvida_catalogo` |
+| Demais 12 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F3.4** (registrar pedido de serviço). Não há F2.3 no backlog |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -106,6 +107,10 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Escala na primeira falha | `FalhaDeClassificacao` e formato inválido marcam o trabalho `concluido` e encaminham a humano. Não se copia o backoff de `interpretar_ficha` | F3.2 |
 | Sinal na fila do dia | Coluna derivada `precisa_atendimento_humano` (hospedado com desfecho `encaminhado_humano` / `formato_invalido` / `indisponivel`). Não se reusa `estado_cadastro = leitura_humana` | F3.2 |
 | Ramo automático não executa | Dúvida, pedido e reclamação só gravam eixos (`desfecho = classificado`). Upsell, checkout e fora de escopo já vão a humano. Zero `solicitacao`, zero envio, zero catálogo | F3.2 |
+| Consumo de `responder_duvida` | Allowlist, enqueue na classificação de `duvida_geral` e ramo no worker no mesmo passo. Classificar não lê catálogo nem envia | F3.3 |
+| Chamado desta fatia | Desfecho `duvida_nao_coberta` na fila do dia (`precisa_atendimento_humano`). Zero `solicitacao` — chamado operacional é F3.5 | F3.3 |
+| Fidelidade ao catálogo | Trechos citados têm de ser substring do catálogo ativo **e** do texto enviado. Mentira estruturada vira o mesmo aviso da não coberta | F3.3 |
+| Catálogo vazio ou IA caída | Não chama (ou não retenta) o LLM; aviso + chamado; trabalho `concluido`. Falha de envio reagenda mensageria, não a redação | F3.3 |
 
 ## Onde ficam os arquivos
 

@@ -19,11 +19,14 @@ from app.modulos.propriedade import repository as propriedade_repository
 from app.modulos.propriedade import service as propriedade_service
 from app.portas.llm import (
     FalhaDeClassificacao,
+    FalhaDeConversacao,
     FalhaDeExtracao,
     LLMProvider,
     ResultadoExtracao,
 )
 from app.portas.mensageria import FalhaDeEnvio, MensageriaGateway
+from app.modulos.conversa.fidelidade import resposta_fiel_ao_catalogo
+from app.modulos.conversa.texto_aviso_duvida import montar_aviso_duvida_nao_coberta
 
 logger = obter_logger(__name__)
 
@@ -656,9 +659,14 @@ def processar_trabalho_classificar_mensagem(
     trabalho: dict,
     llm: LLMProvider,
     repositorio=repositorio_padrao,
+    enfileirar_resposta=None,
 ) -> None:
     """Classifica mensagem de estadia. Sem envio, sem chamado, sem hospedagem."""
     from app.fila import repository as fila_repo
+    from app.fila import service as fila_svc
+
+    if enfileirar_resposta is None:
+        enfileirar_resposta = fila_svc.enfileirar_responder_duvida
 
     id_trabalho = trabalho["id_trabalho"]
     id_hotel = trabalho["id_hotel"]
@@ -675,6 +683,19 @@ def processar_trabalho_classificar_mensagem(
         and existente.get("tipo") == "classificacao_intencao"
         and existente.get("desfecho")
     ):
+        if (
+            existente.get("desfecho") == "classificado"
+            and (existente.get("intencao") or (mensagem or {}).get("intencao"))
+            == "duvida_geral"
+            and existente.get("resposta") not in ("automatica", "aviso")
+        ):
+            _enfileirar_responder_duvida(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=id_reserva,
+                id_mensagem=id_mensagem,
+                enfileirar=enfileirar_resposta,
+            )
         fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
         logger.info(
             "classificacao_ja_concluida id_trabalho=%s id_mensagem=%s",
@@ -775,6 +796,14 @@ def processar_trabalho_classificar_mensagem(
             "bruto": resultado.bruto,
         },
     )
+    if valida.intencao == "duvida_geral":
+        _enfileirar_responder_duvida(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            id_mensagem=id_mensagem,
+            enfileirar=enfileirar_resposta,
+        )
     fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
     logger.info(
         "mensagem_classificada id_mensagem=%s id_reserva=%s id_hotel=%s"
@@ -785,3 +814,234 @@ def processar_trabalho_classificar_mensagem(
         desfecho,
         valida.intencao,
     )
+
+
+def _enfileirar_responder_duvida(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    enfileirar,
+) -> None:
+    try:
+        with _savepoint(conexao):
+            enfileirar(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=id_reserva,
+                id_mensagem=id_mensagem,
+            )
+    except IntegrityError:
+        logger.info(
+            "responder_duvida_ja_enfileirada id_mensagem=%s id_hotel=%s",
+            id_mensagem,
+            id_hotel,
+        )
+
+
+def processar_trabalho_responder_duvida(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    llm: LLMProvider,
+    catalogo,
+    gateway: MensageriaGateway,
+    repositorio=repositorio_padrao,
+) -> None:
+    from app.fila import repository as fila_repo
+
+    id_trabalho = trabalho["id_trabalho"]
+    id_hotel = trabalho["id_hotel"]
+    payload = trabalho["payload"]
+    id_mensagem = int(payload["id_mensagem"])
+    id_reserva = int(payload["id_reserva"])
+
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    existente = _json_classificacao(
+        mensagem.get("classificacao_bruta") if mensagem else None
+    )
+    if (
+        existente
+        and existente.get("resposta") in ("automatica", "aviso")
+        and existente.get("id_mensagem_resposta")
+    ):
+        id_enviada = int(existente["id_mensagem_resposta"])
+        enviada = repositorio.ler_mensagem(conexao, id_mensagem=id_enviada)
+        if enviada and enviada.get("status_envio") == "pendente":
+            _enviar_resposta_sessao(
+                conexao,
+                trabalho=trabalho,
+                gateway=gateway,
+                repositorio=repositorio,
+                id_enviada=id_enviada,
+                corpo=enviada["conteudo"],
+                id_reserva=id_reserva,
+            )
+            return
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        logger.info(
+            "duvida_ja_respondida id_trabalho=%s id_mensagem=%s id_hotel=%s"
+            " resultado=%s",
+            id_trabalho,
+            id_mensagem,
+            id_hotel,
+            existente.get("resposta"),
+        )
+        return
+
+    pergunta = (mensagem or {}).get("conteudo") or ""
+    itens = catalogo.listar_ativos(id_hotel)
+    motivo = "aviso"
+    texto_automatico = None
+    if not itens:
+        motivo = "catalogo_vazio"
+    else:
+        try:
+            resultado = llm.responder_duvida(pergunta, itens)
+        except FalhaDeConversacao as erro:
+            motivo = "indisponivel"
+            logger.info(
+                "conversacao_indisponivel id_mensagem=%s id_trabalho=%s"
+                " id_hotel=%s codigo=%s resultado=indisponivel",
+                id_mensagem,
+                id_trabalho,
+                id_hotel,
+                erro.codigo,
+            )
+        else:
+            if not resultado.coberta:
+                motivo = "aviso"
+            elif not resposta_fiel_ao_catalogo(
+                resultado.texto or "", resultado.trechos_citados, itens
+            ):
+                motivo = "nao_fiel"
+                logger.info(
+                    "resposta_nao_fiel id_mensagem=%s id_trabalho=%s"
+                    " id_hotel=%s resultado=nao_fiel",
+                    id_mensagem,
+                    id_trabalho,
+                    id_hotel,
+                )
+            else:
+                motivo = "automatica"
+                texto_automatico = resultado.texto
+
+    if motivo == "automatica":
+        corpo = texto_automatico or ""
+        resposta = "automatica"
+        desfecho = None
+        resultado_log = "automatica"
+        evento = "duvida_respondida"
+    else:
+        nome = "hospede"
+        ler_nome = getattr(repositorio, "ler_nome_titular", None)
+        if ler_nome is not None:
+            nome = ler_nome(conexao, id_reserva=id_reserva) or "hospede"
+        corpo = montar_aviso_duvida_nao_coberta(nome_completo=nome)
+        resposta = "aviso"
+        desfecho = "duvida_nao_coberta"
+        resultado_log = "aviso" if motivo in ("aviso", "catalogo_vazio") else motivo
+        evento = "duvida_nao_coberta"
+
+    id_enviada = repositorio.inserir_mensagem_enviada_pendente(
+        conexao, id_reserva=id_reserva, conteudo=corpo
+    )
+    repositorio.gravar_resposta_duvida(
+        conexao,
+        id_hotel=id_hotel,
+        id_mensagem=id_mensagem,
+        resposta=resposta,
+        id_mensagem_resposta=id_enviada,
+        desfecho=desfecho,
+    )
+    if motivo != "indisponivel" and motivo != "nao_fiel":
+        logger.info(
+            "%s id_mensagem=%s id_reserva=%s id_hotel=%s resultado=%s",
+            evento,
+            id_mensagem,
+            id_reserva,
+            id_hotel,
+            resultado_log,
+        )
+    elif motivo == "nao_fiel":
+        logger.info(
+            "duvida_nao_coberta id_mensagem=%s id_reserva=%s id_hotel=%s"
+            " resultado=nao_fiel",
+            id_mensagem,
+            id_reserva,
+            id_hotel,
+        )
+
+    _enviar_resposta_sessao(
+        conexao,
+        trabalho=trabalho,
+        gateway=gateway,
+        repositorio=repositorio,
+        id_enviada=id_enviada,
+        corpo=corpo,
+        id_reserva=id_reserva,
+    )
+
+
+def _enviar_resposta_sessao(
+    conexao,
+    *,
+    trabalho: dict,
+    gateway: MensageriaGateway,
+    repositorio,
+    id_enviada: int,
+    corpo: str,
+    id_reserva: int,
+) -> None:
+    from app.fila import repository as fila_repo
+    from app.fila import service as fila_svc
+
+    id_trabalho = trabalho["id_trabalho"]
+    id_hotel = trabalho["id_hotel"]
+    telefone = repositorio.ler_telefone_da_reserva(conexao, id_reserva=id_reserva)
+    if not telefone:
+        fila_repo.marcar_falha(
+            conexao,
+            id_trabalho=id_trabalho,
+            tentativas=(trabalho.get("tentativas") or 0) + 1,
+            erro="telefone_ausente",
+        )
+        marcar_envio_falha(
+            conexao, id_mensagem=id_enviada, repositorio=repositorio
+        )
+        return
+    try:
+        resultado = gateway.enviar_texto_sessao(
+            telefone_destino=telefone,
+            corpo=corpo,
+            id_mensagem=id_enviada,
+            id_reserva=id_reserva,
+        )
+    except FalhaDeEnvio as erro:
+        destino = fila_svc.registrar_falha_de_envio(
+            conexao,
+            id_trabalho=id_trabalho,
+            id_hotel=id_hotel,
+            tentativas_atuais=trabalho.get("tentativas") or 0,
+            codigo_erro=erro.codigo,
+        )
+        if destino == "falha":
+            marcar_envio_falha(
+                conexao, id_mensagem=id_enviada, repositorio=repositorio
+            )
+        logger.info(
+            "envio_tentativa_falhou id_trabalho=%s tipo=%s destino=%s codigo=%s",
+            id_trabalho,
+            trabalho.get("tipo"),
+            destino,
+            erro.codigo,
+        )
+        return
+    marcar_envio_sucesso(
+        conexao,
+        id_mensagem=id_enviada,
+        id_externo=resultado.id_externo,
+        repositorio=repositorio,
+    )
+    fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)

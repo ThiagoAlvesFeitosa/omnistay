@@ -42,6 +42,14 @@ class FalhaDeClassificacao(Exception):
         super().__init__(codigo)
 
 
+class FalhaDeConversacao(Exception):
+    """Redacao a partir do catalogo indisponivel — sem eco do texto."""
+
+    def __init__(self, codigo: str) -> None:
+        self.codigo = codigo
+        super().__init__(codigo)
+
+
 @dataclass(frozen=True)
 class ResultadoClassificacao:
     """Eixos da mensagem de estadia. Valores podem ser invalidos; o dominio valida."""
@@ -52,6 +60,18 @@ class ResultadoClassificacao:
     bruto: dict = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class ResultadoResposta:
+    """Redacao de duvida geral. O dominio valida trechos contra o catalogo."""
+
+    coberta: bool
+    texto: str | None = None
+    trechos_citados: tuple[str, ...] = ()
+
+
 class LLMProvider(Protocol):
     def extrair_ficha(self, texto: str) -> ResultadoExtracao: ...
     def classificar(self, texto: str) -> ResultadoClassificacao: ...
+    def responder_duvida(
+        self, pergunta: str, itens_ativos: tuple
+    ) -> ResultadoResposta: ...

@@ -49,6 +49,13 @@ def test_classificacao_valida_nao_liga_sinal_nem_altera_conteudo(cenario):
     id_reserva = _criar_hospedada(cliente, ambiente)
     _postar(cliente, "evt-cls-1", "que horas e o cafe")
     with ambiente.engine.begin() as conexao:
+        conexao.execute(
+            text(
+                "INSERT INTO catalogo_item (id_hotel, categoria, titulo, conteudo) "
+                "VALUES (:h, 'horario', 'Cafe da manha', '7h as 10h')"
+            ),
+            {"h": ambiente.propriedade_a.id_hotel},
+        )
         antes = conexao.execute(
             text(
                 "SELECT conteudo FROM mensagem"
@@ -59,13 +66,24 @@ def test_classificacao_valida_nao_liga_sinal_nem_altera_conteudo(cenario):
         processar_uma_passagem(conexao, gateway=MensageriaFalsa())
         depois = conexao.execute(
             text(
-                "SELECT conteudo, intencao FROM mensagem"
+                "SELECT conteudo, intencao, classificacao_bruta"
+                " FROM mensagem"
                 " WHERE id_reserva = :r AND direcao = 'recebida'"
             ),
             {"r": id_reserva},
         ).mappings().one()
+        enviada = conexao.execute(
+            text(
+                "SELECT conteudo FROM mensagem WHERE id_mensagem = :id"
+            ),
+            {"id": depois["classificacao_bruta"]["id_mensagem_resposta"]},
+        ).scalar_one()
+        solicitacoes = conexao.execute(text("SELECT COUNT(*) FROM solicitacao")).scalar_one()
     assert antes == depois["conteudo"] == "que horas e o cafe"
     assert depois["intencao"] == "duvida_geral"
+    assert depois["classificacao_bruta"]["resposta"] == "automatica"
+    assert "7h as 10h" in enviada
+    assert solicitacoes == 0
     _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
     assert _item_fila(cliente, id_reserva)["precisa_atendimento_humano"] is False
 
@@ -88,6 +106,7 @@ def test_indisponivel_liga_sinal_na_fila(cenario):
         ).mappings().one()
     assert eixos["intencao"] is None
     assert eixos["classificacao_bruta"]["desfecho"] == "indisponivel"
+    assert "resposta" not in eixos["classificacao_bruta"]
     _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
     assert _item_fila(cliente, id_reserva)["precisa_atendimento_humano"] is True
     for perfil in ("staff", "gestor"):
@@ -121,6 +140,7 @@ def test_formato_invalido_preserva_bruto_e_sinal(cenario):
         ).scalar_one()
     assert bruto["desfecho"] == "formato_invalido"
     assert bruto["bruto"] == {"cru": "xyz"}
+    assert "resposta" not in bruto
     _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
     assert _item_fila(cliente, id_reserva)["precisa_atendimento_humano"] is True
 
@@ -145,9 +165,17 @@ def test_upsell_liga_sinal_reclamacao_nao_cria_solicitacao(cenario):
             text("SELECT status FROM reserva WHERE id_reserva = :r"),
             {"r": id_reserva},
         ).scalar_one()
+        bruto = conexao.execute(
+            text(
+                "SELECT classificacao_bruta FROM mensagem"
+                " WHERE id_reserva = :r AND direcao = 'recebida'"
+            ),
+            {"r": id_reserva},
+        ).scalar_one()
         solicitacoes = conexao.execute(text("SELECT COUNT(*) FROM solicitacao")).scalar_one()
     assert status == "hospedado"
     assert solicitacoes == 0
+    assert "resposta" not in bruto
     _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
     assert _item_fila(cliente, id_reserva)["precisa_atendimento_humano"] is True
 

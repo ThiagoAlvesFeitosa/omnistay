@@ -681,19 +681,27 @@ coluna `estado_cadastro` deriva o desfecho operacional (`aguardando`, `completa`
 `leitura_humana`) a partir do status da reserva e do `classificacao_bruta` da mensagem
 recebida. A coluna `precisa_atendimento_humano` é verdadeira quando a reserva está
 `hospedado` e existe mensagem recebida com `classificacao_bruta.tipo = classificacao_intencao`
-e desfecho `encaminhado_humano`, `formato_invalido` ou `indisponivel`. Não se reutiliza
-`leitura_humana` — esse valor é da ficha em `aguardando_cadastro`.
+e desfecho `encaminhado_humano`, `formato_invalido`, `indisponivel` ou
+`duvida_nao_coberta`. Não se reutiliza `leitura_humana` — esse valor é da ficha em
+`aguardando_cadastro`. Dúvida geral coberta pelo catálogo permanece `classificado` e
+não liga o flag.
 
 **A tabela `trabalho` é a fila durável do Artefato 5.** O cadastro de reserva grava, na mesma
 transação, a mensagem de coleta (`status_envio = pendente`) e um trabalho `enviar_coleta`; o
 webhook de resposta de ficha grava mensagem recebida e um trabalho `interpretar_ficha`; o
 webhook de estadia (reserva `hospedado`) grava mensagem recebida e um trabalho
 `classificar_mensagem`. O worker consome esse tipo: preenche intenção, sentimento e urgência
-(ou encaminha a humano) e marca o trabalho `concluido`. `classificacao_bruta` da estadia usa
-`tipo = classificacao_intencao` e desfecho `classificado`, `encaminhado_humano`,
-`formato_invalido` ou `indisponivel`. O worker consome os demais tipos com `FOR UPDATE SKIP LOCKED`.
+(ou encaminha a humano) e marca o trabalho `concluido`. Dúvida geral classificada enfileira
+`responder_duvida` (unicidade por mensagem recebida): resposta automática fiel ao catálogo
+ou aviso à recepção com desfecho `duvida_nao_coberta`. O JSON ganha `resposta`
+(`automatica` / `aviso`) e `id_mensagem_resposta`. Isso **não** cria `solicitacao` —
+o chamado desta fatia é a pendência visível na fila do dia. `classificacao_bruta` da
+estadia usa `tipo = classificacao_intencao` e desfecho `classificado`,
+`encaminhado_humano`, `formato_invalido`, `indisponivel` ou `duvida_nao_coberta`.
+O worker consome os demais tipos com `FOR UPDATE SKIP LOCKED`.
 Índices únicos parciais: uma coleta por reserva, uma interpretação por mensagem de
-entrada, um `classificar_mensagem` por mensagem. Payload só com identificadores — sem PII.
+entrada, um `classificar_mensagem` por mensagem, um `responder_duvida` por mensagem.
+Payload só com identificadores — sem PII.
 
 ### 7.2 Verificação realizada
 

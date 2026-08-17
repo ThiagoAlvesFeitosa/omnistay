@@ -135,3 +135,39 @@ class MensageriaWhatsapp:
             id_mensagem=id_mensagem,
             id_reserva=id_reserva,
         )
+
+    def enviar_texto_sessao(
+        self,
+        *,
+        telefone_destino: str,
+        corpo: str,
+        id_mensagem: int,
+        id_reserva: int,
+    ) -> ResultadoEnvio:
+        del id_mensagem, id_reserva
+        if not self.token or not self.phone_number_id:
+            raise FalhaDeEnvio("whatsapp_nao_configurado")
+        url = (
+            f"https://graph.facebook.com/v21.0/{self.phone_number_id}/messages"
+        )
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": telefone_destino,
+            "type": "text",
+            "text": {"body": corpo},
+        }
+        try:
+            resposta = httpx.post(
+                url,
+                headers={"Authorization": f"Bearer {self.token}"},
+                json=payload,
+                timeout=15.0,
+            )
+        except httpx.HTTPError as erro:
+            raise FalhaDeEnvio("whatsapp_rede") from erro
+        if resposta.status_code >= 400:
+            raise FalhaDeEnvio(f"whatsapp_http_{resposta.status_code}")
+        dados = resposta.json()
+        mensagens = dados.get("messages") or []
+        id_externo = mensagens[0].get("id") if mensagens else None
+        return ResultadoEnvio(id_externo=id_externo)

@@ -95,6 +95,22 @@ def enfileirar_classificar_mensagem(
     )
 
 
+def enfileirar_responder_duvida(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    return repositorio.enfileirar_responder_duvida(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_mensagem=id_mensagem,
+    )
+
+
 def tentativas_maximas(
     conexao: Connection,
     *,

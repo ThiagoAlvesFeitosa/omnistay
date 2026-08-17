@@ -1,4 +1,4 @@
-"""Porta falsa de mensageria."""
+"""Porta falsa de mensageria — envio em sessao."""
 
 import pytest
 
@@ -6,86 +6,27 @@ from app.adaptadores.mensageria_falsa import MensageriaFalsa
 from app.portas.mensageria import FalhaDeEnvio
 
 
-def test_sucesso_registra_um_envio():
+def test_enviar_texto_sessao_registra_corpo():
     porta = MensageriaFalsa()
-    resultado = porta.enviar_coleta(
-        telefone_destino="5511987654321",
-        primeiro_nome="Maria",
-        corpo="Ola, Maria!",
-        id_mensagem=7,
-        id_reserva=42,
+    resultado = porta.enviar_texto_sessao(
+        telefone_destino="5511999999999",
+        corpo="Cafe das 7h as 10h",
+        id_mensagem=3,
+        id_reserva=2,
     )
-    assert resultado.id_externo == "fake-7"
-    assert len(porta.envios) == 1
-    assert porta.envios[0]["telefone_destino"] == "5511987654321"
+    assert resultado.id_externo == "fake-3"
+    assert porta.envios[0]["tipo"] == "sessao"
+    assert porta.envios[0]["corpo"] == "Cafe das 7h as 10h"
 
 
-def test_lembrete_registra_tipo_distinto_da_coleta():
-    porta = MensageriaFalsa()
-    porta.enviar_lembrete(
-        telefone_destino="5511987654321",
-        primeiro_nome="Maria",
-        corpo="Ola, Maria!",
-        id_mensagem=8,
-        id_reserva=42,
-    )
-    assert porta.envios[0]["tipo"] == "lembrete"
-    assert porta.envios[0]["id_mensagem"] == 8
-
-
-def test_lembrete_modo_falha_levanta_erro_tipado():
+def test_enviar_texto_sessao_falha_tipada():
     porta = MensageriaFalsa()
     porta.falhar_sempre = True
-    with pytest.raises(FalhaDeEnvio) as exc:
-        porta.enviar_lembrete(
-            telefone_destino="5511987654321",
-            primeiro_nome="Maria",
-            corpo="x",
+    with pytest.raises(FalhaDeEnvio) as erro:
+        porta.enviar_texto_sessao(
+            telefone_destino="5511999999999",
+            corpo="segredo",
             id_mensagem=1,
             id_reserva=1,
         )
-    assert exc.value.codigo == "mensageria_indisponivel"
-    assert porta.envios == []
-
-
-def test_modo_falha_levanta_erro_tipado():
-    porta = MensageriaFalsa()
-    porta.falhar_sempre = True
-    with pytest.raises(FalhaDeEnvio) as exc:
-        porta.enviar_coleta(
-            telefone_destino="5511987654321",
-            primeiro_nome="Maria",
-            corpo="x",
-            id_mensagem=1,
-            id_reserva=1,
-        )
-    assert exc.value.codigo == "mensageria_indisponivel"
-    assert porta.envios == []
-
-
-def test_boas_vindas_registra_tipo_e_quatro_variaveis():
-    porta = MensageriaFalsa()
-    variaveis = ("Maria", "cafe 7h", "wifi hotel", "12h")
-    porta.enviar_boas_vindas(
-        telefone_destino="5511987654321",
-        variaveis=variaveis,
-        corpo="Ola, Maria!",
-        id_mensagem=9,
-        id_reserva=42,
-    )
-    assert porta.envios[0]["tipo"] == "boas_vindas"
-    assert porta.envios[0]["variaveis"] == variaveis
-
-
-def test_boas_vindas_modo_falha_levanta_erro_tipado():
-    porta = MensageriaFalsa()
-    porta.falhar_sempre = True
-    with pytest.raises(FalhaDeEnvio):
-        porta.enviar_boas_vindas(
-            telefone_destino="5511987654321",
-            variaveis=("Maria", "a", "b", "c"),
-            corpo="x",
-            id_mensagem=1,
-            id_reserva=1,
-        )
-    assert porta.envios == []
+    assert erro.value.codigo == "mensageria_indisponivel"

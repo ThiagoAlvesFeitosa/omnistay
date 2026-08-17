@@ -203,6 +203,50 @@ def gravar_classificacao_intencao(
     return resultado.rowcount or 0
 
 
+def gravar_resposta_duvida(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_mensagem: int,
+    resposta: str,
+    id_mensagem_resposta: int,
+    desfecho: str | None = None,
+) -> int:
+    import json
+
+    extra = {"resposta": resposta, "id_mensagem_resposta": id_mensagem_resposta}
+    if desfecho is not None:
+        extra["desfecho"] = desfecho
+    resultado = conexao.execute(
+        text(
+            "UPDATE mensagem m SET"
+            " classificacao_bruta = COALESCE(m.classificacao_bruta, '{}'::jsonb)"
+            " || CAST(:extra AS jsonb)"
+            " FROM reserva r"
+            " WHERE m.id_mensagem = :id"
+            " AND m.id_reserva = r.id_reserva"
+            " AND r.id_hotel = :id_hotel"
+        ),
+        {
+            "extra": json.dumps(extra),
+            "id": id_mensagem,
+            "id_hotel": id_hotel,
+        },
+    )
+    return resultado.rowcount or 0
+
+
+def ler_nome_titular(conexao: Connection, *, id_reserva: int) -> str | None:
+    return conexao.execute(
+        text(
+            "SELECT h.nome_completo FROM reserva_hospede rh"
+            " JOIN hospede h ON h.id_hospede = rh.id_hospede"
+            " WHERE rh.id_reserva = :id AND rh.titular"
+        ),
+        {"id": id_reserva},
+    ).scalar_one_or_none()
+
+
 def resolver_reserva_aguardando_cadastro(
     conexao: Connection,
     *,

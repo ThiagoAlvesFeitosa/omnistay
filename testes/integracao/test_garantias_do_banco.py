@@ -303,3 +303,47 @@ def test_segundo_trabalho_classificar_da_mesma_mensagem_e_recusado(conexao):
         _inserir_trabalho_classificar(conexao, id_hotel, id_reserva, id_mensagem=7)
 
     assert "uq_trabalho_classificar_mensagem_mensagem" in str(erro.value)
+
+
+def _inserir_trabalho_responder(
+    conexao, id_hotel: int, id_reserva: int, id_mensagem: int = 1
+) -> None:
+    conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, 'responder_duvida',"
+            " CAST(:payload AS jsonb), 'pendente')"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "payload": (
+                '{"id_reserva": %s, "id_mensagem": %s}'
+                % (id_reserva, id_mensagem)
+            ),
+        },
+    )
+
+
+@pytest.mark.postgres
+def test_tipo_responder_duvida_e_aceito_pelo_check(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+
+    _inserir_trabalho_responder(conexao, id_hotel, id_reserva)
+
+    tipo = conexao.execute(
+        text("SELECT tipo FROM trabalho WHERE tipo = 'responder_duvida'")
+    ).scalar_one()
+    assert tipo == "responder_duvida"
+
+
+@pytest.mark.postgres
+def test_segundo_trabalho_responder_da_mesma_mensagem_e_recusado(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    _inserir_trabalho_responder(conexao, id_hotel, id_reserva, id_mensagem=7)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_trabalho_responder(conexao, id_hotel, id_reserva, id_mensagem=7)
+
+    assert "uq_trabalho_responder_duvida_mensagem" in str(erro.value)

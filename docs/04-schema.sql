@@ -306,7 +306,8 @@ CREATE TABLE trabalho (
     atualizado_em          TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT ck_trabalho_tipo CHECK (
         tipo IN ('enviar_coleta', 'interpretar_ficha', 'enviar_lembrete',
-                 'enviar_boas_vindas', 'classificar_mensagem')
+                 'enviar_boas_vindas', 'classificar_mensagem',
+                 'responder_duvida')
     ),
     CONSTRAINT ck_trabalho_status CHECK (
         status IN ('pendente', 'processando', 'concluido', 'falha')
@@ -336,6 +337,10 @@ CREATE UNIQUE INDEX uq_trabalho_enviar_boas_vindas_reserva
 CREATE UNIQUE INDEX uq_trabalho_classificar_mensagem_mensagem
     ON trabalho ( ((payload->>'id_mensagem')::bigint) )
     WHERE tipo = 'classificar_mensagem';
+
+CREATE UNIQUE INDEX uq_trabalho_responder_duvida_mensagem
+    ON trabalho ( ((payload->>'id_mensagem')::bigint) )
+    WHERE tipo = 'responder_duvida';
 
 CREATE INDEX ix_trabalho_claim
     ON trabalho (status, proxima_tentativa_em)
@@ -576,7 +581,8 @@ SELECT r.id_hotel,
                  AND mh.direcao = 'recebida'
                  AND mh.classificacao_bruta->>'tipo' = 'classificacao_intencao'
                  AND mh.classificacao_bruta->>'desfecho'
-                     IN ('encaminhado_humano', 'formato_invalido', 'indisponivel')
+                     IN ('encaminhado_humano', 'formato_invalido', 'indisponivel',
+                         'duvida_nao_coberta')
             )) AS precisa_atendimento_humano
   FROM reserva r
   LEFT JOIN reserva_hospede rh
@@ -602,4 +608,5 @@ COMMENT ON VIEW vw_fila_do_dia IS
     'estado_cadastro (aguardando, completa, parcial, leitura_humana, '
     'sem_cadastro_previo), boas_vindas_nao_enviadas (hospedado sem recado) e '
     'precisa_atendimento_humano (hospedado com mensagem de estadia encaminhada a '
-    'pessoa: classificador falhou ou intencao sem ramo proprio).';
+    'pessoa: classificador falhou, intencao sem ramo proprio ou duvida nao coberta '
+    'pelo catalogo).';
