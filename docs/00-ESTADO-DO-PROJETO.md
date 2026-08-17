@@ -1,6 +1,6 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 14/08/2026
+**Atualizado em:** 17/08/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
 
 ---
@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 7 de 24 fatias concluídas.
+**Progresso:** 9 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -20,8 +20,9 @@
 | F1.2 Disparar a coleta de dados | ✅ Concluída — tabela `trabalho`, módulo `conversa`, `MensageriaGateway` + falsa, worker, revisão `0005_trabalho_e_coleta` |
 | F1.3 Receber e interpretar a ficha | ✅ Concluída — webhook, `LLMProvider` + falsa, `interpretar_ficha`, `estado_cadastro`, revisão `0006_interpretar_ficha` |
 | F1.4 Controlar o silêncio | ✅ Concluída — lembrete único, `sem_cadastro_previo`, prazos em `parametro_hotel`, `worker/agendador.py`, revisão `0007_controlar_silencio` |
-| F2.1 Catálogo da propriedade | ⬅️ **Próxima** |
-| Demais 16 fatias | Pendentes, na ordem de `docs/backlog.md` |
+| F2.1 Catálogo da propriedade | ✅ Concluída — CRUD em `propriedade`, `GET /catalogo/ativo`, porta `CatalogoRepository`, `ler_catalogo` na matriz; sem migração (tabela `0001`) |
+| F2.2 Confirmar chegada e dar boas-vindas | ✅ Concluída — clique `POST /reservas/{id}/chegada`, recado curto, slots em `parametro_hotel`, recuperação pela janela de `checkin_em`, revisão `0008_confirmar_chegada` |
+| Demais 15 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F3.1** (receber mensagem com segurança). Não há F2.3 no backlog |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -79,6 +80,22 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Lembrete único | Trabalho `enviar_lembrete` + `reenvio_realizado` + índice único por reserva | F1.4 |
 | t0 do silêncio | `mensagem.enviada_em` atualizado no sucesso do envio | F1.4 |
 | Prazos de silêncio | Bootstrap e `0007` semeiam `horas_ate_reenvio=24` e `horas_corte_antes_checkin=12`; ausência não usa default no verificador | F1.4 |
+| Catálogo | Fatos em texto por categoria; desativar não apaga; consulta ativa agrupa as cinco chaves | F2.1 |
+| Porta `CatalogoRepository` | `listar_ativos` na mesma transação; HTTP de manutenção não passa pela porta | F2.1 |
+| `ler_catalogo` | Recepção e gestão leem; só recepção altera; operação recusada | F2.1 |
+| Preço estruturado | **Adiado para F3.7.** F2.1 não cria coluna nem item vendável — o recado de boas-vindas não carrega catálogo | F2.1 |
+| Recado de boas-vindas | **Mensagem curta, não o catálogo.** Variável de template recusa quebra de linha, tabulação e mais de 4 espaços seguidos: catálogo inteiro numa variável não é enviável. O recado confirma a chegada, leva três informações de entrada e convida a perguntar; o catálogo responde sob demanda na janela de 24h (F3.3) | F2.2 (spec) |
+| Informações de entrada | Três chaves em `parametro_hotel` — `boas_vindas_cafe`, `boas_vindas_wifi`, `boas_vindas_checkout`. Obrigatórias, semeadas no bootstrap, validadas **na gravação** (vazio, quebra de linha, tabulação, >4 espaços). Validar só no envio faria a falha coincidir com a chegada | F2.2 (spec) |
+| Slot vazio na confirmação | Check-in ocorre, recado **não** sai, reserva sinalizada na fila do dia. Nunca variável em branco | F2.2 (spec) |
+| Recuperação do recado | Completar os slots envia para reserva `hospedado` cujo **`checkin_em` está dentro da janela de validade** da propriedade. Reserva com chegada anterior à janela mantém a sinalização e não recebe envio automático — boas-vindas tem validade curta, e sem o limite completar a configuração dispararia rajada de template pago, inclusive para quem já saiu | F2.2 (spec) |
+| Eixo da janela de validade | **Instante do check-in, nunca data de calendário.** A clarificação dizia `data_checkin_prevista = CURRENT_DATE`; isso perdia em silêncio a chegada das 23h30 com slots preenchidos às 23h40 e varredura às 00h05 — o dia virava, a reserva saía da elegibilidade e o pacote nunca saía, sem erro nenhum. Corrigido no planejamento. Fecha também a chegada antecipada, que o critério por data excluía | F2.2 (correção no plano) |
+| Duração da janela | Chave `horas_validade_boas_vindas` em `parametro_hotel`, semeada em `12`. Artigo XIII: prazo não é constante de código, e `horas_ate_reenvio` e `horas_corte_antes_checkin` já estabeleceram o padrão na F1.4. É parâmetro de comportamento — fora da permissão da recepção e fora da rota de boas-vindas. Sem valor configurado, a propriedade não recebe recuperação e o log registra `prazo_ausente`; nenhum prazo é suposto | F2.2 (plano) |
+| Unicidade do recado | Restrição `UNIQUE` por reserva, no padrão da idempotência de webhook. Conferência em código não basta: duas execuções simultâneas do worker enviariam duas vezes | F2.2 (spec) |
+| Permissão de configuração | Operação por **grupo de chaves** (`alterar_texto_de_boas_vindas`, só recepção), nunca `alterar_parametro_hotel` genérico. A tabela guarda texto operacional de balcão (recepção) e parâmetro de comportamento (gestão, fatia futura); permissão pela tabela daria à recepção o poder de mudar como o sistema se comporta com o hóspede | F2.2 (spec) |
+| Autorização do clique de chegada | Sem operação nova: `confirmar_fase_da_reserva` está na matriz desde a F0.3 e nunca teve consumidor. A F2.2 é a primeira a usá-la | F2.2 (plano) |
+| Chegada em `aguardando_cadastro` | Recusada com `409`, porque a trigger só admite `hospedado` a partir de ficha recebida, ficha parcial ou sem cadastro prévio. Atalho para o balcão exigiria spec própria | F2.2 (plano) |
+| Recuperação do recado, na prática | Varredura na `worker/agendador.py` da F1.4 (`--verificar-boas-vindas`), não efeito colateral da gravação dos slots — a janela precisa ser reavaliada a cada passagem, e o slot pode ser preenchido por outro caminho. O SQL lista `hospedado` com `checkin_em` e sem trabalho; a janela é comparada em Python, por hotel, porque o prazo é por propriedade | F2.2 (plano) |
+| Sinalização de recado não enviado | Coluna derivada `boas_vindas_nao_enviadas` na `vw_fila_do_dia` (hospedado sem trabalho de boas-vindas). Mutuamente exclusiva de `chegada_nao_confirmada`, que exige status diferente de hospedado | F2.2 (plano) |
 
 ## Onde ficam os arquivos
 
@@ -166,7 +183,13 @@ visível, mas não a eliminam. Isso é assumido no documento.
 | Comissão sobre serviços | Reduzida de 20% para 8% da receita — depende de lançamento manual no PMS |
 | Dados como ativo | **Não** se apoia no conteúdo das conversas. O ativo é o catálogo da propriedade |
 
-## Catálogo e preços — desenho a fechar antes da F2.1
+## Catálogo e preços — fechado na F2.1 por adiamento
+
+**Decisão (14/08/2026):** F2.1 entrega fato afirmável em texto (`catalogo_item` já existente).
+Item vendável com preço em campo próprio fica para a F3.7, quando existir consumo faturável.
+Incluir preço nesta fatia inflaria o esquema sem consumidor (Artigo XI).
+
+O desenho proposto abaixo permanece válido para a F3.7 — não foi descartado, só não entra agora.
 
 **Problema.** `catalogo_item` guarda `conteudo` como texto livre. Isso serve bem para horário,
 regra e programação, mas não para item vendável: não dá para alterar um preço sem reescrever o
@@ -188,8 +211,7 @@ lê o preço no banco e monta a mensagem. Modelo que não emite número não err
 **Compatível com o que está fechado.** "Catálogo inteiro no prompt" continua valendo — a diferença
 é que o texto passa a ser *gerado* a partir das linhas, em vez de digitado.
 
-**Custo:** uma tabela e uma tela a mais na F2.1. **Decidir antes da F2.1**, porque muda o esquema —
-e mudança de esquema depois da F0.2 exige revisão nova de migração.
+**Custo na F3.7:** uma tabela (ou colunas) e tela a mais, com revisão Alembic. Não na F2.1.
 
 ## Categorias de mensagem do WhatsApp — referência rápida
 
@@ -206,6 +228,11 @@ As quatro mensagens proativas do MVP — coleta de dados, boas-vindas, pulso e p
 checkout — são todas **Utility**, e é sobre elas que a projeção de custo foi calculada.
 Qualquer mensagem nova precisa ser classificada antes de entrar no escopo.
 
+**Limite técnico da variável de template** (descoberto na F2.2, vale para as quatro): o valor
+enviado numa variável não pode conter quebra de linha, tabulação nem mais de quatro espaços
+seguidos, e não pode ser vazio. Texto longo estruturado — catálogo, lista formatada — não é
+enviável por template. Conteúdo assim pertence à janela de 24h, que é texto livre e gratuita.
+
 ## Ficha de cadastro do hóspede
 
 Nome completo · Profissão · Data de nascimento · Tipo de documento · Número do documento ·
@@ -218,8 +245,11 @@ o silêncio, o sistema para de insistir e sinaliza no painel que a reserva chega
 cadastro prévio. **Não ser intrusivo é requisito explícito do projeto.**
 
 Os parâmetros são linhas em `parametro_hotel`, configuráveis por propriedade:
-`horas_ate_reenvio` e `horas_corte_antes_checkin`. Os **valores** ainda precisam ser
-definidos com o hotel, mas a estrutura para armazená-los já existe.
+`horas_ate_reenvio`, `horas_corte_antes_checkin`, `horas_validade_boas_vindas`, e os três
+slots de entrada (`boas_vindas_cafe`, `boas_vindas_wifi`, `boas_vindas_checkout`). Os
+**valores** dos prazos ainda precisam ser definidos com o hotel, mas a estrutura para
+armazená-los já existe. A recepção edita só os três slots, pela operação
+`alterar_texto_de_boas_vindas`; `ler_texto_de_boas_vindas` vale para recepção e gestão.
 
 ## Personas de referência (Artefato 2)
 
@@ -279,7 +309,9 @@ Lacunas encontradas no backlog (agosto/2026) — nenhuma tem fatia dedicada:
 - [x] ~~**`parametro_hotel` é lido por três fatias e escrito por nenhuma.**~~ F1.4 semeia
       `horas_ate_reenvio` e `horas_corte_antes_checkin` no bootstrap e na `0007`. Continua
       **sem tela** de edição (SQL no MVP), escolha registrada
-- [ ] **Fechar o desenho de catálogo e preços** — ver seção própria acima. Prazo: antes da F2.1
+- [x] ~~**Fechar o desenho de catálogo e preços**~~ F2.1 adia preço estruturado para F3.7.
+      Catálogo ativo (fatos em texto) está entregue. Reabrir na fatia de consumo, se o texto
+      corrido for insuficiente para cobrar
 - [ ] **Contenção de tentativa repetida de senha** — fora da F0.3 de propósito (painel ainda não
       publicado). Precisa entrar antes de qualquer exposição contínua; a sessão longa do staff
       amplifica a consequência

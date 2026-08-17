@@ -139,12 +139,19 @@ reserva no painel. Não ser intrusivo é requisito explícito do projeto.
 | --- | --- |
 | **Ação** | Marina chega ao balcão, apresenta o documento físico, confere e assina o que for necessário, recebe a chave |
 | **Canal** | Presencial + WhatsApp (logo após) |
-| **O que o OmniStay faz** | Ao receber `checkin_confirmado`, dispara o pacote de boas-vindas: programação, cardápio, serviços e horários. A partir daqui a conversa está em regime ativo |
+| **O que o OmniStay faz** | Ao receber `checkin_confirmado`, dispara o recado curto de boas-vindas: chegada, informações de entrada da propriedade (café, wi-fi, checkout) e convite a perguntar. A partir daqui a conversa está em regime ativo |
 | **Dado gerado** | Timestamp de check-in · abertura da janela de atendimento de 24h · vínculo hóspede↔estadia ativo |
 | **Estado emocional** | **Alívio se a ficha já estava pronta** — o balcão vira conferência de documento, não preenchimento. Se ela não respondeu na F1, a experiência é a tradicional, e o sistema não piorou nada |
-| **Risco / oportunidade** | **Risco central:** se o Cléber esquecer de confirmar o check-in no painel, nada é disparado e o sistema continua achando que ela não chegou. **Oportunidade:** o pacote de boas-vindas chega quando ela está subindo para o quarto — momento de atenção alta e disposição para ler |
+| **Risco / oportunidade** | **Risco central:** se o Cléber esquecer de confirmar o check-in no painel, nada é disparado e o sistema continua achando que ela não chegou. **Oportunidade:** o recado chega quando ela está subindo para o quarto — momento de atenção alta e disposição para ler |
 
 **Tratamento do check-in não confirmado** — ver a mitigação proposta na seção 9.1.
+
+> **Correção (17/08/2026), na execução da F2.2.** A jornada descrevia o recado de chegada
+> como o próprio catálogo (programação, cardápio, serviços, horários). Na Cloud API, variável
+> de template não aceita quebra de linha, tabulação nem mais de quatro espaços seguidos — um
+> catálogo numa variável não sai. O recado ficou curto e termina convidando Marina a
+> perguntar. Para ela é melhor assim: ela está com a chave na mão, não vai ler um mural. O
+> catálogo responde quando ela pergunta, na janela de 24h (F3a).
 
 ### F3 — Estadia *(P3)*
 
@@ -308,7 +315,7 @@ Esta é a fase mais importante da trilha B e a mais frágil da proposta de valor
 | --- | --- |
 | **Ação** | Marina chega. Cléber confere o documento físico, **confirma o check-in no painel**, e transcreve a ficha para o PMS |
 | **Canal** | Presencial + painel web + PMS |
-| **O que o OmniStay faz** | Emite `checkin_confirmado` e dispara o pacote de boas-vindas |
+| **O que o OmniStay faz** | Emite `checkin_confirmado` e dispara o recado curto de boas-vindas |
 | **Dado gerado** | Timestamp de check-in · status `cadastro_concluido` após a transcrição |
 | **Estado emocional** | **Ambivalente.** O atendimento no balcão ficou mais rápido, mas a digitação não desapareceu — apenas mudou de lugar |
 | **Risco / oportunidade** | Dois riscos: **esquecer de clicar** (o processo trava silenciosamente) e **a percepção de digitação dupla** (o sistema perde o defensor interno) |

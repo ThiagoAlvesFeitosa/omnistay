@@ -88,3 +88,63 @@ def test_agendar_lembrete_loga_so_identificadores(monkeypatch):
     assert "Maria" not in texto
     assert "Silva" not in texto
     assert "opcional" not in texto
+
+
+def test_eventos_de_boas_vindas_nao_levam_conteudo(monkeypatch):
+    class Repo:
+        def inserir_mensagem_enviada_pendente(self, conexao, *, id_reserva, conteudo):
+            return 11
+
+        def ler_parametros(self, conexao, id_hotel, chaves):
+            return {
+                "boas_vindas_cafe": "segredo do cafe",
+                "boas_vindas_wifi": "senha-secreta",
+                "boas_vindas_checkout": "12h",
+            }
+
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(conversa.logger, "info", fake_info)
+    conversa.agendar_boas_vindas(
+        object(),
+        id_hotel=1,
+        id_reserva=42,
+        nome_completo="Maria Silva",
+        repositorio=Repo(),
+        repositorio_propriedade=Repo(),
+        enfileirar=lambda *a, **k: 1,
+    )
+    texto = " ".join(registros)
+    assert "boas_vindas_agendadas" in texto
+    assert "id_reserva=42" in texto
+    assert "id_mensagem=11" in texto
+    assert "segredo do cafe" not in texto
+    assert "senha-secreta" not in texto
+    assert "Maria" not in texto
+    assert "5511" not in texto
+
+    registros.clear()
+    class Vazio:
+        def ler_parametros(self, conexao, id_hotel, chaves):
+            return {}
+
+        def inserir_mensagem_enviada_pendente(self, conexao, *, id_reserva, conteudo):
+            raise AssertionError("nao deveria gravar")
+
+    conversa.agendar_boas_vindas(
+        object(),
+        id_hotel=1,
+        id_reserva=7,
+        nome_completo="Maria Silva",
+        repositorio=Vazio(),
+        repositorio_propriedade=Vazio(),
+        enfileirar=lambda *a, **k: 1,
+    )
+    texto = " ".join(registros)
+    assert "boas_vindas_bloqueadas" in texto
+    assert "chave=boas_vindas_cafe" in texto
+    assert "Maria" not in texto
+    assert "segredo" not in texto

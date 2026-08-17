@@ -29,12 +29,16 @@ TRANSICOES_RECUSADAS = [
 TRANSICOES_ACEITAS = [
     ("aguardando_cadastro", "ficha_recebida"),
     ("ficha_recebida", "hospedado"),
+    ("ficha_parcial", "hospedado"),
+    ("sem_cadastro_previo", "hospedado"),
     ("hospedado", "encerrado"),
 ]
 
 CAMINHO_ATE = {
     "aguardando_cadastro": [],
     "ficha_recebida": ["ficha_recebida"],
+    "ficha_parcial": ["ficha_parcial"],
+    "sem_cadastro_previo": ["sem_cadastro_previo"],
     "hospedado": ["ficha_recebida", "hospedado"],
     "encerrado": ["ficha_recebida", "hospedado", "encerrado"],
 }
@@ -194,3 +198,62 @@ def test_consumo_nasce_pendente_de_lancamento(conexao):
     ).scalar()
 
     assert status == "pendente"
+
+
+@pytest.mark.postgres
+def test_categoria_de_catalogo_fora_do_dominio_e_recusada(conexao):
+    id_hotel = criar_hotel(conexao)
+
+    with pytest.raises(DBAPIError) as erro:
+        conexao.execute(
+            text(
+                "INSERT INTO catalogo_item (id_hotel, categoria, titulo, conteudo) "
+                "VALUES (:id_hotel, 'spa', 'Massagem', 'Sob agendamento')"
+            ),
+            {"id_hotel": id_hotel},
+        )
+
+    assert "ck_catalogo_categoria" in str(erro.value)
+
+
+def _inserir_trabalho_boas_vindas(conexao, id_hotel: int, id_reserva: int) -> None:
+    conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, 'enviar_boas_vindas',"
+            " CAST(:payload AS jsonb), 'pendente')"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "payload": (
+                '{"id_reserva": %s, "id_mensagem": 1}' % id_reserva
+            ),
+        },
+    )
+
+
+@pytest.mark.postgres
+def test_tipo_enviar_boas_vindas_e_aceito_pelo_check(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+
+    _inserir_trabalho_boas_vindas(conexao, id_hotel, id_reserva)
+
+    tipo = conexao.execute(
+        text(
+            "SELECT tipo FROM trabalho WHERE tipo = 'enviar_boas_vindas'"
+        )
+    ).scalar_one()
+    assert tipo == "enviar_boas_vindas"
+
+
+@pytest.mark.postgres
+def test_segundo_trabalho_de_boas_vindas_da_mesma_reserva_e_recusado(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    _inserir_trabalho_boas_vindas(conexao, id_hotel, id_reserva)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_trabalho_boas_vindas(conexao, id_hotel, id_reserva)
+
+    assert "uq_trabalho_enviar_boas_vindas_reserva" in str(erro.value)

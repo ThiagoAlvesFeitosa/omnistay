@@ -98,10 +98,17 @@ check-in. Devem ser configuráveis por propriedade, não fixos no código.
 | --- | --- | --- | --- |
 | 2.1 | Hóspede | Chega ao hotel | — |
 | 2.2 | Recepção | Confirma o check-in no painel | Evento `checkin_confirmado` |
-| 2.3 | OmniStay | Dispara o pacote de boas-vindas: programação, cardápio, serviços, horários | Mensagens enviadas |
+| 2.3 | OmniStay | Dispara o recado curto de boas-vindas: chegada, informações de entrada da propriedade (café, wi-fi, checkout) e convite a perguntar | Mensagem enviada |
 
 A partir de 2.3 a conversa entra em regime ativo: qualquer mensagem do hóspede abre a
 janela de atendimento, dentro da qual as respostas do sistema não têm custo de API.
+
+> **Correção (17/08/2026), na execução da F2.2.** O passo 2.3 dizia "programação, cardápio,
+> serviços, horários" no próprio recado. Variável de template não aceita quebra de linha,
+> tabulação nem mais de quatro espaços seguidos, então despejar o catálogo ali não é
+> enviável. O recado ficou curto e **termina convidando o hóspede a perguntar** — é ele que
+> abre a janela de 24h, e é dentro dela que o catálogo responde em texto livre e sem custo
+> (P3.3a). O conteúdo não foi perdido: mudou de momento.
 
 ## 5. Processo P3 — Estadia
 

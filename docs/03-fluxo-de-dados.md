@@ -163,11 +163,17 @@ flowchart TB
 
 Três observações que o desenho torna visíveis e que o texto sozinho escondia:
 
-**a) D7 não existia em nenhum artefato anterior, e é obrigatório.** Tanto o P2 quanto o P3
-precisam ler os fatos da propriedade — horário do café, cardápio, serviços, programação. No
-P2 isso alimenta o pacote de boas-vindas; no P3 é o que delimita o que a IA pode responder
-sem inventar. A pendência aberta no Artefato 2 (*"definir a base de conhecimento que limita
-a resposta automática da IA"*) ganha aqui a forma de um depósito com dois consumidores.
+**a) D7 não existia em nenhum artefato anterior, e é obrigatório.** O P3 precisa ler os fatos
+da propriedade — horário do café, cardápio, serviços, programação — e é o que delimita o que a
+IA pode responder sem inventar. A pendência aberta no Artefato 2 (*"definir a base de
+conhecimento que limita a resposta automática da IA"*) ganha aqui a forma de um depósito.
+
+> **Correção (17/08/2026), na execução da F2.2.** O texto original dava dois consumidores a
+> D7, P2 e P3. Na prática o P2 não lê D7: o recado de chegada é curto e usa três informações
+> de entrada configuradas por propriedade, porque variável de template não aceita quebra de
+> linha, tabulação nem mais de quatro espaços seguidos. **D7 tem um consumidor: o P3.** Isso
+> não diminui a importância do depósito — o recado do P2 existe justamente para abrir a
+> janela em que o P3 responde a partir de D7.
 
 **b) D1 Reservas é escrito por três processos diferentes** — P1, P2 e P4 — e cada um só
 altera o status. É o depósito que carrega o estado do ciclo de vida da estadia, e por isso
@@ -416,9 +422,16 @@ caminho feliz descreve um sistema que não existe.
 | --- | --- |
 | **Gatilho** | Recepcionista clica em confirmar check-in. Manual |
 | **Payload** | `id_reserva` · `id_hospede` · timestamp |
-| **Consumidor** | P2 — pacote de boas-vindas |
+| **Consumidor** | P2 — recado curto de boas-vindas |
 | **Efeito no estado** | Status em D1 vai para `hospedado`; abre a janela de atendimento de 24h |
 | **Se falhar** | **É o ponto único de falha mais crítico do sistema, e falha em silêncio.** Se o clique não acontecer, nada é disparado e nenhum erro é gerado. Mitigações no Artefato 2 §9.1: detecção de divergência temporal, inferência por mensagem recebida de hóspede não confirmado, e confirmação em lote |
+
+> **Correção (17/08/2026), na execução da F2.2.** O recado de chegada **não** carrega o
+> conteúdo de D7. Ele leva três informações de entrada configuradas por propriedade (café,
+> wi-fi, checkout) e convida o hóspede a perguntar; D7 é lido depois, no P3, para responder na
+> janela de 24h. Motivo: variável de template recusa quebra de linha, tabulação e mais de
+> quatro espaços seguidos. A aresta `D7 → P2` do diagrama de nível 1 (e o PNG correspondente)
+> descreve a intenção original e permanece como registro; o consumidor real de D7 é o P3.
 
 ### 6.5 `mensagem_recebida`
 

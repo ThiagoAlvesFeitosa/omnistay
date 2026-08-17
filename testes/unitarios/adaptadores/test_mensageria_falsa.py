@@ -61,3 +61,31 @@ def test_modo_falha_levanta_erro_tipado():
         )
     assert exc.value.codigo == "mensageria_indisponivel"
     assert porta.envios == []
+
+
+def test_boas_vindas_registra_tipo_e_quatro_variaveis():
+    porta = MensageriaFalsa()
+    variaveis = ("Maria", "cafe 7h", "wifi hotel", "12h")
+    porta.enviar_boas_vindas(
+        telefone_destino="5511987654321",
+        variaveis=variaveis,
+        corpo="Ola, Maria!",
+        id_mensagem=9,
+        id_reserva=42,
+    )
+    assert porta.envios[0]["tipo"] == "boas_vindas"
+    assert porta.envios[0]["variaveis"] == variaveis
+
+
+def test_boas_vindas_modo_falha_levanta_erro_tipado():
+    porta = MensageriaFalsa()
+    porta.falhar_sempre = True
+    with pytest.raises(FalhaDeEnvio):
+        porta.enviar_boas_vindas(
+            telefone_destino="5511987654321",
+            variaveis=("Maria", "a", "b", "c"),
+            corpo="x",
+            id_mensagem=1,
+            id_reserva=1,
+        )
+    assert porta.envios == []

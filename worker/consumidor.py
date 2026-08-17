@@ -48,6 +48,10 @@ def processar_uma_passagem(
             conversa_service.processar_trabalho_enviar_lembrete(
                 conexao, trabalho=trabalho, gateway=gateway
             )
+        elif trabalho["tipo"] == "enviar_boas_vindas":
+            conversa_service.processar_trabalho_enviar_boas_vindas(
+                conexao, trabalho=trabalho, gateway=gateway
+            )
         else:
             fila_repository.marcar_falha(
                 conexao,

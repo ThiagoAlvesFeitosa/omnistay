@@ -5,7 +5,7 @@ import os
 from io import StringIO
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import bindparam, create_engine, text
 
 from app.comum.seguranca import conferir_senha
 from testes.suporte.banco_descartavel import banco_vazio
@@ -116,3 +116,43 @@ def test_bootstrap_nao_escreve_senha_na_saida_nem_no_log(
     assert resultado.ok
     assert senha not in saida
     assert senha not in caplog.text
+
+
+CHAVES_BOAS_VINDAS = (
+    "boas_vindas_cafe",
+    "boas_vindas_wifi",
+    "boas_vindas_checkout",
+    "horas_validade_boas_vindas",
+)
+
+
+@pytest.mark.postgres
+def test_bootstrap_semeia_quatro_chaves_de_boas_vindas(banco_migrado, monkeypatch):
+    from app.bootstrap import executar_bootstrap
+
+    monkeypatch.setenv("BOOTSTRAP_SENHA_INICIAL", "senha-inicial-do-gestor")
+    resultado = executar_bootstrap(
+        nome_hotel="Hotel Exemplo",
+        telefone_whatsapp="+5511999999999",
+        nome_gestor="Thiago Feitosa",
+        email_gestor="gestor@hotel.com.br",
+    )
+    assert resultado.ok
+
+    engine = create_engine(banco_migrado)
+    try:
+        with engine.connect() as conexao:
+            linhas = conexao.execute(
+                text(
+                    "SELECT chave, valor FROM parametro_hotel "
+                    "WHERE chave IN :chaves"
+                ).bindparams(bindparam("chaves", expanding=True)),
+                {"chaves": list(CHAVES_BOAS_VINDAS)},
+            ).mappings().all()
+    finally:
+        engine.dispose()
+
+    valores = {linha["chave"]: linha["valor"] for linha in linhas}
+    assert set(valores) == set(CHAVES_BOAS_VINDAS)
+    for chave in CHAVES_BOAS_VINDAS:
+        assert valores[chave].strip()

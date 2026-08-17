@@ -18,7 +18,10 @@ OPERACOES_ESPERADAS = {
     "resolver_solicitacao": {"recepcao", "staff"},
     "lancar_consumo": {"recepcao"},
     "alterar_catalogo": {"recepcao"},
+    "ler_catalogo": {"recepcao", "gestor"},
     "ler_indicadores": {"recepcao", "gestor"},
+    "alterar_texto_de_boas_vindas": {"recepcao"},
+    "ler_texto_de_boas_vindas": {"recepcao", "gestor"},
 }
 
 
@@ -49,5 +52,39 @@ def test_ler_indicadores_continua_para_recepcao_e_gestor():
     assert politica.permitido("staff", "ler_indicadores") is False
 
 
+def test_ler_catalogo_recepcao_e_gestor_staff_recusado():
+    assert politica.permitido("recepcao", "ler_catalogo") is True
+    assert politica.permitido("gestor", "ler_catalogo") is True
+    assert politica.permitido("staff", "ler_catalogo") is False
+
+
+def test_alterar_catalogo_continua_so_recepcao():
+    assert politica.permitido("recepcao", "alterar_catalogo") is True
+    assert politica.permitido("gestor", "alterar_catalogo") is False
+    assert politica.permitido("staff", "alterar_catalogo") is False
+
+
 def test_operacao_desconhecida_e_recusada():
     assert politica.permitido("gestor", "operacao_inventada") is False
+
+
+def test_alterar_texto_de_boas_vindas_so_recepcao():
+    assert politica.permitido("recepcao", "alterar_texto_de_boas_vindas") is True
+    assert politica.permitido("gestor", "alterar_texto_de_boas_vindas") is False
+    assert politica.permitido("staff", "alterar_texto_de_boas_vindas") is False
+
+
+def test_ler_texto_de_boas_vindas_recepcao_e_gestor():
+    assert politica.permitido("recepcao", "ler_texto_de_boas_vindas") is True
+    assert politica.permitido("gestor", "ler_texto_de_boas_vindas") is True
+    assert politica.permitido("staff", "ler_texto_de_boas_vindas") is False
+
+
+def test_confirmar_fase_da_reserva_continua_so_recepcao():
+    assert politica.permitido("recepcao", "confirmar_fase_da_reserva") is True
+    assert politica.permitido("gestor", "confirmar_fase_da_reserva") is False
+    assert politica.permitido("staff", "confirmar_fase_da_reserva") is False
+
+
+def test_nenhuma_operacao_da_matriz_contem_parametro_no_nome():
+    assert all("parametro" not in nome for nome in politica.OPERACOES)

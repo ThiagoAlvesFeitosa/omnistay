@@ -1,16 +1,21 @@
 """Regras de conversa: agendar coleta, receber webhook e extrair ficha."""
 
+from contextlib import nullcontext
+
 from sqlalchemy.engine import Connection
+from sqlalchemy.exc import IntegrityError
 
 from app.comum.log import obter_logger
 from app.comum.telefone import TelefoneInvalido, normalizar
 from app.fila import service as fila_service
 from app.modulos.conversa import repository as repositorio_padrao
 from app.modulos.conversa.schema import EventoEntrada
+from app.modulos.conversa.texto_boas_vindas import montar_texto_boas_vindas
 from app.modulos.conversa.texto_coleta import montar_texto_coleta
 from app.modulos.conversa.texto_lembrete import montar_texto_lembrete
 from app.modulos.conversa.validacao_ficha import refinar_resultado
 from app.modulos.propriedade import repository as propriedade_repository
+from app.modulos.propriedade import service as propriedade_service
 from app.portas.llm import FalhaDeExtracao, LLMProvider, ResultadoExtracao
 from app.portas.mensageria import FalhaDeEnvio, MensageriaGateway
 
@@ -80,6 +85,83 @@ def agendar_lembrete(
         id_hotel,
     )
     return id_mensagem
+
+
+CHAVES_SLOTS_BOAS_VINDAS = (
+    ("cafe", "boas_vindas_cafe"),
+    ("wifi", "boas_vindas_wifi"),
+    ("checkout", "boas_vindas_checkout"),
+)
+
+
+def _savepoint(conexao):
+    begin = getattr(conexao, "begin_nested", None)
+    if begin is None:
+        return nullcontext()
+    return begin()
+
+
+def agendar_boas_vindas(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    nome_completo: str,
+    repositorio=repositorio_padrao,
+    repositorio_propriedade=propriedade_repository,
+    enfileirar=fila_service.enfileirar_enviar_boas_vindas,
+) -> str:
+    lidos = repositorio_propriedade.ler_parametros(
+        conexao,
+        id_hotel,
+        [chave for _, chave in CHAVES_SLOTS_BOAS_VINDAS],
+    )
+    valores = {}
+    for campo, chave in CHAVES_SLOTS_BOAS_VINDAS:
+        try:
+            valores[campo] = propriedade_service.validar_texto_de_boas_vindas(
+                campo, lidos.get(chave) or ""
+            )
+        except propriedade_service.DadosInvalidos:
+            logger.info(
+                "boas_vindas_bloqueadas motivo=slot_invalido chave=%s "
+                "id_reserva=%s id_hotel=%s",
+                chave,
+                id_reserva,
+                id_hotel,
+            )
+            return "nao_enviada_slot_ausente"
+    texto = montar_texto_boas_vindas(
+        nome_completo=nome_completo,
+        cafe=valores["cafe"],
+        wifi=valores["wifi"],
+        checkout=valores["checkout"],
+    )
+    try:
+        with _savepoint(conexao):
+            id_mensagem = repositorio.inserir_mensagem_enviada_pendente(
+                conexao, id_reserva=id_reserva, conteudo=texto
+            )
+            enfileirar(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=id_reserva,
+                id_mensagem=id_mensagem,
+            )
+    except IntegrityError:
+        logger.info(
+            "boas_vindas_ja_agendadas id_reserva=%s id_hotel=%s",
+            id_reserva,
+            id_hotel,
+        )
+        return "ja_agendada"
+    logger.info(
+        "boas_vindas_agendadas id_reserva=%s id_mensagem=%s id_hotel=%s",
+        id_reserva,
+        id_mensagem,
+        id_hotel,
+    )
+    return "agendada"
 
 
 def tem_mensagem_recebida(
@@ -159,6 +241,118 @@ def processar_trabalho_enviar_lembrete(
         trabalho=trabalho,
         enviar=gateway.enviar_lembrete,
         repositorio=repositorio,
+    )
+
+
+def processar_trabalho_enviar_boas_vindas(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    gateway: MensageriaGateway,
+    repositorio=repositorio_padrao,
+    repositorio_propriedade=propriedade_repository,
+) -> None:
+    from app.fila import repository as fila_repo
+    from app.fila import service as fila_svc
+
+    id_trabalho = trabalho["id_trabalho"]
+    id_hotel = trabalho["id_hotel"]
+    payload = trabalho["payload"]
+    id_mensagem = int(payload["id_mensagem"])
+    id_reserva = int(payload["id_reserva"])
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    if mensagem is None:
+        fila_repo.marcar_falha(
+            conexao,
+            id_trabalho=id_trabalho,
+            tentativas=trabalho["tentativas"] + 1,
+            erro="mensagem_ausente",
+        )
+        return
+    telefone = repositorio.ler_telefone_da_reserva(conexao, id_reserva=id_reserva)
+    if not telefone:
+        fila_repo.marcar_falha(
+            conexao,
+            id_trabalho=id_trabalho,
+            tentativas=trabalho["tentativas"] + 1,
+            erro="telefone_ausente",
+        )
+        marcar_envio_falha(conexao, id_mensagem=id_mensagem, repositorio=repositorio)
+        return
+    lidos = repositorio_propriedade.ler_parametros(
+        conexao,
+        id_hotel,
+        [chave for _, chave in CHAVES_SLOTS_BOAS_VINDAS],
+    )
+    valores = {}
+    for campo, chave in CHAVES_SLOTS_BOAS_VINDAS:
+        try:
+            valores[campo] = propriedade_service.validar_texto_de_boas_vindas(
+                campo, lidos.get(chave) or ""
+            )
+        except propriedade_service.DadosInvalidos:
+            fila_svc.registrar_falha_de_envio(
+                conexao,
+                id_trabalho=id_trabalho,
+                id_hotel=id_hotel,
+                tentativas_atuais=trabalho["tentativas"],
+                codigo_erro="slot_invalido",
+            )
+            marcar_envio_falha(
+                conexao, id_mensagem=id_mensagem, repositorio=repositorio
+            )
+            logger.info(
+                "envio_tentativa_falhou id_trabalho=%s tipo=%s destino=falha "
+                "codigo=slot_invalido",
+                id_trabalho,
+                trabalho.get("tipo"),
+            )
+            return
+    prenome = primeiro_nome_do_conteudo_ou_reserva(mensagem["conteudo"])
+    try:
+        resultado = gateway.enviar_boas_vindas(
+            telefone_destino=telefone,
+            variaveis=(
+                prenome,
+                valores["cafe"],
+                valores["wifi"],
+                valores["checkout"],
+            ),
+            corpo=mensagem["conteudo"],
+            id_mensagem=id_mensagem,
+            id_reserva=id_reserva,
+        )
+    except FalhaDeEnvio as erro:
+        destino = fila_svc.registrar_falha_de_envio(
+            conexao,
+            id_trabalho=id_trabalho,
+            id_hotel=id_hotel,
+            tentativas_atuais=trabalho["tentativas"],
+            codigo_erro=erro.codigo,
+        )
+        if destino == "falha":
+            marcar_envio_falha(
+                conexao, id_mensagem=id_mensagem, repositorio=repositorio
+            )
+        logger.info(
+            "envio_tentativa_falhou id_trabalho=%s tipo=%s destino=%s codigo=%s",
+            id_trabalho,
+            trabalho.get("tipo"),
+            destino,
+            erro.codigo,
+        )
+        return
+    marcar_envio_sucesso(
+        conexao,
+        id_mensagem=id_mensagem,
+        id_externo=resultado.id_externo,
+        repositorio=repositorio,
+    )
+    fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+    logger.info(
+        "boas_vindas_enviadas id_mensagem=%s id_externo=%s",
+        id_mensagem,
+        resultado.id_externo,
     )
 
 

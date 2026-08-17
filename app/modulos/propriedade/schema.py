@@ -1,0 +1,60 @@
+"""Contratos de entrada e saida do catalogo da propriedade."""
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class ItemCatalogoEntrada(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    categoria: str = Field(min_length=1, max_length=40)
+    titulo: str = Field(min_length=1, max_length=160)
+    conteudo: str = Field(min_length=1)
+
+
+class ItemCatalogoPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    titulo: str | None = Field(default=None, min_length=1, max_length=160)
+    conteudo: str | None = Field(default=None, min_length=1)
+    ativo: bool | None = None
+
+
+class ItemCatalogoResposta(BaseModel):
+    id_catalogo_item: int
+    categoria: str
+    titulo: str
+    conteudo: str
+    ativo: bool
+
+
+class ItemCatalogoAtivo(BaseModel):
+    id_catalogo_item: int
+    categoria: str
+    titulo: str
+    conteudo: str
+
+
+class ListaManutencaoResposta(BaseModel):
+    itens: list[ItemCatalogoResposta]
+
+
+class CatalogoAtivoResposta(BaseModel):
+    horario: list[ItemCatalogoAtivo]
+    cardapio: list[ItemCatalogoAtivo]
+    servico: list[ItemCatalogoAtivo]
+    programacao: list[ItemCatalogoAtivo]
+    regra: list[ItemCatalogoAtivo]
+
+
+class BoasVindasEntrada(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cafe: str = Field(min_length=1, max_length=255)
+    wifi: str = Field(min_length=1, max_length=255)
+    checkout: str = Field(min_length=1, max_length=255)
+
+
+class BoasVindasResposta(BaseModel):
+    cafe: str | None = None
+    wifi: str | None = None
+    checkout: str | None = None

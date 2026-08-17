@@ -101,6 +101,22 @@ def _semear_parametros_coleta(
         )
 
 
+def _semear_boas_vindas(conexao: Connection, id_hotel: int, sufixo: str) -> None:
+    for chave, valor in (
+        ("boas_vindas_cafe", f"Cafe da manha das 7h as 10h ({sufixo})"),
+        ("boas_vindas_wifi", f"Wi-Fi: rede {sufixo}, senha na recepcao"),
+        ("boas_vindas_checkout", f"Checkout ate as 12h ({sufixo})"),
+        ("horas_validade_boas_vindas", "12"),
+    ):
+        conexao.execute(
+            text(
+                "INSERT INTO parametro_hotel (id_hotel, chave, valor) "
+                "VALUES (:id_hotel, :chave, :valor)"
+            ),
+            {"id_hotel": id_hotel, "chave": chave, "valor": valor},
+        )
+
+
 def _inserir_usuario(
     conexao: Connection,
     id_hotel: int,
@@ -144,6 +160,7 @@ def _montar_propriedade(
     id_hotel = _inserir_hotel(conexao, nome_hotel, telefone)
     _semear_duracoes(conexao, id_hotel)
     _semear_parametros_coleta(conexao, id_hotel, telefone)
+    _semear_boas_vindas(conexao, id_hotel, sufixo_email)
     usuarios = {
         "gestor": _inserir_usuario(
             conexao,

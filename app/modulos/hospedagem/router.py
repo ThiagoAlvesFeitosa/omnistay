@@ -8,6 +8,7 @@ from app.modulos.acesso.dependencias import Conexao, exigir_operacao
 from app.modulos.acesso.service import SessaoAtual
 from app.modulos.hospedagem import service as hospedagem
 from app.modulos.hospedagem.schema import (
+    ChegadaResposta,
     ContagemChegadasResposta,
     FichaTitularResposta,
     FilaDoDiaResposta,
@@ -83,3 +84,43 @@ def ler_ficha(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(erro),
         ) from erro
+
+
+@roteador.post("/reservas/{id_reserva}/chegada", response_model=ChegadaResposta)
+def confirmar_chegada(
+    id_reserva: int,
+    conexao: Conexao,
+    sessao: Annotated[
+        SessaoAtual, Depends(exigir_operacao("confirmar_fase_da_reserva"))
+    ],
+) -> ChegadaResposta:
+    try:
+        return hospedagem.confirmar_chegada(
+            conexao, id_hotel=sessao.id_hotel, id_reserva=id_reserva
+        )
+    except hospedagem.ReservaNaoEncontrada as erro:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reserva nao encontrada.",
+        ) from erro
+    except hospedagem.ChegadaNaoPermitida as erro:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_motivo_chegada_recusada(erro.status_atual),
+        ) from erro
+
+
+def _motivo_chegada_recusada(status_atual: str) -> str:
+    motivos = {
+        "hospedado": "A chegada desta reserva ja foi confirmada.",
+        "encerrado": "Reserva encerrada nao pode ter a chegada confirmada.",
+        "cancelada": "Reserva cancelada nao pode ter a chegada confirmada.",
+        "aguardando_cadastro": (
+            "A chegada so pode ser confirmada depois da ficha ou da marcacao "
+            "de chegada sem cadastro previo."
+        ),
+    }
+    return motivos.get(
+        status_atual,
+        "O estado atual da reserva nao admite confirmacao de chegada.",
+    )

@@ -4,18 +4,32 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Protocol
 
+from app.comum.log import obter_logger
 from app.comum.telefone import TelefoneInvalido, normalizar
 from app.modulos.conversa import service as conversa_service
 from app.modulos.hospedagem import repository as repositorio_padrao
 from app.modulos.hospedagem.schema import (
+    ChegadaResposta,
     FichaTitularResposta,
     ItemFilaDoDia,
     ReservaResposta,
 )
 
+logger = obter_logger(__name__)
+
 
 class DadosInvalidos(ValueError):
     """Entrada rejeitada na borda de negocio, com mensagem para o usuario."""
+
+
+class ReservaNaoEncontrada(Exception):
+    pass
+
+
+class ChegadaNaoPermitida(Exception):
+    def __init__(self, status_atual: str) -> None:
+        self.status_atual = status_atual
+        super().__init__(status_atual)
 
 
 class RepositorioDeHospedagem(Protocol):
@@ -137,6 +151,7 @@ def listar_fila_do_dia(
             status=linha["status"],
             ficha_completa=linha.get("ficha_completa"),
             chegada_nao_confirmada=bool(linha["chegada_nao_confirmada"]),
+            boas_vindas_nao_enviadas=bool(linha.get("boas_vindas_nao_enviadas")),
             status_envio_coleta=linha.get("status_envio_coleta"),
             estado_cadastro=linha.get("estado_cadastro"),
         )
@@ -268,3 +283,58 @@ def marcar_sem_cadastro_previo(
         id_reserva,
         id_hotel,
     )
+
+
+def confirmar_chegada(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    repositorio=repositorio_padrao,
+    agendar_boas_vindas=conversa_service.agendar_boas_vindas,
+) -> ChegadaResposta:
+    atualizada = repositorio.confirmar_chegada(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    if atualizada is None:
+        existente = repositorio.ler_reserva_do_hotel(
+            conexao, id_hotel=id_hotel, id_reserva=id_reserva
+        )
+        if existente is None:
+            raise ReservaNaoEncontrada
+        logger.info(
+            "chegada_recusada id_reserva=%s id_hotel=%s status=%s",
+            id_reserva,
+            id_hotel,
+            existente["status"],
+        )
+        raise ChegadaNaoPermitida(existente["status"])
+
+    titular = repositorio.ler_titular_da_reserva(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    nome = titular["nome_completo"] if titular else "hospede"
+    desfecho = agendar_boas_vindas(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        nome_completo=nome,
+    )
+    logger.info(
+        "chegada_confirmada id_reserva=%s id_hotel=%s",
+        id_reserva,
+        id_hotel,
+    )
+    return ChegadaResposta(
+        id_reserva=id_reserva,
+        status=atualizada["status"],
+        checkin_em=atualizada["checkin_em"],
+        boas_vindas=desfecho,
+    )
+
+
+def listar_hospedados_sem_boas_vindas(
+    conexao,
+    repositorio=repositorio_padrao,
+) -> list[dict]:
+    return repositorio.listar_hospedados_sem_boas_vindas(conexao)

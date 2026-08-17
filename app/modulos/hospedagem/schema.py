@@ -1,6 +1,6 @@
 """Contratos de entrada e saida do modulo de hospedagem."""
 
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -31,6 +31,7 @@ class ItemFilaDoDia(BaseModel):
     status: str
     ficha_completa: bool | None
     chegada_nao_confirmada: bool
+    boas_vindas_nao_enviadas: bool = False
     status_envio_coleta: str | None = None
     estado_cadastro: str | None = None
 
@@ -58,3 +59,10 @@ class FichaTitularResposta(BaseModel):
     cep: str | None = None
     cidade: str | None = None
     telefone: str
+
+
+class ChegadaResposta(BaseModel):
+    id_reserva: int
+    status: str
+    checkin_em: datetime
+    boas_vindas: str

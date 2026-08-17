@@ -97,7 +97,8 @@ COMMENT ON TABLE parametro_hotel IS
     'Configuracao operacional por propriedade. Chaves previstas: horas_ate_reenvio, '
     'horas_corte_antes_checkin, periodicidade_coleta_mercado, horas_minimas_para_pulso, '
     'duracao_sessao_recepcao_horas, duracao_sessao_staff_horas, duracao_sessao_gestor_horas, '
-    'contato_responsavel_dados, tentativas_max_envio_mensagem.';
+    'contato_responsavel_dados, tentativas_max_envio_mensagem, boas_vindas_cafe, '
+    'boas_vindas_wifi, boas_vindas_checkout, horas_validade_boas_vindas.';
 
 
 CREATE TABLE catalogo_item (
@@ -304,7 +305,8 @@ CREATE TABLE trabalho (
     criado_em              TIMESTAMPTZ  NOT NULL DEFAULT now(),
     atualizado_em          TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT ck_trabalho_tipo CHECK (
-        tipo IN ('enviar_coleta', 'interpretar_ficha', 'enviar_lembrete')
+        tipo IN ('enviar_coleta', 'interpretar_ficha', 'enviar_lembrete',
+                 'enviar_boas_vindas')
     ),
     CONSTRAINT ck_trabalho_status CHECK (
         status IN ('pendente', 'processando', 'concluido', 'falha')
@@ -326,6 +328,10 @@ CREATE UNIQUE INDEX uq_trabalho_interpretar_ficha_mensagem
 CREATE UNIQUE INDEX uq_trabalho_enviar_lembrete_reserva
     ON trabalho ( ((payload->>'id_reserva')::bigint) )
     WHERE tipo = 'enviar_lembrete';
+
+CREATE UNIQUE INDEX uq_trabalho_enviar_boas_vindas_reserva
+    ON trabalho ( ((payload->>'id_reserva')::bigint) )
+    WHERE tipo = 'enviar_boas_vindas';
 
 CREATE INDEX ix_trabalho_claim
     ON trabalho (status, proxima_tentativa_em)
@@ -551,7 +557,13 @@ SELECT r.id_hotel,
                 ) THEN 'leitura_humana'
            WHEN r.status = 'aguardando_cadastro' THEN 'aguardando'
            ELSE r.status
-       END AS estado_cadastro
+       END AS estado_cadastro,
+       (r.status = 'hospedado'
+        AND NOT EXISTS (
+              SELECT 1 FROM trabalho t
+               WHERE t.tipo = 'enviar_boas_vindas'
+                 AND (t.payload->>'id_reserva')::bigint = r.id_reserva
+            )) AS boas_vindas_nao_enviadas
   FROM reserva r
   LEFT JOIN reserva_hospede rh
          ON rh.id_reserva = r.id_reserva AND rh.titular
@@ -574,4 +586,4 @@ COMMENT ON VIEW vw_fila_do_dia IS
     'chegada_nao_confirmada sinaliza divergencia temporal. Inclui telefone_contato, '
     'data_checkout_prevista, status_envio_coleta da mensagem de coleta e '
     'estado_cadastro (aguardando, completa, parcial, leitura_humana, '
-    'sem_cadastro_previo).';
+    'sem_cadastro_previo) e boas_vindas_nao_enviadas (hospedado sem recado).';

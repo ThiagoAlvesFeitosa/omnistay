@@ -254,23 +254,25 @@ worker (`python -m worker --uma-passagem`), revisão `0005_trabalho_e_coleta`,
 **Depende de:** F0.3.
 **Referência:** Artefato 3 §4.1, Artefato 4 §6.2.
 
-> Esta fatia vem antes do check-in porque o pacote de boas-vindas depende dela.
+> Esta fatia vem antes do check-in porque a conversa aberta na chegada depende dela: sem
+> catálogo publicado, não há o que responder quando o hóspede pergunta.
 
 ## F2.2 — Confirmar chegada e dar boas-vindas
 
-**Objetivo:** o clique da recepção dispara o pacote de boas-vindas.
+**Objetivo:** o clique da recepção dispara o recado de boas-vindas e abre a conversa.
 
 **Descrição para o `/specify`:**
 > A recepção confirma a chegada do hóspede no painel. Isso registra o momento real da entrada
-> e dispara o pacote de boas-vindas com a programação, o cardápio, os serviços e os horários
-> da propriedade. A confirmação só é possível para reservas que ainda não foram encerradas ou
-> canceladas. Reservas cuja data prevista de entrada já passou sem confirmação são destacadas
-> na fila do dia.
+> e dispara um recado curto de boas-vindas com as informações de entrada da propriedade,
+> convidando o hóspede a perguntar o que quiser pelo mesmo canal. A confirmação só é possível
+> para reservas que ainda não foram encerradas ou canceladas. Reservas cuja data prevista de
+> entrada já passou sem confirmação são destacadas na fila do dia.
 
 **Critérios de aceite:**
 
 - Confirmação registra o momento real e muda o status para hospedado
-- Pacote de boas-vindas é enviado usando o catálogo da propriedade
+- Recado curto de boas-vindas é enviado com as informações de entrada configuradas pela
+  propriedade e termina convidando o hóspede a perguntar
 - Confirmação em reserva encerrada ou cancelada é recusada
 - Reserva com entrada prevista vencida e sem confirmação aparece destacada
 - Mensagem de boas-vindas não contém oferta comercial
@@ -280,6 +282,15 @@ worker (`python -m worker --uma-passagem`), revisão `0005_trabalho_e_coleta`,
 
 > O último critério é econômico, não estético: oferta dentro do pacote faz a Meta
 > reclassificar o template como marketing, multiplicando o custo por cerca de sete.
+
+> **Correção (17/08/2026).** O critério dizia "pacote de boas-vindas é enviado usando o
+> catálogo da propriedade", o que na execução não é enviável: variável de template da Cloud
+> API recusa quebra de linha, tabulação e mais de quatro espaços seguidos, então o catálogo
+> inteiro não cabe numa variável. O recado de chegada passa a ser **curto** — confirmação,
+> três informações de entrada configuradas pela propriedade (café, wi-fi, checkout) e um
+> convite a perguntar. **O catálogo continua sendo a única fonte de afirmação**, consumido
+> sob demanda na janela de 24h pela F3.3. A F2.1 segue sendo pré-requisito: sem fatos
+> publicados, a conversa aberta pelo recado não tem o que responder depois.
 
 ---
 

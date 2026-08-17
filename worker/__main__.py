@@ -1,4 +1,4 @@
-"""Ponto de entrada: python -m worker [--uma-passagem|--verificar-cadastros]."""
+"""Ponto de entrada: python -m worker [--uma-passagem|--verificar-cadastros|--verificar-boas-vindas]."""
 
 import argparse
 import time
@@ -10,7 +10,10 @@ from app.adaptadores.mensageria_falsa import MensageriaFalsa
 from app.config import obter_configuracao
 from app.comum import relogio
 from app.comum.log import configurar_log, obter_logger
-from worker.agendador import verificar_cadastros_pendentes
+from worker.agendador import (
+    verificar_boas_vindas_pendentes,
+    verificar_cadastros_pendentes,
+)
 from worker.consumidor import processar_uma_passagem_na_engine
 
 logger = obter_logger(__name__)
@@ -25,6 +28,13 @@ def _rodar_verificacao(engine) -> int:
     return n
 
 
+def _rodar_verificacao_boas_vindas(engine) -> int:
+    with engine.begin() as conexao:
+        n = verificar_boas_vindas_pendentes(conexao)
+    logger.info("verificacao_boas_vindas_concluida afetados=%s", n)
+    return n
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Worker OmniStay")
     parser.add_argument(
@@ -36,6 +46,11 @@ def main(argv: list[str] | None = None) -> None:
         "--verificar-cadastros",
         action="store_true",
         help="Verifica cadastros pendentes uma vez e encerra",
+    )
+    parser.add_argument(
+        "--verificar-boas-vindas",
+        action="store_true",
+        help="Verifica boas-vindas pendentes uma vez e encerra",
     )
     parser.add_argument(
         "--intervalo-segundos",
@@ -54,6 +69,9 @@ def main(argv: list[str] | None = None) -> None:
     if args.verificar_cadastros:
         _rodar_verificacao(engine)
         return
+    if args.verificar_boas_vindas:
+        _rodar_verificacao_boas_vindas(engine)
+        return
     logger.info("worker_iniciado")
     ultima_verificacao = None
     while True:
@@ -64,6 +82,7 @@ def main(argv: list[str] | None = None) -> None:
             or agora - ultima_verificacao >= INTERVALO_VERIFICACAO
         ):
             _rodar_verificacao(engine)
+            _rodar_verificacao_boas_vindas(engine)
             ultima_verificacao = agora
         time.sleep(args.intervalo_segundos)
 

@@ -93,6 +93,10 @@ def test_criacao_inicial_grava_propriedade_gestor_e_duracoes():
         "tentativas_max_envio_mensagem",
         "horas_ate_reenvio",
         "horas_corte_antes_checkin",
+        "boas_vindas_cafe",
+        "boas_vindas_wifi",
+        "boas_vindas_checkout",
+        "horas_validade_boas_vindas",
     }
     valores = {p["chave"]: p["valor"] for p in propriedade.parametros}
     assert valores["duracao_sessao_recepcao_horas"] == "12"
@@ -102,6 +106,15 @@ def test_criacao_inicial_grava_propriedade_gestor_e_duracoes():
     assert valores["tentativas_max_envio_mensagem"] == "5"
     assert valores["horas_ate_reenvio"] == "24"
     assert valores["horas_corte_antes_checkin"] == "12"
+    for chave in (
+        "boas_vindas_cafe",
+        "boas_vindas_wifi",
+        "boas_vindas_checkout",
+    ):
+        propriedade_service.validar_texto_de_boas_vindas(
+            chave.removeprefix("boas_vindas_"), valores[chave]
+        )
+    assert int(valores["horas_validade_boas_vindas"]) > 0
 
 
 def test_criacao_inicial_recusa_quando_ja_existe_propriedade():
