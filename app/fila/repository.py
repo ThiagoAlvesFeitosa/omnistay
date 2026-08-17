@@ -10,6 +10,13 @@ TIPO_ENVIAR_COLETA = "enviar_coleta"
 TIPO_INTERPRETAR_FICHA = "interpretar_ficha"
 TIPO_ENVIAR_LEMBRETE = "enviar_lembrete"
 TIPO_ENVIAR_BOAS_VINDAS = "enviar_boas_vindas"
+TIPO_CLASSIFICAR_MENSAGEM = "classificar_mensagem"
+TIPOS_CONSUMIVEIS = (
+    TIPO_ENVIAR_COLETA,
+    TIPO_INTERPRETAR_FICHA,
+    TIPO_ENVIAR_LEMBRETE,
+    TIPO_ENVIAR_BOAS_VINDAS,
+)
 BLOQUEIO_PROCESSANDO = timedelta(minutes=5)
 
 
@@ -108,6 +115,35 @@ def enfileirar_enviar_boas_vindas(
     ).scalar_one()
 
 
+def enfileirar_classificar_mensagem(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    id_evento: int,
+) -> int:
+    payload = json.dumps(
+        {
+            "id_reserva": id_reserva,
+            "id_mensagem": id_mensagem,
+            "id_evento": id_evento,
+        }
+    )
+    return conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, :tipo, CAST(:payload AS jsonb), 'pendente') "
+            "RETURNING id_trabalho"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "tipo": TIPO_CLASSIFICAR_MENSAGEM,
+            "payload": payload,
+        },
+    ).scalar_one()
+
+
 def reclaim_expirados(
     conexao: Connection,
     *,
@@ -142,6 +178,8 @@ def reclamar_proximo(
             " proxima_tentativa_em, erro_ultima_tentativa"
             " FROM trabalho"
             " WHERE status = 'pendente'"
+            " AND tipo IN ('enviar_coleta', 'interpretar_ficha',"
+            " 'enviar_lembrete', 'enviar_boas_vindas')"
             " AND (proxima_tentativa_em IS NULL OR proxima_tentativa_em <= :agora)"
             " ORDER BY id_trabalho ASC"
             " FOR UPDATE SKIP LOCKED"

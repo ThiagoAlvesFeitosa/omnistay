@@ -119,17 +119,33 @@ def inserir_mensagem_recebida(
     id_reserva: int,
     conteudo: str,
     id_externo: str | None = None,
+    enviada_em=None,
 ) -> int:
+    if enviada_em is None:
+        return conexao.execute(
+            text(
+                "INSERT INTO mensagem (id_reserva, direcao, conteudo, id_externo) "
+                "VALUES (:id_reserva, 'recebida', :conteudo, :id_externo) "
+                "RETURNING id_mensagem"
+            ),
+            {
+                "id_reserva": id_reserva,
+                "conteudo": conteudo,
+                "id_externo": id_externo,
+            },
+        ).scalar_one()
     return conexao.execute(
         text(
-            "INSERT INTO mensagem (id_reserva, direcao, conteudo, id_externo) "
-            "VALUES (:id_reserva, 'recebida', :conteudo, :id_externo) "
+            "INSERT INTO mensagem (id_reserva, direcao, conteudo, id_externo,"
+            " enviada_em) "
+            "VALUES (:id_reserva, 'recebida', :conteudo, :id_externo, :enviada_em) "
             "RETURNING id_mensagem"
         ),
         {
             "id_reserva": id_reserva,
             "conteudo": conteudo,
             "id_externo": id_externo,
+            "enviada_em": enviada_em,
         },
     ).scalar_one()
 
@@ -164,6 +180,27 @@ def resolver_reserva_aguardando_cadastro(
             " WHERE id_hotel = :id_hotel"
             " AND telefone_contato = :telefone"
             " AND status = 'aguardando_cadastro'"
+            " ORDER BY id_reserva DESC"
+            " LIMIT 1"
+        ),
+        {"id_hotel": id_hotel, "telefone": telefone_contato},
+    ).mappings().first()
+    return dict(linha) if linha else None
+
+
+def resolver_reserva_hospedada(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    telefone_contato: str,
+) -> dict | None:
+    linha = conexao.execute(
+        text(
+            "SELECT id_reserva, id_hotel, status, telefone_contato"
+            " FROM reserva"
+            " WHERE id_hotel = :id_hotel"
+            " AND telefone_contato = :telefone"
+            " AND status = 'hospedado'"
             " ORDER BY id_reserva DESC"
             " LIMIT 1"
         ),

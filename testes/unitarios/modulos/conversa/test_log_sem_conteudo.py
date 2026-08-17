@@ -32,7 +32,7 @@ def test_receber_evento_loga_so_identificadores(monkeypatch):
         def resolver_reserva_aguardando_cadastro(self, conexao, *, id_hotel, telefone_contato):
             return {"id_reserva": 10, "id_hotel": 1, "status": "aguardando_cadastro"}
 
-        def inserir_mensagem_recebida(self, conexao, *, id_reserva, conteudo, id_externo=None):
+        def inserir_mensagem_recebida(self, conexao, *, id_reserva, conteudo, id_externo=None, enviada_em=None):
             return 8
 
     def enfileirar(*args, **kwargs):
@@ -148,3 +148,96 @@ def test_eventos_de_boas_vindas_nao_levam_conteudo(monkeypatch):
     assert "chave=boas_vindas_cafe" in texto
     assert "Maria" not in texto
     assert "segredo" not in texto
+
+
+def test_desfechos_de_estadia_nao_levam_conteudo_ao_log(monkeypatch):
+    class Repo:
+        def __init__(self):
+            self.eventos = {}
+            self.proximo = 1
+            self.hospedada = {
+                "id_reserva": 20,
+                "id_hotel": 1,
+                "status": "hospedado",
+            }
+
+        def inserir_evento_webhook(self, conexao, *, id_externo, payload):
+            if id_externo in self.eventos:
+                return None
+            eid = self.proximo
+            self.proximo += 1
+            self.eventos[id_externo] = eid
+            return eid
+
+        def resolver_reserva_aguardando_cadastro(
+            self, conexao, *, id_hotel, telefone_contato
+        ):
+            return None
+
+        def resolver_reserva_hospedada(self, conexao, *, id_hotel, telefone_contato):
+            return self.hospedada
+
+        def inserir_mensagem_recebida(
+            self, conexao, *, id_reserva, conteudo, id_externo=None, enviada_em=None
+        ):
+            return 8
+
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(conversa.logger, "info", fake_info)
+    repo = Repo()
+    evento = EventoEntrada(
+        id_externo="est-log",
+        telefone_origem="11987654321",
+        texto="segredo da estadia",
+        tem_texto_utilizavel=True,
+    )
+    conversa.receber_evento_entrada(
+        object(),
+        evento=evento,
+        id_hotel=1,
+        repositorio=repo,
+        enfileirar_estadia=lambda *a, **k: 4,
+    )
+    conversa.receber_evento_entrada(
+        object(),
+        evento=evento,
+        id_hotel=1,
+        repositorio=repo,
+        enfileirar_estadia=lambda *a, **k: 4,
+    )
+    repo.hospedada = None
+    conversa.receber_evento_entrada(
+        object(),
+        evento=EventoEntrada(
+            id_externo="orfao-log",
+            telefone_origem="11987654321",
+            texto="orfao secreto",
+            tem_texto_utilizavel=True,
+        ),
+        id_hotel=1,
+        repositorio=repo,
+    )
+    conversa.receber_evento_entrada(
+        object(),
+        evento=EventoEntrada(
+            id_externo="midia-log",
+            telefone_origem="11987654321",
+            texto="",
+            tem_texto_utilizavel=False,
+        ),
+        id_hotel=1,
+        repositorio=repo,
+    )
+    texto = " ".join(registros)
+    assert "id_evento=" in texto
+    assert "webhook_duplicado" in texto
+    assert "webhook_sem_reserva" in texto
+    assert "webhook_sem_texto" in texto
+    assert "segredo da estadia" not in texto
+    assert "orfao secreto" not in texto
+    assert "11987654321" not in texto
+

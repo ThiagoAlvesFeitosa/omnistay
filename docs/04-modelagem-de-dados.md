@@ -683,9 +683,12 @@ recebida.
 
 **A tabela `trabalho` é a fila durável do Artefato 5.** O cadastro de reserva grava, na mesma
 transação, a mensagem de coleta (`status_envio = pendente`) e um trabalho `enviar_coleta`; o
-webhook de resposta grava mensagem recebida e um trabalho `interpretar_ficha`. O worker
-consome com `FOR UPDATE SKIP LOCKED`. Índices únicos parciais: uma coleta por reserva e uma
-interpretação por mensagem de entrada. Payload só com identificadores — sem PII.
+webhook de resposta de ficha grava mensagem recebida e um trabalho `interpretar_ficha`; o
+webhook de estadia (reserva `hospedado`) grava mensagem recebida e um trabalho
+`classificar_mensagem`, que permanece pendente até a fatia de classificação — o worker não
+o consome nesta entrega. O worker consome os demais tipos com `FOR UPDATE SKIP LOCKED`.
+Índices únicos parciais: uma coleta por reserva, uma interpretação por mensagem de
+entrada, um `classificar_mensagem` por mensagem. Payload só com identificadores — sem PII.
 
 ### 7.2 Verificação realizada
 

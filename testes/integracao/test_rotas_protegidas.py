@@ -8,6 +8,9 @@ ROTAS_PUBLICAS = {
     ("GET", "/health"),
     ("POST", "/sessoes"),
     ("DELETE", "/sessoes/atual"),
+    # Canal do provedor: posse (GET) e HMAC (POST), sem cookie de sessão.
+    ("GET", "/webhook"),
+    ("POST", "/webhook"),
 }
 
 # Documentacao automatica do FastAPI — nao sao recursos de dominio.

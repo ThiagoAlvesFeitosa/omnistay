@@ -306,7 +306,7 @@ CREATE TABLE trabalho (
     atualizado_em          TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT ck_trabalho_tipo CHECK (
         tipo IN ('enviar_coleta', 'interpretar_ficha', 'enviar_lembrete',
-                 'enviar_boas_vindas')
+                 'enviar_boas_vindas', 'classificar_mensagem')
     ),
     CONSTRAINT ck_trabalho_status CHECK (
         status IN ('pendente', 'processando', 'concluido', 'falha')
@@ -332,6 +332,10 @@ CREATE UNIQUE INDEX uq_trabalho_enviar_lembrete_reserva
 CREATE UNIQUE INDEX uq_trabalho_enviar_boas_vindas_reserva
     ON trabalho ( ((payload->>'id_reserva')::bigint) )
     WHERE tipo = 'enviar_boas_vindas';
+
+CREATE UNIQUE INDEX uq_trabalho_classificar_mensagem_mensagem
+    ON trabalho ( ((payload->>'id_mensagem')::bigint) )
+    WHERE tipo = 'classificar_mensagem';
 
 CREATE INDEX ix_trabalho_claim
     ON trabalho (status, proxima_tentativa_em)

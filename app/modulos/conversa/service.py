@@ -441,6 +441,7 @@ def receber_evento_entrada(
     id_hotel: int,
     repositorio=repositorio_padrao,
     enfileirar=fila_service.enfileirar_interpretar_ficha,
+    enfileirar_estadia=fila_service.enfileirar_classificar_mensagem,
 ) -> dict:
     """Grava evento (+ mensagem/trabalho se elegivel). Nao chama LLM."""
     payload = {
@@ -469,6 +470,12 @@ def receber_evento_entrada(
     reserva = repositorio.resolver_reserva_aguardando_cadastro(
         conexao, id_hotel=id_hotel, telefone_contato=telefone
     )
+    destino = "ficha"
+    if reserva is None:
+        reserva = repositorio.resolver_reserva_hospedada(
+            conexao, id_hotel=id_hotel, telefone_contato=telefone
+        )
+        destino = "estadia"
     if reserva is None:
         logger.info(
             "webhook_sem_reserva id_evento=%s id_hotel=%s", id_evento, id_hotel
@@ -480,14 +487,24 @@ def receber_evento_entrada(
         id_reserva=reserva["id_reserva"],
         conteudo=evento.texto,
         id_externo=evento.id_mensagem_canal,
+        enviada_em=evento.instante_origem,
     )
-    id_trabalho = enfileirar(
-        conexao,
-        id_hotel=id_hotel,
-        id_reserva=reserva["id_reserva"],
-        id_mensagem=id_mensagem,
-        id_evento=id_evento,
-    )
+    enfileirar_fn = enfileirar if destino == "ficha" else enfileirar_estadia
+    try:
+        id_trabalho = enfileirar_fn(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=reserva["id_reserva"],
+            id_mensagem=id_mensagem,
+            id_evento=id_evento,
+        )
+    except IntegrityError:
+        logger.info(
+            "webhook_trabalho_duplicado id_evento=%s id_mensagem=%s",
+            id_evento,
+            id_mensagem,
+        )
+        id_trabalho = None
     logger.info(
         "webhook_enfileirado id_evento=%s id_mensagem=%s id_trabalho=%s"
         " id_reserva=%s",

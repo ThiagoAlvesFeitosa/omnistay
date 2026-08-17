@@ -77,6 +77,24 @@ def enfileirar_enviar_boas_vindas(
     )
 
 
+def enfileirar_classificar_mensagem(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    id_evento: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    return repositorio.enfileirar_classificar_mensagem(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_mensagem=id_mensagem,
+        id_evento=id_evento,
+    )
+
+
 def tentativas_maximas(
     conexao: Connection,
     *,

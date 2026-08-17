@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 9 de 24 fatias concluídas.
+**Progresso:** 10 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -22,7 +22,8 @@
 | F1.4 Controlar o silêncio | ✅ Concluída — lembrete único, `sem_cadastro_previo`, prazos em `parametro_hotel`, `worker/agendador.py`, revisão `0007_controlar_silencio` |
 | F2.1 Catálogo da propriedade | ✅ Concluída — CRUD em `propriedade`, `GET /catalogo/ativo`, porta `CatalogoRepository`, `ler_catalogo` na matriz; sem migração (tabela `0001`) |
 | F2.2 Confirmar chegada e dar boas-vindas | ✅ Concluída — clique `POST /reservas/{id}/chegada`, recado curto, slots em `parametro_hotel`, recuperação pela janela de `checkin_em`, revisão `0008_confirmar_chegada` |
-| Demais 15 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F3.1** (receber mensagem com segurança). Não há F2.3 no backlog |
+| F3.1 Receber mensagem com segurança | ✅ Concluída — `POST /webhook` reutilizado, HMAC falha-fechada, `classificar_mensagem` pendente sem consumo, revisão `0009_receber_mensagem` |
+| Demais 14 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F3.2** (classificar e decidir). Não há F2.3 no backlog |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -96,6 +97,10 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Chegada em `aguardando_cadastro` | Recusada com `409`, porque a trigger só admite `hospedado` a partir de ficha recebida, ficha parcial ou sem cadastro prévio. Atalho para o balcão exigiria spec própria | F2.2 (plano) |
 | Recuperação do recado, na prática | Varredura na `worker/agendador.py` da F1.4 (`--verificar-boas-vindas`), não efeito colateral da gravação dos slots — a janela precisa ser reavaliada a cada passagem, e o slot pode ser preenchido por outro caminho. O SQL lista `hospedado` com `checkin_em` e sem trabalho; a janela é comparada em Python, por hotel, porque o prazo é por propriedade | F2.2 (plano) |
 | Sinalização de recado não enviado | Coluna derivada `boas_vindas_nao_enviadas` na `vw_fila_do_dia` (hospedado sem trabalho de boas-vindas). Mutuamente exclusiva de `chegada_nao_confirmada`, que exige status diferente de hospedado | F2.2 (plano) |
+| Webhook falha-fechada | `WHATSAPP_APP_SECRET` vazio ou ausente recusa o `POST /webhook` com `401` **antes** de qualquer INSERT. A F1.3 pulava a verificação quando o segredo faltava; esse furo fecha aqui | F3.1 |
+| Tipo `classificar_mensagem` | Trabalho durável da estadia; o worker desta fatia **não** o consome (`reclamar_proximo` em allowlist). Consumir agora marcaria `tipo_desconhecido` e destruiria o gancho da F3.2 | F3.1 |
+| Unicidade da classificação | Índice único parcial por `id_mensagem` no payload, no padrão de `enviar_coleta`. Reenvio do mesmo `id_externo` já para em `evento_webhook` | F3.1 |
+| Mesmo telefone, dois estados | `aguardando_cadastro` vence `hospedado` no webhook — a ficha da F1.3 não muda. Mensagem não infere check-in (Artigo I) | F3.1 |
 
 ## Onde ficam os arquivos
 
