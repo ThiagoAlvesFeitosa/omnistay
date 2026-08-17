@@ -1,4 +1,8 @@
-"""Assinatura de envelopes de webhook para a suíte — sem segredo versionado."""
+"""Assinatura de envelopes de webhook para a suíte — sem segredo versionado.
+
+O caminho da conversa da estadia (F3.1 + F3.2) é: POST /webhook assinado, depois
+`python -m worker --uma-passagem` com `LLMFalso`. Nenhum teste chama o provedor real.
+"""
 
 import hashlib
 import hmac

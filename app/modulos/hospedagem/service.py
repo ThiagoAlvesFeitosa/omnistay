@@ -152,6 +152,9 @@ def listar_fila_do_dia(
             ficha_completa=linha.get("ficha_completa"),
             chegada_nao_confirmada=bool(linha["chegada_nao_confirmada"]),
             boas_vindas_nao_enviadas=bool(linha.get("boas_vindas_nao_enviadas")),
+            precisa_atendimento_humano=bool(
+                linha.get("precisa_atendimento_humano")
+            ),
             status_envio_coleta=linha.get("status_envio_coleta"),
             estado_cadastro=linha.get("estado_cadastro"),
         )

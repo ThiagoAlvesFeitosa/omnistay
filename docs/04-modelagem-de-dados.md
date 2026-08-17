@@ -679,14 +679,19 @@ proposta no Artefato 2 §9.1 implementada como dado, não como código de tela. 
 `status_envio_coleta` espelha o `status_envio` da mensagem de coleta (saída) da reserva. A
 coluna `estado_cadastro` deriva o desfecho operacional (`aguardando`, `completa`, `parcial`,
 `leitura_humana`) a partir do status da reserva e do `classificacao_bruta` da mensagem
-recebida.
+recebida. A coluna `precisa_atendimento_humano` é verdadeira quando a reserva está
+`hospedado` e existe mensagem recebida com `classificacao_bruta.tipo = classificacao_intencao`
+e desfecho `encaminhado_humano`, `formato_invalido` ou `indisponivel`. Não se reutiliza
+`leitura_humana` — esse valor é da ficha em `aguardando_cadastro`.
 
 **A tabela `trabalho` é a fila durável do Artefato 5.** O cadastro de reserva grava, na mesma
 transação, a mensagem de coleta (`status_envio = pendente`) e um trabalho `enviar_coleta`; o
 webhook de resposta de ficha grava mensagem recebida e um trabalho `interpretar_ficha`; o
 webhook de estadia (reserva `hospedado`) grava mensagem recebida e um trabalho
-`classificar_mensagem`, que permanece pendente até a fatia de classificação — o worker não
-o consome nesta entrega. O worker consome os demais tipos com `FOR UPDATE SKIP LOCKED`.
+`classificar_mensagem`. O worker consome esse tipo: preenche intenção, sentimento e urgência
+(ou encaminha a humano) e marca o trabalho `concluido`. `classificacao_bruta` da estadia usa
+`tipo = classificacao_intencao` e desfecho `classificado`, `encaminhado_humano`,
+`formato_invalido` ou `indisponivel`. O worker consome os demais tipos com `FOR UPDATE SKIP LOCKED`.
 Índices únicos parciais: uma coleta por reserva, uma interpretação por mensagem de
 entrada, um `classificar_mensagem` por mensagem. Payload só com identificadores — sem PII.
 

@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 10 de 24 fatias concluídas.
+**Progresso:** 11 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -23,7 +23,8 @@
 | F2.1 Catálogo da propriedade | ✅ Concluída — CRUD em `propriedade`, `GET /catalogo/ativo`, porta `CatalogoRepository`, `ler_catalogo` na matriz; sem migração (tabela `0001`) |
 | F2.2 Confirmar chegada e dar boas-vindas | ✅ Concluída — clique `POST /reservas/{id}/chegada`, recado curto, slots em `parametro_hotel`, recuperação pela janela de `checkin_em`, revisão `0008_confirmar_chegada` |
 | F3.1 Receber mensagem com segurança | ✅ Concluída — `POST /webhook` reutilizado, HMAC falha-fechada, `classificar_mensagem` pendente sem consumo, revisão `0009_receber_mensagem` |
-| Demais 14 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F3.2** (classificar e decidir). Não há F2.3 no backlog |
+| F3.2 Classificar a intenção | ✅ Concluída — worker consome `classificar_mensagem`, taxonomia validada no domínio, `precisa_atendimento_humano` na fila, revisão `0010_classificar_intencao` |
+| Demais 13 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F3.3** (responder dúvida a partir do catálogo). Não há F2.3 no backlog |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -101,6 +102,10 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Tipo `classificar_mensagem` | Trabalho durável da estadia; o worker desta fatia **não** o consome (`reclamar_proximo` em allowlist). Consumir agora marcaria `tipo_desconhecido` e destruiria o gancho da F3.2 | F3.1 |
 | Unicidade da classificação | Índice único parcial por `id_mensagem` no payload, no padrão de `enviar_coleta`. Reenvio do mesmo `id_externo` já para em `evento_webhook` | F3.1 |
 | Mesmo telefone, dois estados | `aguardando_cadastro` vence `hospedado` no webhook — a ficha da F1.3 não muda. Mensagem não infere check-in (Artigo I) | F3.1 |
+| Consumo de `classificar_mensagem` | Allowlist e ramo no worker no mesmo passo. Os testes da F3.1 que proibiam o claim foram invertidos — isso é a fatia, não regressão | F3.2 |
+| Escala na primeira falha | `FalhaDeClassificacao` e formato inválido marcam o trabalho `concluido` e encaminham a humano. Não se copia o backoff de `interpretar_ficha` | F3.2 |
+| Sinal na fila do dia | Coluna derivada `precisa_atendimento_humano` (hospedado com desfecho `encaminhado_humano` / `formato_invalido` / `indisponivel`). Não se reusa `estado_cadastro = leitura_humana` | F3.2 |
+| Ramo automático não executa | Dúvida, pedido e reclamação só gravam eixos (`desfecho = classificado`). Upsell, checkout e fora de escopo já vão a humano. Zero `solicitacao`, zero envio, zero catálogo | F3.2 |
 
 ## Onde ficam os arquivos
 

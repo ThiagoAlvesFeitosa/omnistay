@@ -32,6 +32,7 @@ class ItemFilaDoDia(BaseModel):
     ficha_completa: bool | None
     chegada_nao_confirmada: bool
     boas_vindas_nao_enviadas: bool = False
+    precisa_atendimento_humano: bool = False
     status_envio_coleta: str | None = None
     estado_cadastro: str | None = None
 

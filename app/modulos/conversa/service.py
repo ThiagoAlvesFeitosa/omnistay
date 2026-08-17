@@ -9,6 +9,7 @@ from app.comum.log import obter_logger
 from app.comum.telefone import TelefoneInvalido, normalizar
 from app.fila import service as fila_service
 from app.modulos.conversa import repository as repositorio_padrao
+from app.modulos.conversa.classificacao import desfecho_de, validar_classificacao
 from app.modulos.conversa.schema import EventoEntrada
 from app.modulos.conversa.texto_boas_vindas import montar_texto_boas_vindas
 from app.modulos.conversa.texto_coleta import montar_texto_coleta
@@ -16,7 +17,12 @@ from app.modulos.conversa.texto_lembrete import montar_texto_lembrete
 from app.modulos.conversa.validacao_ficha import refinar_resultado
 from app.modulos.propriedade import repository as propriedade_repository
 from app.modulos.propriedade import service as propriedade_service
-from app.portas.llm import FalhaDeExtracao, LLMProvider, ResultadoExtracao
+from app.portas.llm import (
+    FalhaDeClassificacao,
+    FalhaDeExtracao,
+    LLMProvider,
+    ResultadoExtracao,
+)
 from app.portas.mensageria import FalhaDeEnvio, MensageriaGateway
 
 logger = obter_logger(__name__)
@@ -630,3 +636,152 @@ def processar_trabalho_interpretar_ficha(
             desfecho=resultado.desfecho,
         )
     fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+
+
+def _json_classificacao(valor):
+    if valor is None:
+        return None
+    if isinstance(valor, dict):
+        return valor
+    import json
+
+    if isinstance(valor, str):
+        return json.loads(valor)
+    return dict(valor)
+
+
+def processar_trabalho_classificar_mensagem(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    llm: LLMProvider,
+    repositorio=repositorio_padrao,
+) -> None:
+    """Classifica mensagem de estadia. Sem envio, sem chamado, sem hospedagem."""
+    from app.fila import repository as fila_repo
+
+    id_trabalho = trabalho["id_trabalho"]
+    id_hotel = trabalho["id_hotel"]
+    payload = trabalho["payload"]
+    id_mensagem = int(payload["id_mensagem"])
+    id_reserva = int(payload["id_reserva"])
+
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    existente = _json_classificacao(
+        mensagem.get("classificacao_bruta") if mensagem else None
+    )
+    if (
+        existente
+        and existente.get("tipo") == "classificacao_intencao"
+        and existente.get("desfecho")
+    ):
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        logger.info(
+            "classificacao_ja_concluida id_trabalho=%s id_mensagem=%s",
+            id_trabalho,
+            id_mensagem,
+        )
+        return
+
+    if mensagem is None or not (mensagem.get("conteudo") or "").strip():
+        repositorio.gravar_classificacao_intencao(
+            conexao,
+            id_hotel=id_hotel,
+            id_mensagem=id_mensagem,
+            intencao=None,
+            sentimento=None,
+            urgencia=None,
+            classificacao={
+                "tipo": "classificacao_intencao",
+                "desfecho": "formato_invalido",
+                "bruto": {},
+            },
+        )
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        logger.info(
+            "classificacao_formato_invalido id_mensagem=%s id_trabalho=%s"
+            " id_hotel=%s",
+            id_mensagem,
+            id_trabalho,
+            id_hotel,
+        )
+        return
+
+    try:
+        resultado = llm.classificar(mensagem["conteudo"])
+    except FalhaDeClassificacao as erro:
+        repositorio.gravar_classificacao_intencao(
+            conexao,
+            id_hotel=id_hotel,
+            id_mensagem=id_mensagem,
+            intencao=None,
+            sentimento=None,
+            urgencia=None,
+            classificacao={
+                "tipo": "classificacao_intencao",
+                "desfecho": "indisponivel",
+            },
+        )
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        logger.info(
+            "classificacao_indisponivel id_mensagem=%s id_trabalho=%s"
+            " id_hotel=%s codigo=%s",
+            id_mensagem,
+            id_trabalho,
+            id_hotel,
+            erro.codigo,
+        )
+        return
+
+    valida = validar_classificacao(resultado)
+    if valida is None:
+        repositorio.gravar_classificacao_intencao(
+            conexao,
+            id_hotel=id_hotel,
+            id_mensagem=id_mensagem,
+            intencao=None,
+            sentimento=None,
+            urgencia=None,
+            classificacao={
+                "tipo": "classificacao_intencao",
+                "desfecho": "formato_invalido",
+                "bruto": resultado.bruto,
+            },
+        )
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        logger.info(
+            "classificacao_formato_invalido id_mensagem=%s id_trabalho=%s"
+            " id_hotel=%s",
+            id_mensagem,
+            id_trabalho,
+            id_hotel,
+        )
+        return
+
+    desfecho = desfecho_de(valida.intencao)
+    repositorio.gravar_classificacao_intencao(
+        conexao,
+        id_hotel=id_hotel,
+        id_mensagem=id_mensagem,
+        intencao=valida.intencao,
+        sentimento=valida.sentimento,
+        urgencia=valida.urgencia,
+        classificacao={
+            "tipo": "classificacao_intencao",
+            "desfecho": desfecho,
+            "intencao": valida.intencao,
+            "sentimento": valida.sentimento,
+            "urgencia": valida.urgencia,
+            "bruto": resultado.bruto,
+        },
+    )
+    fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+    logger.info(
+        "mensagem_classificada id_mensagem=%s id_reserva=%s id_hotel=%s"
+        " desfecho=%s intencao=%s",
+        id_mensagem,
+        id_reserva,
+        id_hotel,
+        desfecho,
+        valida.intencao,
+    )

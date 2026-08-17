@@ -34,5 +34,24 @@ class ResultadoExtracao:
     campos_reconhecidos: tuple[str, ...] = ()
 
 
+class FalhaDeClassificacao(Exception):
+    """Classificador indisponivel, recusa ou tempo esgotado — sem eco do texto."""
+
+    def __init__(self, codigo: str) -> None:
+        self.codigo = codigo
+        super().__init__(codigo)
+
+
+@dataclass(frozen=True)
+class ResultadoClassificacao:
+    """Eixos da mensagem de estadia. Valores podem ser invalidos; o dominio valida."""
+
+    intencao: str | None
+    sentimento: str | None
+    urgencia: str | None
+    bruto: dict = field(default_factory=dict)
+
+
 class LLMProvider(Protocol):
     def extrair_ficha(self, texto: str) -> ResultadoExtracao: ...
+    def classificar(self, texto: str) -> ResultadoClassificacao: ...

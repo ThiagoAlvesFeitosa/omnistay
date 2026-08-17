@@ -567,7 +567,17 @@ SELECT r.id_hotel,
               SELECT 1 FROM trabalho t
                WHERE t.tipo = 'enviar_boas_vindas'
                  AND (t.payload->>'id_reserva')::bigint = r.id_reserva
-            )) AS boas_vindas_nao_enviadas
+            )) AS boas_vindas_nao_enviadas,
+       (r.status = 'hospedado'
+        AND EXISTS (
+              SELECT 1
+                FROM mensagem mh
+               WHERE mh.id_reserva = r.id_reserva
+                 AND mh.direcao = 'recebida'
+                 AND mh.classificacao_bruta->>'tipo' = 'classificacao_intencao'
+                 AND mh.classificacao_bruta->>'desfecho'
+                     IN ('encaminhado_humano', 'formato_invalido', 'indisponivel')
+            )) AS precisa_atendimento_humano
   FROM reserva r
   LEFT JOIN reserva_hospede rh
          ON rh.id_reserva = r.id_reserva AND rh.titular
@@ -588,6 +598,8 @@ COMMENT ON VIEW vw_fila_do_dia IS
     'Alimenta a tela inicial do turno: check-in previsto ate hoje (chegadas do dia, '
     'atrasadas e hospedados). Reserva futura fica de fora. A coluna '
     'chegada_nao_confirmada sinaliza divergencia temporal. Inclui telefone_contato, '
-    'data_checkout_prevista, status_envio_coleta da mensagem de coleta e '
+    'data_checkout_prevista, status_envio_coleta da mensagem de coleta, '
     'estado_cadastro (aguardando, completa, parcial, leitura_humana, '
-    'sem_cadastro_previo) e boas_vindas_nao_enviadas (hospedado sem recado).';
+    'sem_cadastro_previo), boas_vindas_nao_enviadas (hospedado sem recado) e '
+    'precisa_atendimento_humano (hospedado com mensagem de estadia encaminhada a '
+    'pessoa: classificador falhou ou intencao sem ramo proprio).';

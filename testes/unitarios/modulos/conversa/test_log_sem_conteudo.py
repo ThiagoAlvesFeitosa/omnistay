@@ -241,3 +241,60 @@ def test_desfechos_de_estadia_nao_levam_conteudo_ao_log(monkeypatch):
     assert "orfao secreto" not in texto
     assert "11987654321" not in texto
 
+
+def test_classificar_loga_sem_conteudo_nem_bruto(monkeypatch):
+    class Repo:
+        def ler_mensagem(self, conexao, *, id_mensagem):
+            return {
+                "id_mensagem": id_mensagem,
+                "id_reserva": 1,
+                "conteudo": "segredo da conversa",
+                "classificacao_bruta": None,
+            }
+
+        def gravar_classificacao_intencao(self, conexao, **kwargs):
+            return 1
+
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(conversa.logger, "info", fake_info)
+    monkeypatch.setattr("app.fila.repository.marcar_concluido", lambda *a, **k: None)
+
+    from app.adaptadores.llm_falso import LLMFalso
+    from app.portas.llm import ResultadoClassificacao
+
+    trabalho = {
+        "id_trabalho": 5,
+        "id_hotel": 1,
+        "payload": {"id_reserva": 1, "id_mensagem": 8, "id_evento": 3},
+        "tentativas": 0,
+    }
+    llm = LLMFalso()
+    conversa.processar_trabalho_classificar_mensagem(
+        object(), trabalho=trabalho, llm=llm, repositorio=Repo()
+    )
+    llm.falhar_classificacao = True
+    conversa.processar_trabalho_classificar_mensagem(
+        object(), trabalho=trabalho, llm=llm, repositorio=Repo()
+    )
+    llm.falhar_classificacao = False
+    llm.configurar_classificacao(
+        ResultadoClassificacao(
+            intencao="nao_existe",
+            sentimento="neutro",
+            urgencia="baixa",
+            bruto={"eco": "segredo da conversa"},
+        )
+    )
+    conversa.processar_trabalho_classificar_mensagem(
+        object(), trabalho=trabalho, llm=llm, repositorio=Repo()
+    )
+    texto = " ".join(registros)
+    assert "id_mensagem=8" in texto
+    assert "desfecho=" in texto
+    assert "segredo da conversa" not in texto
+    assert "eco" not in texto
+

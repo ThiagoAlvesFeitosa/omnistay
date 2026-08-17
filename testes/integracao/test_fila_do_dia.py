@@ -3,8 +3,18 @@
 from datetime import date, timedelta
 
 import pytest
+from sqlalchemy import text
 
 from testes.integracao.test_reservas import _corpo_valido, _login
+
+
+@pytest.mark.postgres
+def test_fila_do_dia_tem_precisa_atendimento_humano(app_sobre_ambiente):
+    _, ambiente = app_sobre_ambiente
+    with ambiente.conexao() as conexao:
+        conexao.execute(
+            text("SELECT precisa_atendimento_humano FROM vw_fila_do_dia LIMIT 0")
+        )
 
 
 @pytest.mark.postgres
@@ -198,3 +208,20 @@ def test_fila_distingue_chegada_atrasada_de_boas_vindas_nao_enviadas(
             item["chegada_nao_confirmada"] and item["boas_vindas_nao_enviadas"]
         )
     del atrasada, do_dia
+
+
+@pytest.mark.postgres
+def test_hospedado_sem_classificacao_nao_pede_humano(app_sobre_ambiente):
+    from testes.integracao.test_confirmar_chegada import _tornar
+
+    cliente, ambiente = app_sobre_ambiente
+    _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
+    id_reserva = cliente.post("/reservas", json=_corpo_valido()).json()["id_reserva"]
+    _tornar(ambiente, id_reserva, "ficha_recebida")
+    _tornar(ambiente, id_reserva, "hospedado")
+    item = next(
+        i
+        for i in cliente.get("/fila-do-dia").json()["itens"]
+        if i["id_reserva"] == id_reserva
+    )
+    assert item["precisa_atendimento_humano"] is False

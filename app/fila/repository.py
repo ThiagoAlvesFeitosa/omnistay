@@ -16,6 +16,7 @@ TIPOS_CONSUMIVEIS = (
     TIPO_INTERPRETAR_FICHA,
     TIPO_ENVIAR_LEMBRETE,
     TIPO_ENVIAR_BOAS_VINDAS,
+    TIPO_CLASSIFICAR_MENSAGEM,
 )
 BLOQUEIO_PROCESSANDO = timedelta(minutes=5)
 
@@ -179,7 +180,7 @@ def reclamar_proximo(
             " FROM trabalho"
             " WHERE status = 'pendente'"
             " AND tipo IN ('enviar_coleta', 'interpretar_ficha',"
-            " 'enviar_lembrete', 'enviar_boas_vindas')"
+            " 'enviar_lembrete', 'enviar_boas_vindas', 'classificar_mensagem')"
             " AND (proxima_tentativa_em IS NULL OR proxima_tentativa_em <= :agora)"
             " ORDER BY id_trabalho ASC"
             " FOR UPDATE SKIP LOCKED"

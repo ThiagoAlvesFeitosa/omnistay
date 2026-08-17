@@ -290,7 +290,7 @@ def test_reenvio_do_mesmo_evento_nao_duplica_estadia(webhook_estadia):
 
 
 @pytest.mark.postgres
-def test_worker_nao_consome_classificar_mensagem(webhook_estadia):
+def test_worker_classifica_mensagem_de_estadia(webhook_estadia):
     from app.adaptadores.mensageria_falsa import MensageriaFalsa
     from worker.consumidor import processar_uma_passagem
 
@@ -307,26 +307,29 @@ def test_worker_nao_consome_classificar_mensagem(webhook_estadia):
         segredo=SEGREDO,
     )
     with ambiente.engine.begin() as conexao:
-        id_trabalho, status_antes = conexao.execute(
-            text(
-                "SELECT id_trabalho, status FROM trabalho"
-                " WHERE tipo = 'classificar_mensagem'"
-                " AND (payload->>'id_reserva')::bigint = :r"
-            ),
-            {"r": id_reserva},
-        ).one()
         processar_uma_passagem(conexao, gateway=MensageriaFalsa())
         linha = conexao.execute(
             text(
-                "SELECT id_trabalho, status, erro_ultima_tentativa"
-                " FROM trabalho WHERE id_trabalho = :id"
+                "SELECT m.intencao, m.sentimento, m.urgencia, m.conteudo,"
+                " m.classificacao_bruta, t.status AS status_trabalho,"
+                " r.status AS status_reserva"
+                " FROM mensagem m"
+                " JOIN trabalho t ON (t.payload->>'id_mensagem')::bigint"
+                " = m.id_mensagem AND t.tipo = 'classificar_mensagem'"
+                " JOIN reserva r ON r.id_reserva = m.id_reserva"
+                " WHERE m.id_reserva = :r AND m.direcao = 'recebida'"
             ),
-            {"id": id_trabalho},
+            {"r": id_reserva},
         ).mappings().one()
-    assert status_antes == "pendente"
-    assert linha["id_trabalho"] == id_trabalho
-    assert linha["status"] == "pendente"
-    assert linha["erro_ultima_tentativa"] is None
+        solicitacoes = conexao.execute(text("SELECT COUNT(*) FROM solicitacao")).scalar_one()
+    assert linha["intencao"] == "duvida_geral"
+    assert linha["sentimento"] == "neutro"
+    assert linha["urgencia"] == "baixa"
+    assert linha["conteudo"] == "wifi caiu"
+    assert linha["classificacao_bruta"]["desfecho"] == "classificado"
+    assert linha["status_trabalho"] == "concluido"
+    assert linha["status_reserva"] == "hospedado"
+    assert solicitacoes == 0
 
 
 @pytest.mark.postgres

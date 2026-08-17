@@ -52,6 +52,10 @@ def processar_uma_passagem(
             conversa_service.processar_trabalho_enviar_boas_vindas(
                 conexao, trabalho=trabalho, gateway=gateway
             )
+        elif trabalho["tipo"] == "classificar_mensagem":
+            conversa_service.processar_trabalho_classificar_mensagem(
+                conexao, trabalho=trabalho, llm=porta_llm
+            )
         else:
             fila_repository.marcar_falha(
                 conexao,

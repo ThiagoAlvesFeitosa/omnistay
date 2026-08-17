@@ -65,7 +65,7 @@ def ler_mensagem(conexao: Connection, *, id_mensagem: int) -> dict | None:
     linha = conexao.execute(
         text(
             "SELECT id_mensagem, id_reserva, direcao, conteudo, status_envio,"
-            " id_externo, classificacao_bruta"
+            " id_externo, intencao, sentimento, urgencia, classificacao_bruta"
             " FROM mensagem WHERE id_mensagem = :id"
         ),
         {"id": id_mensagem},
@@ -165,6 +165,42 @@ def gravar_classificacao_bruta(
         ),
         {"c": json.dumps(classificacao), "id": id_mensagem},
     )
+
+
+def gravar_classificacao_intencao(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_mensagem: int,
+    intencao: str | None,
+    sentimento: str | None,
+    urgencia: str | None,
+    classificacao: dict,
+) -> int:
+    import json
+
+    resultado = conexao.execute(
+        text(
+            "UPDATE mensagem m SET"
+            " intencao = :intencao,"
+            " sentimento = :sentimento,"
+            " urgencia = :urgencia,"
+            " classificacao_bruta = CAST(:c AS jsonb)"
+            " FROM reserva r"
+            " WHERE m.id_mensagem = :id"
+            " AND m.id_reserva = r.id_reserva"
+            " AND r.id_hotel = :id_hotel"
+        ),
+        {
+            "intencao": intencao,
+            "sentimento": sentimento,
+            "urgencia": urgencia,
+            "c": json.dumps(classificacao),
+            "id": id_mensagem,
+            "id_hotel": id_hotel,
+        },
+    )
+    return resultado.rowcount or 0
 
 
 def resolver_reserva_aguardando_cadastro(
