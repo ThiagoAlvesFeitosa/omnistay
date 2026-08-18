@@ -111,6 +111,56 @@ def enfileirar_responder_duvida(
     )
 
 
+def enfileirar_registrar_pedido_servico(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    return repositorio.enfileirar_registrar_pedido_servico(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_mensagem=id_mensagem,
+    )
+
+
+def enfileirar_abrir_chamado_reclamacao(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    return repositorio.enfileirar_abrir_chamado_reclamacao(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_mensagem=id_mensagem,
+    )
+
+
+def enfileirar_enviar_confirmacao_resolucao(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_solicitacao: int,
+    id_mensagem: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    return repositorio.enfileirar_enviar_confirmacao_resolucao(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_solicitacao=id_solicitacao,
+        id_mensagem=id_mensagem,
+    )
+
+
 def tentativas_maximas(
     conexao: Connection,
     *,

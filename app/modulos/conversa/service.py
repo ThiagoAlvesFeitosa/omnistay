@@ -27,6 +27,9 @@ from app.portas.llm import (
 from app.portas.mensageria import FalhaDeEnvio, MensageriaGateway
 from app.modulos.conversa.fidelidade import resposta_fiel_ao_catalogo
 from app.modulos.conversa.texto_aviso_duvida import montar_aviso_duvida_nao_coberta
+from app.modulos.conversa.texto_confirmacao_resolucao import (
+    montar_confirmacao_resolucao,
+)
 
 logger = obter_logger(__name__)
 
@@ -167,6 +170,59 @@ def agendar_boas_vindas(
     logger.info(
         "boas_vindas_agendadas id_reserva=%s id_mensagem=%s id_hotel=%s",
         id_reserva,
+        id_mensagem,
+        id_hotel,
+    )
+    return "agendada"
+
+
+def agendar_confirmacao_resolucao(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_solicitacao: int,
+    tipo: str,
+    repositorio=repositorio_padrao,
+    enfileirar=fila_service.enfileirar_enviar_confirmacao_resolucao,
+) -> str:
+    nome = "hospede"
+    ler_nome = getattr(repositorio, "ler_nome_titular", None)
+    if ler_nome is not None:
+        nome = ler_nome(conexao, id_reserva=id_reserva) or "hospede"
+    texto = montar_confirmacao_resolucao(nome_completo=nome, tipo=tipo)
+    try:
+        with _savepoint(conexao):
+            id_mensagem = repositorio.inserir_mensagem_enviada_pendente(
+                conexao, id_reserva=id_reserva, conteudo=texto
+            )
+            repositorio.gravar_classificacao_bruta(
+                conexao,
+                id_mensagem=id_mensagem,
+                classificacao={
+                    "tipo": "confirmacao_resolucao",
+                    "id_solicitacao": id_solicitacao,
+                },
+            )
+            enfileirar(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=id_reserva,
+                id_solicitacao=id_solicitacao,
+                id_mensagem=id_mensagem,
+            )
+    except IntegrityError:
+        logger.info(
+            "resolucao_ja_agendada id_solicitacao=%s id_hotel=%s"
+            " resultado=ja_agendada",
+            id_solicitacao,
+            id_hotel,
+        )
+        return "ja_agendada"
+    logger.info(
+        "resolucao_confirmacao_agendada id_solicitacao=%s id_mensagem=%s"
+        " id_hotel=%s resultado=agendada",
+        id_solicitacao,
         id_mensagem,
         id_hotel,
     )
@@ -660,13 +716,20 @@ def processar_trabalho_classificar_mensagem(
     llm: LLMProvider,
     repositorio=repositorio_padrao,
     enfileirar_resposta=None,
+    enfileirar_pedido=None,
+    enfileirar_chamado=None,
+    completar_janela=None,
 ) -> None:
-    """Classifica mensagem de estadia. Sem envio, sem chamado, sem hospedagem."""
+    """Classifica mensagem de estadia. Sem envio, sem INSERT de solicitacao."""
     from app.fila import repository as fila_repo
     from app.fila import service as fila_svc
 
     if enfileirar_resposta is None:
         enfileirar_resposta = fila_svc.enfileirar_responder_duvida
+    if enfileirar_pedido is None:
+        enfileirar_pedido = fila_svc.enfileirar_registrar_pedido_servico
+    if enfileirar_chamado is None:
+        enfileirar_chamado = fila_svc.enfileirar_abrir_chamado_reclamacao
 
     id_trabalho = trabalho["id_trabalho"]
     id_hotel = trabalho["id_hotel"]
@@ -675,6 +738,38 @@ def processar_trabalho_classificar_mensagem(
     id_reserva = int(payload["id_reserva"])
 
     mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    if completar_janela is not None and mensagem is not None:
+        id_solicitacao = completar_janela(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            texto=mensagem.get("conteudo") or "",
+        )
+        if id_solicitacao:
+            repositorio.gravar_classificacao_intencao(
+                conexao,
+                id_hotel=id_hotel,
+                id_mensagem=id_mensagem,
+                intencao=None,
+                sentimento=None,
+                urgencia=None,
+                classificacao={
+                    "tipo": "classificacao_intencao",
+                    "desfecho": "janela_registrada",
+                    "id_solicitacao": id_solicitacao,
+                },
+            )
+            fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+            logger.info(
+                "janela_registrada id_trabalho=%s id_mensagem=%s id_hotel=%s"
+                " id_solicitacao=%s resultado=janela_registrada",
+                id_trabalho,
+                id_mensagem,
+                id_hotel,
+                id_solicitacao,
+            )
+            return
+
     existente = _json_classificacao(
         mensagem.get("classificacao_bruta") if mensagem else None
     )
@@ -695,6 +790,32 @@ def processar_trabalho_classificar_mensagem(
                 id_reserva=id_reserva,
                 id_mensagem=id_mensagem,
                 enfileirar=enfileirar_resposta,
+            )
+        if (
+            existente.get("desfecho") == "classificado"
+            and (existente.get("intencao") or (mensagem or {}).get("intencao"))
+            == "pedido_de_servico"
+            and existente.get("resposta") != "confirmacao_pedido"
+        ):
+            _enfileirar_pedido_servico(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=id_reserva,
+                id_mensagem=id_mensagem,
+                enfileirar=enfileirar_pedido,
+            )
+        if (
+            existente.get("desfecho") == "classificado"
+            and (existente.get("intencao") or (mensagem or {}).get("intencao"))
+            == "reclamacao_tecnica"
+            and existente.get("resposta") != "confirmacao_reclamacao"
+        ):
+            _enfileirar_chamado_reclamacao(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=id_reserva,
+                id_mensagem=id_mensagem,
+                enfileirar=enfileirar_chamado,
             )
         fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
         logger.info(
@@ -804,6 +925,22 @@ def processar_trabalho_classificar_mensagem(
             id_mensagem=id_mensagem,
             enfileirar=enfileirar_resposta,
         )
+    elif valida.intencao == "pedido_de_servico":
+        _enfileirar_pedido_servico(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            id_mensagem=id_mensagem,
+            enfileirar=enfileirar_pedido,
+        )
+    elif valida.intencao == "reclamacao_tecnica":
+        _enfileirar_chamado_reclamacao(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            id_mensagem=id_mensagem,
+            enfileirar=enfileirar_chamado,
+        )
     fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
     logger.info(
         "mensagem_classificada id_mensagem=%s id_reserva=%s id_hotel=%s"
@@ -835,6 +972,54 @@ def _enfileirar_responder_duvida(
     except IntegrityError:
         logger.info(
             "responder_duvida_ja_enfileirada id_mensagem=%s id_hotel=%s",
+            id_mensagem,
+            id_hotel,
+        )
+
+
+def _enfileirar_pedido_servico(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    enfileirar,
+) -> None:
+    try:
+        with _savepoint(conexao):
+            enfileirar(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=id_reserva,
+                id_mensagem=id_mensagem,
+            )
+    except IntegrityError:
+        logger.info(
+            "registrar_pedido_servico_ja_enfileirado id_mensagem=%s id_hotel=%s",
+            id_mensagem,
+            id_hotel,
+        )
+
+
+def _enfileirar_chamado_reclamacao(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    enfileirar,
+) -> None:
+    try:
+        with _savepoint(conexao):
+            enfileirar(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=id_reserva,
+                id_mensagem=id_mensagem,
+            )
+    except IntegrityError:
+        logger.info(
+            "abrir_chamado_reclamacao_ja_enfileirado id_mensagem=%s id_hotel=%s",
             id_mensagem,
             id_hotel,
         )
@@ -1037,6 +1222,36 @@ def _enviar_resposta_sessao(
             destino,
             erro.codigo,
         )
+        if trabalho.get("tipo") == "registrar_pedido_servico":
+            origem = (trabalho.get("payload") or {}).get("id_mensagem")
+            logger.info(
+                "pedido_envio_falhou id_trabalho=%s id_mensagem=%s id_hotel=%s"
+                " resultado=envio_falhou codigo=%s",
+                id_trabalho,
+                origem,
+                id_hotel,
+                erro.codigo,
+            )
+        if trabalho.get("tipo") == "abrir_chamado_reclamacao":
+            origem = (trabalho.get("payload") or {}).get("id_mensagem")
+            logger.info(
+                "chamado_envio_falhou id_trabalho=%s id_mensagem=%s id_hotel=%s"
+                " resultado=envio_falhou codigo=%s",
+                id_trabalho,
+                origem,
+                id_hotel,
+                erro.codigo,
+            )
+        if trabalho.get("tipo") == "enviar_confirmacao_resolucao":
+            payload = trabalho.get("payload") or {}
+            logger.info(
+                "resolucao_envio_falhou id_trabalho=%s id_solicitacao=%s"
+                " id_hotel=%s resultado=envio_falhou codigo=%s",
+                id_trabalho,
+                payload.get("id_solicitacao"),
+                id_hotel,
+                erro.codigo,
+            )
         return
     marcar_envio_sucesso(
         conexao,
@@ -1045,3 +1260,260 @@ def _enviar_resposta_sessao(
         repositorio=repositorio,
     )
     fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+
+
+def processar_trabalho_enviar_confirmacao_resolucao(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    gateway: MensageriaGateway,
+    repositorio=repositorio_padrao,
+) -> None:
+    from app.fila import repository as fila_repo
+
+    id_trabalho = trabalho["id_trabalho"]
+    payload = trabalho["payload"]
+    id_mensagem = int(payload["id_mensagem"])
+    id_reserva = int(payload["id_reserva"])
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    if mensagem is None:
+        fila_repo.marcar_falha(
+            conexao,
+            id_trabalho=id_trabalho,
+            tentativas=(trabalho.get("tentativas") or 0) + 1,
+            erro="mensagem_ausente",
+        )
+        return
+    if mensagem.get("status_envio") == "enviada":
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        return
+    _enviar_resposta_sessao(
+        conexao,
+        trabalho=trabalho,
+        gateway=gateway,
+        repositorio=repositorio,
+        id_enviada=id_mensagem,
+        corpo=mensagem["conteudo"],
+        id_reserva=id_reserva,
+    )
+
+
+def processar_trabalho_registrar_pedido(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    gateway: MensageriaGateway,
+    abrir_servico,
+    repositorio=repositorio_padrao,
+) -> None:
+    from app.fila import repository as fila_repo
+    from app.modulos.atendimento.quarto import extrair_numero_quarto
+    from app.modulos.conversa.texto_confirmacao_pedido import (
+        montar_confirmacao_pedido,
+    )
+
+    id_trabalho = trabalho["id_trabalho"]
+    id_hotel = trabalho["id_hotel"]
+    payload = trabalho["payload"]
+    id_mensagem = int(payload["id_mensagem"])
+    id_reserva = int(payload["id_reserva"])
+
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    existente = _json_classificacao(
+        mensagem.get("classificacao_bruta") if mensagem else None
+    )
+    if (
+        existente
+        and existente.get("resposta") == "confirmacao_pedido"
+        and existente.get("id_solicitacao")
+    ):
+        id_enviada = int(existente["id_mensagem_resposta"])
+        enviada = repositorio.ler_mensagem(conexao, id_mensagem=id_enviada)
+        if enviada and enviada.get("status_envio") == "pendente":
+            logger.info(
+                "pedido_ja_registrado id_trabalho=%s id_mensagem=%s"
+                " id_hotel=%s id_solicitacao=%s resultado=ja_registrado",
+                id_trabalho,
+                id_mensagem,
+                id_hotel,
+                existente.get("id_solicitacao"),
+            )
+            _enviar_resposta_sessao(
+                conexao,
+                trabalho=trabalho,
+                gateway=gateway,
+                repositorio=repositorio,
+                id_enviada=id_enviada,
+                corpo=enviada["conteudo"],
+                id_reserva=id_reserva,
+            )
+            return
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        logger.info(
+            "pedido_ja_registrado id_trabalho=%s id_mensagem=%s id_hotel=%s"
+            " id_solicitacao=%s resultado=ja_registrado",
+            id_trabalho,
+            id_mensagem,
+            id_hotel,
+            existente.get("id_solicitacao"),
+        )
+        return
+
+    descricao = (mensagem or {}).get("conteudo") or ""
+    numero_quarto = extrair_numero_quarto(descricao)
+    urgencia = (mensagem or {}).get("urgencia") or "media"
+    nome = "hospede"
+    ler_nome = getattr(repositorio, "ler_nome_titular", None)
+    if ler_nome is not None:
+        nome = ler_nome(conexao, id_reserva=id_reserva) or "hospede"
+    corpo = montar_confirmacao_pedido(nome_completo=nome)
+    id_enviada = repositorio.inserir_mensagem_enviada_pendente(
+        conexao, id_reserva=id_reserva, conteudo=corpo
+    )
+    id_solicitacao = abrir_servico(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_mensagem=id_mensagem,
+        descricao=descricao,
+        numero_quarto=numero_quarto,
+        urgencia=urgencia,
+    )
+    repositorio.gravar_confirmacao_pedido(
+        conexao,
+        id_hotel=id_hotel,
+        id_mensagem=id_mensagem,
+        id_mensagem_resposta=id_enviada,
+        id_solicitacao=id_solicitacao,
+    )
+    logger.info(
+        "pedido_registrado id_trabalho=%s id_mensagem=%s id_reserva=%s"
+        " id_hotel=%s id_solicitacao=%s resultado=registrado",
+        id_trabalho,
+        id_mensagem,
+        id_reserva,
+        id_hotel,
+        id_solicitacao,
+    )
+    _enviar_resposta_sessao(
+        conexao,
+        trabalho=trabalho,
+        gateway=gateway,
+        repositorio=repositorio,
+        id_enviada=id_enviada,
+        corpo=corpo,
+        id_reserva=id_reserva,
+    )
+
+
+def processar_trabalho_abrir_chamado(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    gateway: MensageriaGateway,
+    abrir_reclamacao,
+    repositorio=repositorio_padrao,
+) -> None:
+    from app.fila import repository as fila_repo
+    from app.modulos.atendimento.janela import extrair_janela_preferencia
+    from app.modulos.atendimento.quarto import extrair_numero_quarto
+    from app.modulos.conversa.texto_confirmacao_reclamacao import (
+        montar_confirmacao_reclamacao,
+    )
+
+    id_trabalho = trabalho["id_trabalho"]
+    id_hotel = trabalho["id_hotel"]
+    payload = trabalho["payload"]
+    id_mensagem = int(payload["id_mensagem"])
+    id_reserva = int(payload["id_reserva"])
+
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    existente = _json_classificacao(
+        mensagem.get("classificacao_bruta") if mensagem else None
+    )
+    if (
+        existente
+        and existente.get("resposta") == "confirmacao_reclamacao"
+        and existente.get("id_solicitacao")
+    ):
+        id_enviada = int(existente["id_mensagem_resposta"])
+        enviada = repositorio.ler_mensagem(conexao, id_mensagem=id_enviada)
+        if enviada and enviada.get("status_envio") == "pendente":
+            logger.info(
+                "chamado_ja_aberto id_trabalho=%s id_mensagem=%s"
+                " id_hotel=%s id_solicitacao=%s resultado=ja_aberto",
+                id_trabalho,
+                id_mensagem,
+                id_hotel,
+                existente.get("id_solicitacao"),
+            )
+            _enviar_resposta_sessao(
+                conexao,
+                trabalho=trabalho,
+                gateway=gateway,
+                repositorio=repositorio,
+                id_enviada=id_enviada,
+                corpo=enviada["conteudo"],
+                id_reserva=id_reserva,
+            )
+            return
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        logger.info(
+            "chamado_ja_aberto id_trabalho=%s id_mensagem=%s id_hotel=%s"
+            " id_solicitacao=%s resultado=ja_aberto",
+            id_trabalho,
+            id_mensagem,
+            id_hotel,
+            existente.get("id_solicitacao"),
+        )
+        return
+
+    descricao = (mensagem or {}).get("conteudo") or ""
+    numero_quarto = extrair_numero_quarto(descricao)
+    janela = extrair_janela_preferencia(descricao)
+    urgencia = (mensagem or {}).get("urgencia") or "media"
+    nome = "hospede"
+    ler_nome = getattr(repositorio, "ler_nome_titular", None)
+    if ler_nome is not None:
+        nome = ler_nome(conexao, id_reserva=id_reserva) or "hospede"
+    corpo = montar_confirmacao_reclamacao(
+        nome_completo=nome, perguntar_horario=janela is None
+    )
+    id_enviada = repositorio.inserir_mensagem_enviada_pendente(
+        conexao, id_reserva=id_reserva, conteudo=corpo
+    )
+    id_solicitacao = abrir_reclamacao(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_mensagem=id_mensagem,
+        descricao=descricao,
+        numero_quarto=numero_quarto,
+        urgencia=urgencia,
+        janela_preferencia=janela,
+    )
+    repositorio.gravar_confirmacao_reclamacao(
+        conexao,
+        id_hotel=id_hotel,
+        id_mensagem=id_mensagem,
+        id_mensagem_resposta=id_enviada,
+        id_solicitacao=id_solicitacao,
+    )
+    logger.info(
+        "chamado_aberto id_trabalho=%s id_mensagem=%s id_reserva=%s"
+        " id_hotel=%s id_solicitacao=%s resultado=aberto",
+        id_trabalho,
+        id_mensagem,
+        id_reserva,
+        id_hotel,
+        id_solicitacao,
+    )
+    _enviar_resposta_sessao(
+        conexao,
+        trabalho=trabalho,
+        gateway=gateway,
+        repositorio=repositorio,
+        id_enviada=id_enviada,
+        corpo=corpo,
+        id_reserva=id_reserva,
+    )

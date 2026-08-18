@@ -87,10 +87,22 @@ def _trabalho():
     }
 
 
-def _processar(monkeypatch, repo, llm, enfileirados=None):
+def _processar(
+    monkeypatch,
+    repo,
+    llm,
+    enfileirados=None,
+    pedidos=None,
+    chamados=None,
+    completar_janela=None,
+):
     concluidos = []
     if enfileirados is None:
         enfileirados = []
+    if pedidos is None:
+        pedidos = []
+    if chamados is None:
+        chamados = []
 
     def marcar_concluido(conexao, *, id_trabalho):
         concluidos.append(id_trabalho)
@@ -105,6 +117,26 @@ def _processar(monkeypatch, repo, llm, enfileirados=None):
         )
         return 99
 
+    def enfileirar_pedido(conexao, *, id_hotel, id_reserva, id_mensagem):
+        pedidos.append(
+            {
+                "id_hotel": id_hotel,
+                "id_reserva": id_reserva,
+                "id_mensagem": id_mensagem,
+            }
+        )
+        return 100
+
+    def enfileirar_chamado(conexao, *, id_hotel, id_reserva, id_mensagem):
+        chamados.append(
+            {
+                "id_hotel": id_hotel,
+                "id_reserva": id_reserva,
+                "id_mensagem": id_mensagem,
+            }
+        )
+        return 101
+
     monkeypatch.setattr("app.fila.repository.marcar_concluido", marcar_concluido)
     conversa.processar_trabalho_classificar_mensagem(
         object(),
@@ -112,6 +144,9 @@ def _processar(monkeypatch, repo, llm, enfileirados=None):
         llm=llm,
         repositorio=repo,
         enfileirar_resposta=enfileirar,
+        enfileirar_pedido=enfileirar_pedido,
+        enfileirar_chamado=enfileirar_chamado,
+        completar_janela=completar_janela,
     )
     return concluidos, enfileirados
 
@@ -130,10 +165,12 @@ def test_classificacao_valida_grava_eixos_e_conclui(monkeypatch):
 def test_duvida_geral_enfileira_responder_sem_catalogo_nem_gateway(monkeypatch):
     repo = RepoClassificar()
     llm = LLMFalso()
-    _, enfileirados = _processar(monkeypatch, repo, llm)
+    pedidos = []
+    _, enfileirados = _processar(monkeypatch, repo, llm, pedidos=pedidos)
     assert enfileirados == [
         {"id_hotel": 1, "id_reserva": 1, "id_mensagem": 8}
     ]
+    assert pedidos == []
     assert llm.chamadas_responder == []
 
 
@@ -152,16 +189,54 @@ def test_pedido_e_reclamacao_nao_enfileiram_responder(monkeypatch):
     assert enfileirados == []
 
 
+def test_pedido_de_servico_enfileira_registrar_sem_enviar(monkeypatch):
+    repo = RepoClassificar(conteudo="toalha extra")
+    llm = LLMFalso()
+    llm.configurar_classificacao(
+        ResultadoClassificacao(
+            intencao="pedido_de_servico",
+            sentimento="neutro",
+            urgencia="baixa",
+            bruto={},
+        )
+    )
+    pedidos = []
+    _, enfileirados = _processar(monkeypatch, repo, llm, pedidos=pedidos)
+    assert enfileirados == []
+    assert pedidos == [{"id_hotel": 1, "id_reserva": 1, "id_mensagem": 8}]
+    assert not hasattr(repo, "solicitacao")
+    assert llm.chamadas_responder == []
+
+
+def test_ja_classificada_pedido_sem_confirmacao_enfileira_registrar(monkeypatch):
+    repo = RepoClassificar(
+        conteudo="toalha extra",
+        classificacao={
+            "tipo": "classificacao_intencao",
+            "desfecho": "classificado",
+            "intencao": "pedido_de_servico",
+        },
+    )
+    llm = LLMFalso()
+    pedidos = []
+    _, enfileirados = _processar(monkeypatch, repo, llm, pedidos=pedidos)
+    assert llm.chamadas_classificar == []
+    assert enfileirados == []
+    assert pedidos == [{"id_hotel": 1, "id_reserva": 1, "id_mensagem": 8}]
+
+
 def test_indisponivel_encaminha_sem_eixos_e_conclui(monkeypatch):
     repo = RepoClassificar()
     llm = LLMFalso()
     llm.falhar_classificacao = True
-    concluidos, enfileirados = _processar(monkeypatch, repo, llm)
+    pedidos = []
+    concluidos, enfileirados = _processar(monkeypatch, repo, llm, pedidos=pedidos)
     assert repo.eixos["intencao"] is None
     assert repo.classificacao["desfecho"] == "indisponivel"
     assert "bruto" not in repo.classificacao
     assert concluidos == [5]
     assert enfileirados == []
+    assert pedidos == []
 
 
 def test_formato_invalido_preserva_bruto(monkeypatch):
@@ -193,10 +268,132 @@ def test_reclamacao_nao_abre_chamado(monkeypatch):
             bruto={},
         )
     )
-    _, enfileirados = _processar(monkeypatch, repo, llm)
+    pedidos = []
+    chamados = []
+    _, enfileirados = _processar(
+        monkeypatch, repo, llm, pedidos=pedidos, chamados=chamados
+    )
     assert repo.classificacao["desfecho"] == "classificado"
     assert not hasattr(repo, "solicitacao")
     assert enfileirados == []
+    assert pedidos == []
+    assert chamados == [{"id_hotel": 1, "id_reserva": 1, "id_mensagem": 8}]
+    assert llm.chamadas_responder == []
+
+
+def test_reclamacao_neutra_tambem_enfileira_chamado(monkeypatch):
+    repo = RepoClassificar(conteudo="o ar nao gela")
+    llm = LLMFalso()
+    llm.configurar_classificacao(
+        ResultadoClassificacao(
+            intencao="reclamacao_tecnica",
+            sentimento="neutro",
+            urgencia="media",
+            bruto={},
+        )
+    )
+    chamados = []
+    _processar(monkeypatch, repo, llm, chamados=chamados)
+    assert chamados == [{"id_hotel": 1, "id_reserva": 1, "id_mensagem": 8}]
+    assert not hasattr(repo, "solicitacao")
+
+
+def test_ja_classificada_reclamacao_sem_confirmacao_enfileira_chamado(monkeypatch):
+    repo = RepoClassificar(
+        conteudo="ar nao gela",
+        classificacao={
+            "tipo": "classificacao_intencao",
+            "desfecho": "classificado",
+            "intencao": "reclamacao_tecnica",
+        },
+    )
+    llm = LLMFalso()
+    chamados = []
+    _processar(monkeypatch, repo, llm, chamados=chamados)
+    assert llm.chamadas_classificar == []
+    assert chamados == [{"id_hotel": 1, "id_reserva": 1, "id_mensagem": 8}]
+
+
+def test_intencoes_que_nao_sao_reclamacao_nao_enfileiram_chamado(monkeypatch):
+    casos = (
+        ("duvida_geral", "neutro", "baixa"),
+        ("pedido_de_servico", "neutro", "baixa"),
+        ("upsell", "positivo", "baixa"),
+    )
+    for intencao, sentimento, urgencia in casos:
+        repo = RepoClassificar()
+        llm = LLMFalso()
+        llm.configurar_classificacao(
+            ResultadoClassificacao(
+                intencao=intencao,
+                sentimento=sentimento,
+                urgencia=urgencia,
+                bruto={},
+            )
+        )
+        chamados = []
+        _processar(monkeypatch, repo, llm, chamados=chamados)
+        assert chamados == [], intencao
+
+    repo = RepoClassificar()
+    llm = LLMFalso()
+    llm.falhar_classificacao = True
+    chamados = []
+    _processar(monkeypatch, repo, llm, chamados=chamados)
+    assert chamados == []
+
+
+def test_followup_horario_registra_janela_sem_llm(monkeypatch):
+    repo = RepoClassificar(conteudo="depois das 14h")
+    llm = LLMFalso()
+    chamados = []
+    vistos = []
+
+    def completar_janela(conexao, *, id_hotel, id_reserva, texto):
+        vistos.append({"id_hotel": id_hotel, "id_reserva": id_reserva, "texto": texto})
+        return 70
+
+    _processar(
+        monkeypatch,
+        repo,
+        llm,
+        chamados=chamados,
+        completar_janela=completar_janela,
+    )
+    assert vistos == [{"id_hotel": 1, "id_reserva": 1, "texto": "depois das 14h"}]
+    assert llm.chamadas_classificar == []
+    assert chamados == []
+    assert repo.classificacao["desfecho"] == "janela_registrada"
+    assert repo.classificacao["id_solicitacao"] == 70
+    assert repo.eixos["intencao"] is None
+
+
+def test_relato_novo_nao_toma_atalho_de_horario(monkeypatch):
+    repo = RepoClassificar(conteudo="o chuveiro tambem vazou")
+    llm = LLMFalso()
+    llm.configurar_classificacao(
+        ResultadoClassificacao(
+            intencao="reclamacao_tecnica",
+            sentimento="negativo",
+            urgencia="alta",
+            bruto={},
+        )
+    )
+    chamados = []
+
+    def completar_janela(conexao, *, id_hotel, id_reserva, texto):
+        return None
+
+    _processar(
+        monkeypatch,
+        repo,
+        llm,
+        chamados=chamados,
+        completar_janela=completar_janela,
+    )
+    assert llm.chamadas_classificar
+    assert repo.classificacao["desfecho"] == "classificado"
+    assert chamados == [{"id_hotel": 1, "id_reserva": 1, "id_mensagem": 8}]
 
 
 def test_upsell_encaminha_humano(monkeypatch):
@@ -210,10 +407,12 @@ def test_upsell_encaminha_humano(monkeypatch):
             bruto={"intencao": "upsell"},
         )
     )
-    _, enfileirados = _processar(monkeypatch, repo, llm)
+    pedidos = []
+    _, enfileirados = _processar(monkeypatch, repo, llm, pedidos=pedidos)
     assert repo.eixos["intencao"] == "upsell"
     assert repo.classificacao["desfecho"] == "encaminhado_humano"
     assert enfileirados == []
+    assert pedidos == []
 
 
 def test_ja_classificada_nao_chama_llm(monkeypatch):

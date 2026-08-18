@@ -236,6 +236,74 @@ def gravar_resposta_duvida(
     return resultado.rowcount or 0
 
 
+def gravar_confirmacao_pedido(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_mensagem: int,
+    id_mensagem_resposta: int,
+    id_solicitacao: int,
+) -> int:
+    import json
+
+    extra = {
+        "resposta": "confirmacao_pedido",
+        "id_mensagem_resposta": id_mensagem_resposta,
+        "id_solicitacao": id_solicitacao,
+    }
+    resultado = conexao.execute(
+        text(
+            "UPDATE mensagem m SET"
+            " classificacao_bruta = COALESCE(m.classificacao_bruta, '{}'::jsonb)"
+            " || CAST(:extra AS jsonb)"
+            " FROM reserva r"
+            " WHERE m.id_mensagem = :id"
+            " AND m.id_reserva = r.id_reserva"
+            " AND r.id_hotel = :id_hotel"
+        ),
+        {
+            "extra": json.dumps(extra),
+            "id": id_mensagem,
+            "id_hotel": id_hotel,
+        },
+    )
+    return resultado.rowcount or 0
+
+
+def gravar_confirmacao_reclamacao(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_mensagem: int,
+    id_mensagem_resposta: int,
+    id_solicitacao: int,
+) -> int:
+    import json
+
+    extra = {
+        "resposta": "confirmacao_reclamacao",
+        "id_mensagem_resposta": id_mensagem_resposta,
+        "id_solicitacao": id_solicitacao,
+    }
+    resultado = conexao.execute(
+        text(
+            "UPDATE mensagem m SET"
+            " classificacao_bruta = COALESCE(m.classificacao_bruta, '{}'::jsonb)"
+            " || CAST(:extra AS jsonb)"
+            " FROM reserva r"
+            " WHERE m.id_mensagem = :id"
+            " AND m.id_reserva = r.id_reserva"
+            " AND r.id_hotel = :id_hotel"
+        ),
+        {
+            "extra": json.dumps(extra),
+            "id": id_mensagem,
+            "id_hotel": id_hotel,
+        },
+    )
+    return resultado.rowcount or 0
+
+
 def ler_nome_titular(conexao: Connection, *, id_reserva: int) -> str | None:
     return conexao.execute(
         text(

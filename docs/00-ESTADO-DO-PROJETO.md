@@ -1,6 +1,6 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 17/08/2026
+**Atualizado em:** 18/08/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
 
 ---
@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 12 de 24 fatias concluídas.
+**Progresso:** 15 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -25,7 +25,10 @@
 | F3.1 Receber mensagem com segurança | ✅ Concluída — `POST /webhook` reutilizado, HMAC falha-fechada, `classificar_mensagem` pendente sem consumo, revisão `0009_receber_mensagem` |
 | F3.2 Classificar a intenção | ✅ Concluída — worker consome `classificar_mensagem`, taxonomia validada no domínio, `precisa_atendimento_humano` na fila, revisão `0010_classificar_intencao` |
 | F3.3 Responder dúvida a partir do catálogo | ✅ Concluída — worker consome `responder_duvida`, resposta fiel ao catálogo ativo do hotel, aviso + `duvida_nao_coberta` na fila, revisão `0011_responder_duvida_catalogo` |
-| Demais 12 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F3.4** (registrar pedido de serviço). Não há F2.3 no backlog |
+| F3.4 Registrar pedido de serviço | ✅ Concluída — worker consome `registrar_pedido_servico`, confirmação antes da `solicitacao` tipo `servico` (sem `consumo`), `GET /solicitacoes` sem ficha, revisão `0012_registrar_pedido_servico` |
+| F3.5 Abrir chamado de reclamação | ✅ Concluída — worker consome `abrir_chamado_reclamacao`, confirmação antes da `solicitacao` tipo `reclamacao` (sem `consumo`), janela + destaque no `GET /solicitacoes`, revisão `0013_abrir_chamado_reclamacao` |
+| F3.6 Resolver chamado e confirmar | ✅ Concluída — `POST /solicitacoes/{id}/resolucao` grava `resolvida` (autor + instante) e agenda `enviar_confirmacao_resolucao`; worker só envia; revisão `0014_resolver_chamado` |
+| Demais 9 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F3.7** (registrar consumo faturável). Não há F2.3 no backlog |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -111,6 +114,18 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Chamado desta fatia | Desfecho `duvida_nao_coberta` na fila do dia (`precisa_atendimento_humano`). Zero `solicitacao` — chamado operacional é F3.5 | F3.3 |
 | Fidelidade ao catálogo | Trechos citados têm de ser substring do catálogo ativo **e** do texto enviado. Mentira estruturada vira o mesmo aviso da não coberta | F3.3 |
 | Catálogo vazio ou IA caída | Não chama (ou não retenta) o LLM; aviso + chamado; trabalho `concluido`. Falha de envio reagenda mensageria, não a redação | F3.3 |
+| Consumo de `registrar_pedido_servico` | Allowlist, enqueue na classificação de `pedido_de_servico` e ramo no worker no mesmo passo. Classificar não confirma nem insere `solicitacao` | F3.4 |
+| Pedido desta fatia | `solicitacao` tipo `servico`, sem `consumo`. Confirmação padrão **antes** de abrir a tarefa. Quarto só do texto do hóspede; ausência não bloqueia | F3.4 |
+| Fila operacional | `GET /solicitacoes` com `ler_solicitacao_atribuida` (recepção, staff, gestão). Mesmo JSON, sem nome/telefone/documento. Staff continua recusado na ficha e na fila do dia | F3.4 |
+| Flag humano no pedido | `precisa_atendimento_humano` permanece falso. Toalha não é chamado da recepção; a equipe lê `GET /solicitacoes` | F3.4 |
+| Consumo de `abrir_chamado_reclamacao` | Allowlist, enqueue na classificação de `reclamacao_tecnica` e ramo no worker no mesmo passo. Classificar não confirma nem insere `solicitacao` | F3.5 |
+| Chamado desta fatia | `solicitacao` tipo `reclamacao`, sem `consumo`. Toda reclamação técnica classificada abre chamado, qualquer sentimento. Confirmação padrão **antes** de tramitar; pergunta de horário só se a janela for nula | F3.5 |
+| Follow-up de horário | Atalho **antes do LLM** em `classificar_mensagem` se houver reclamação aberta sem janela e o texto `parece_resposta_de_horario`. Sem tipo extra, sem segundo recado | F3.5 |
+| Destaque por tempo | `parametro_hotel.horas_destaque_chamado_aberto` semeado `"2"`. Só `tipo=reclamacao`. Sem default no código se a chave faltar; log `prazo_ausente` | F3.5 |
+| Flag humano na reclamação | `precisa_atendimento_humano` permanece falso. Alert Center continua sendo `GET /solicitacoes` | F3.5 |
+| Resolução no clique | `POST /solicitacoes/{id}/resolucao` (`resolver_solicitacao`: recepção e staff; gestão `403`). UPDATE `resolvida` + autor + instante **antes** do recado. Segundo clique `409`. Outro hotel `404` uniforme | F3.6 |
+| Recado de conclusão | Trabalho `enviar_confirmacao_resolucao` (unicidade por `id_solicitacao`). Worker só chama `enviar_texto_sessao`. Falha de envio **não** reabre. Sem template Utility | F3.6 |
+| Janela de 24h | O recado de resolução usa sessão, não Utility. Se a janela estiver fechada, o envio falha e é retomado; o chamado permanece resolvido. Limitação honesta desta fatia | F3.6 |
 
 ## Onde ficam os arquivos
 
@@ -260,7 +275,8 @@ o silêncio, o sistema para de insistir e sinaliza no painel que a reserva chega
 cadastro prévio. **Não ser intrusivo é requisito explícito do projeto.**
 
 Os parâmetros são linhas em `parametro_hotel`, configuráveis por propriedade:
-`horas_ate_reenvio`, `horas_corte_antes_checkin`, `horas_validade_boas_vindas`, e os três
+`horas_ate_reenvio`, `horas_corte_antes_checkin`, `horas_validade_boas_vindas`,
+`horas_destaque_chamado_aberto`, e os três
 slots de entrada (`boas_vindas_cafe`, `boas_vindas_wifi`, `boas_vindas_checkout`). Os
 **valores** dos prazos ainda precisam ser definidos com o hotel, mas a estrutura para
 armazená-los já existe. A recepção edita só os três slots, pela operação

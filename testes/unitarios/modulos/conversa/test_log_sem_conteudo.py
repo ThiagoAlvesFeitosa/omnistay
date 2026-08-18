@@ -1,5 +1,7 @@
 """Logs de conversa nao carregam conteudo nem telefone."""
 
+import pytest
+
 from app.modulos.conversa import service as conversa
 from app.modulos.conversa.schema import EventoEntrada
 
@@ -365,4 +367,317 @@ def test_responder_duvida_loga_identificadores_sem_conteudo(monkeypatch):
     assert inventado not in texto
     assert "Cafe da manha" not in texto
     assert "5511" not in texto
+
+
+def test_registrar_pedido_loga_identificadores_sem_conteudo(monkeypatch):
+    from app.adaptadores.mensageria_falsa import MensageriaFalsa
+    from app.modulos.conversa.texto_confirmacao_pedido import (
+        montar_confirmacao_pedido,
+    )
+    from testes.suporte.pedido_servico import TEXTO_COM_QUARTO
+    from testes.unitarios.modulos.conversa.test_registrar_pedido import (
+        EspiaoAbrir,
+        RepoPedido,
+        _processar,
+    )
+
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(conversa.logger, "info", fake_info)
+
+    recado = montar_confirmacao_pedido(nome_completo="Maria Silva")
+    repo = RepoPedido()
+    _processar(monkeypatch, repo, EspiaoAbrir(repo))
+
+    repo_ja = RepoPedido(
+        classificacao={
+            "tipo": "classificacao_intencao",
+            "desfecho": "classificado",
+            "intencao": "pedido_de_servico",
+            "resposta": "confirmacao_pedido",
+            "id_mensagem_resposta": 20,
+            "id_solicitacao": 70,
+        },
+        enviadas={
+            20: {
+                "id_mensagem": 20,
+                "id_reserva": 1,
+                "conteudo": recado,
+                "classificacao_bruta": None,
+                "status_envio": "enviada",
+            }
+        },
+    )
+    _processar(monkeypatch, repo_ja, EspiaoAbrir(repo_ja))
+
+    repo_falha = RepoPedido()
+    gateway = MensageriaFalsa()
+    gateway.falhar_sempre = True
+    _processar(
+        monkeypatch, repo_falha, EspiaoAbrir(repo_falha), gateway=gateway
+    )
+
+    texto = " ".join(registros)
+    assert "id_mensagem=8" in texto
+    assert "id_trabalho=5" in texto
+    assert "id_hotel=1" in texto
+    assert "resultado=registrado" in texto
+    assert "resultado=ja_registrado" in texto
+    assert "resultado=envio_falhou" in texto
+    assert TEXTO_COM_QUARTO not in texto
+    assert recado not in texto
+    assert "toalha" not in texto
+    assert "402" not in texto
+    assert "Maria" not in texto
+    assert "5511" not in texto
+
+
+def test_abrir_chamado_loga_identificadores_sem_conteudo(monkeypatch):
+    from app.adaptadores.mensageria_falsa import MensageriaFalsa
+    from app.modulos.conversa.texto_confirmacao_reclamacao import (
+        montar_confirmacao_reclamacao,
+    )
+    from testes.suporte.reclamacao import TEXTO_COM_QUARTO_SEM_HORARIO
+    from testes.unitarios.modulos.conversa.test_abrir_chamado import (
+        EspiaoAbrirReclamacao,
+        RepoChamado,
+        _processar_chamado,
+    )
+
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(conversa.logger, "info", fake_info)
+
+    recado = montar_confirmacao_reclamacao(
+        nome_completo="Maria Silva", perguntar_horario=True
+    )
+    repo = RepoChamado()
+    _processar_chamado(monkeypatch, repo, EspiaoAbrirReclamacao(repo))
+
+    repo_ja = RepoChamado(
+        classificacao={
+            "tipo": "classificacao_intencao",
+            "desfecho": "classificado",
+            "intencao": "reclamacao_tecnica",
+            "resposta": "confirmacao_reclamacao",
+            "id_mensagem_resposta": 20,
+            "id_solicitacao": 70,
+        },
+        enviadas={
+            20: {
+                "id_mensagem": 20,
+                "id_reserva": 1,
+                "conteudo": recado,
+                "classificacao_bruta": None,
+                "status_envio": "enviada",
+            }
+        },
+    )
+    _processar_chamado(monkeypatch, repo_ja, EspiaoAbrirReclamacao(repo_ja))
+
+    repo_falha = RepoChamado()
+    gateway = MensageriaFalsa()
+    gateway.falhar_sempre = True
+    _processar_chamado(
+        monkeypatch,
+        repo_falha,
+        EspiaoAbrirReclamacao(repo_falha),
+        gateway=gateway,
+    )
+
+    texto = " ".join(registros)
+    assert "id_mensagem=8" in texto
+    assert "id_trabalho=5" in texto
+    assert "id_hotel=1" in texto
+    assert "resultado=aberto" in texto
+    assert "resultado=ja_aberto" in texto
+    assert "resultado=envio_falhou" in texto
+    assert TEXTO_COM_QUARTO_SEM_HORARIO not in texto
+    assert recado not in texto
+    assert "gelando" not in texto
+    assert "402" not in texto
+    assert "Maria" not in texto
+    assert "5511" not in texto
+
+
+def test_janela_registrada_loga_identificadores_sem_texto(monkeypatch):
+    class Repo:
+        def ler_mensagem(self, conexao, *, id_mensagem):
+            return {
+                "id_mensagem": id_mensagem,
+                "id_reserva": 1,
+                "conteudo": "depois das 14h",
+                "classificacao_bruta": None,
+            }
+
+        def gravar_classificacao_intencao(self, conexao, **kwargs):
+            return 1
+
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(conversa.logger, "info", fake_info)
+    monkeypatch.setattr("app.fila.repository.marcar_concluido", lambda *a, **k: None)
+
+    from app.adaptadores.llm_falso import LLMFalso
+
+    conversa.processar_trabalho_classificar_mensagem(
+        object(),
+        trabalho={
+            "id_trabalho": 5,
+            "id_hotel": 1,
+            "payload": {"id_reserva": 1, "id_mensagem": 8},
+            "tentativas": 0,
+        },
+        llm=LLMFalso(),
+        repositorio=Repo(),
+        enfileirar_resposta=lambda *a, **k: 1,
+        enfileirar_pedido=lambda *a, **k: 1,
+        enfileirar_chamado=lambda *a, **k: 1,
+        completar_janela=lambda *a, **k: 70,
+    )
+    texto = " ".join(registros)
+    assert "id_mensagem=8" in texto
+    assert "id_trabalho=5" in texto
+    assert "id_hotel=1" in texto
+    assert "resultado=janela_registrada" in texto
+    assert "depois das 14h" not in texto
+
+
+def test_resolucao_loga_identificadores_sem_conteudo(monkeypatch):
+    from datetime import UTC, datetime
+
+    from app.adaptadores.mensageria_falsa import MensageriaFalsa
+    from app.modulos.atendimento import service as atendimento
+    from app.modulos.conversa.texto_confirmacao_resolucao import (
+        montar_confirmacao_resolucao,
+    )
+    from testes.unitarios.modulos.atendimento.test_resolver import (
+        Agendador,
+        Relogio,
+        Repo,
+    )
+    from testes.unitarios.modulos.conversa.test_confirmacao_resolucao import (
+        Fila,
+        RepoMensagem,
+        _processar,
+    )
+
+    recado = montar_confirmacao_resolucao(
+        nome_completo="Maria Silva", tipo="reclamacao"
+    )
+    descricao = "o ar do quarto 402 nao esta gelando"
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(atendimento.logger, "info", fake_info)
+    monkeypatch.setattr(conversa.logger, "info", fake_info)
+
+    instante = datetime(2026, 8, 18, 14, 32, tzinfo=UTC)
+    atendimento.resolver(
+        object(),
+        id_hotel=1,
+        id_solicitacao=7,
+        id_usuario=3,
+        repositorio=Repo(
+            resultado={
+                "id_solicitacao": 7,
+                "id_reserva": 42,
+                "tipo": "reclamacao",
+                "status": "resolvida",
+                "resolvida_em": instante,
+                "id_usuario_responsavel": 3,
+            }
+        ),
+        agendar_confirmacao=Agendador(),
+        relogio=Relogio(instante),
+    )
+    with pytest.raises(atendimento.ResolucaoNaoPermitida):
+        atendimento.resolver(
+            object(),
+            id_hotel=1,
+            id_solicitacao=7,
+            id_usuario=3,
+            repositorio=Repo(
+                resultado=None,
+                existente={"status": "resolvida", "tipo": "reclamacao"},
+            ),
+            agendar_confirmacao=Agendador(),
+        )
+
+    conversa.agendar_confirmacao_resolucao(
+        object(),
+        id_hotel=1,
+        id_reserva=42,
+        id_solicitacao=7,
+        tipo="reclamacao",
+        repositorio=RepoMensagem(),
+        enfileirar=Fila(falhar=True),
+    )
+
+    repo_falha = RepoMensagem()
+    repo_falha.mensagens[1] = {
+        "id_mensagem": 1,
+        "id_reserva": 42,
+        "conteudo": recado,
+        "status_envio": "pendente",
+        "classificacao_bruta": {
+            "tipo": "confirmacao_resolucao",
+            "id_solicitacao": 7,
+        },
+    }
+    gateway = MensageriaFalsa()
+    gateway.falhar_sempre = True
+    _processar(monkeypatch, repo_falha, gateway=gateway)
+
+    texto = " ".join(registros)
+    assert "chamado_resolvido" in texto
+    assert "resolucao_recusada" in texto
+    assert "resolucao_ja_agendada" in texto
+    assert "resolucao_envio_falhou" in texto
+    assert "id_solicitacao=7" in texto
+    assert "id_hotel=1" in texto
+    assert "resultado=resolvido" in texto
+    assert recado not in texto
+    assert descricao not in texto
+    assert "402" not in texto
+    assert "Maria" not in texto
+    assert "5511" not in texto
+
+
+def test_prazo_ausente_loga_hotel_sem_descricao(monkeypatch):
+    from app.modulos.atendimento import service as atendimento
+
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(atendimento.logger, "info", fake_info)
+
+    class Repo:
+        def listar_abertas(self, conexao, *, id_hotel):
+            return []
+
+    atendimento.listar_abertas(
+        object(),
+        id_hotel=9,
+        repositorio=Repo(),
+        ler_parametro=lambda *a, **k: None,
+    )
+    texto = " ".join(registros)
+    assert "prazo_ausente" in texto
+    assert "id_hotel=9" in texto
+    assert "ar nao gela" not in texto
+    assert "depois das" not in texto
 

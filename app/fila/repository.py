@@ -12,6 +12,9 @@ TIPO_ENVIAR_LEMBRETE = "enviar_lembrete"
 TIPO_ENVIAR_BOAS_VINDAS = "enviar_boas_vindas"
 TIPO_CLASSIFICAR_MENSAGEM = "classificar_mensagem"
 TIPO_RESPONDER_DUVIDA = "responder_duvida"
+TIPO_REGISTRAR_PEDIDO_SERVICO = "registrar_pedido_servico"
+TIPO_ABRIR_CHAMADO_RECLAMACAO = "abrir_chamado_reclamacao"
+TIPO_ENVIAR_CONFIRMACAO_RESOLUCAO = "enviar_confirmacao_resolucao"
 TIPOS_CONSUMIVEIS = (
     TIPO_ENVIAR_COLETA,
     TIPO_INTERPRETAR_FICHA,
@@ -19,6 +22,9 @@ TIPOS_CONSUMIVEIS = (
     TIPO_ENVIAR_BOAS_VINDAS,
     TIPO_CLASSIFICAR_MENSAGEM,
     TIPO_RESPONDER_DUVIDA,
+    TIPO_REGISTRAR_PEDIDO_SERVICO,
+    TIPO_ABRIR_CHAMADO_RECLAMACAO,
+    TIPO_ENVIAR_CONFIRMACAO_RESOLUCAO,
 )
 BLOQUEIO_PROCESSANDO = timedelta(minutes=5)
 
@@ -169,6 +175,79 @@ def enfileirar_responder_duvida(
     ).scalar_one()
 
 
+def enfileirar_registrar_pedido_servico(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+) -> int:
+    payload = json.dumps({"id_reserva": id_reserva, "id_mensagem": id_mensagem})
+    return conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, :tipo, CAST(:payload AS jsonb), 'pendente') "
+            "RETURNING id_trabalho"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "tipo": TIPO_REGISTRAR_PEDIDO_SERVICO,
+            "payload": payload,
+        },
+    ).scalar_one()
+
+
+def enfileirar_abrir_chamado_reclamacao(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+) -> int:
+    payload = json.dumps({"id_reserva": id_reserva, "id_mensagem": id_mensagem})
+    return conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, :tipo, CAST(:payload AS jsonb), 'pendente') "
+            "RETURNING id_trabalho"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "tipo": TIPO_ABRIR_CHAMADO_RECLAMACAO,
+            "payload": payload,
+        },
+    ).scalar_one()
+
+
+def enfileirar_enviar_confirmacao_resolucao(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_solicitacao: int,
+    id_mensagem: int,
+) -> int:
+    payload = json.dumps(
+        {
+            "id_reserva": id_reserva,
+            "id_solicitacao": id_solicitacao,
+            "id_mensagem": id_mensagem,
+        }
+    )
+    return conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, :tipo, CAST(:payload AS jsonb), 'pendente') "
+            "RETURNING id_trabalho"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "tipo": TIPO_ENVIAR_CONFIRMACAO_RESOLUCAO,
+            "payload": payload,
+        },
+    ).scalar_one()
+
+
 def reclaim_expirados(
     conexao: Connection,
     *,
@@ -205,7 +284,8 @@ def reclamar_proximo(
             " WHERE status = 'pendente'"
             " AND tipo IN ('enviar_coleta', 'interpretar_ficha',"
             " 'enviar_lembrete', 'enviar_boas_vindas', 'classificar_mensagem',"
-            " 'responder_duvida')"
+            " 'responder_duvida', 'registrar_pedido_servico',"
+            " 'abrir_chamado_reclamacao', 'enviar_confirmacao_resolucao')"
             " AND (proxima_tentativa_em IS NULL OR proxima_tentativa_em <= :agora)"
             " ORDER BY id_trabalho ASC"
             " FOR UPDATE SKIP LOCKED"

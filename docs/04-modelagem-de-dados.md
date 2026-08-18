@@ -439,7 +439,8 @@ Chaves previstas: `horas_ate_reenvio` · `horas_corte_antes_checkin` ·
 `periodicidade_coleta_mercado` · `horas_minimas_para_pulso` ·
 `duracao_sessao_recepcao_horas` · `duracao_sessao_staff_horas` ·
 `duracao_sessao_gestor_horas` · `contato_responsavel_dados` ·
-`tentativas_max_envio_mensagem`.
+`tentativas_max_envio_mensagem` · `horas_validade_boas_vindas` ·
+`horas_destaque_chamado_aberto`.
 
 A F1.4 **usa** os dois prazos de silêncio: o bootstrap (e a revisão `0007`) semeia
 `horas_ate_reenvio=24` e `horas_corte_antes_checkin=12`. Ausência da chave na verificação
@@ -699,8 +700,30 @@ o chamado desta fatia é a pendência visível na fila do dia. `classificacao_br
 estadia usa `tipo = classificacao_intencao` e desfecho `classificado`,
 `encaminhado_humano`, `formato_invalido`, `indisponivel` ou `duvida_nao_coberta`.
 O worker consome os demais tipos com `FOR UPDATE SKIP LOCKED`.
+Pedido de serviço classificado enfileira `registrar_pedido_servico` (unicidade por
+mensagem recebida): recado de confirmação, JSON com `resposta = confirmacao_pedido`,
+`id_mensagem_resposta` e `id_solicitacao`, e uma linha `solicitacao` tipo `servico`
+sem `consumo`. Unicidade também em `solicitacao.id_mensagem_origem`. Pedido **não**
+liga `precisa_atendimento_humano`.
+Reclamação técnica classificada enfileira `abrir_chamado_reclamacao` (unicidade por
+mensagem recebida): recado de confirmação com acionamento da manutenção (pergunta
+de horário só se a janela ainda for desconhecida), JSON com
+`resposta = confirmacao_reclamacao`, `id_mensagem_resposta` e `id_solicitacao`, e
+uma linha `solicitacao` tipo `reclamacao` com `janela_preferencia` quando
+informada, sem `consumo`. Reclamação **não** liga `precisa_atendimento_humano`.
+O prazo `horas_destaque_chamado_aberto` (semeado `2`) destaca chamado aberto
+além desse intervalo no Alert Center; ausência da chave não inventa limite.
+`POST /solicitacoes/{id}/resolucao` transita `aberta` ou `em_andamento` para
+`resolvida` (terminal nesta fatia), preenchendo `resolvida_em` e
+`id_usuario_responsavel`. Chamado resolvido **não** permanece `aberta`. O recado
+de conclusão é outra mensagem enviada (`classificacao_bruta.tipo =
+confirmacao_resolucao`), distinta da origem. O worker consome
+`enviar_confirmacao_resolucao` (unicidade por `id_solicitacao`) só para entregar
+esse recado — não reabre nem altera a solicitação.
 Índices únicos parciais: uma coleta por reserva, uma interpretação por mensagem de
-entrada, um `classificar_mensagem` por mensagem, um `responder_duvida` por mensagem.
+entrada, um `classificar_mensagem` por mensagem, um `responder_duvida` por mensagem,
+um `registrar_pedido_servico` por mensagem, um `abrir_chamado_reclamacao` por
+mensagem, um `enviar_confirmacao_resolucao` por solicitação.
 Payload só com identificadores — sem PII.
 
 ### 7.2 Verificação realizada

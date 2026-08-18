@@ -91,6 +91,7 @@ def _semear_parametros_coleta(
         ("tentativas_max_envio_mensagem", "5"),
         ("horas_ate_reenvio", "24"),
         ("horas_corte_antes_checkin", "12"),
+        ("horas_destaque_chamado_aberto", "2"),
     ):
         conexao.execute(
             text(

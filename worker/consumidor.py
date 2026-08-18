@@ -7,6 +7,7 @@ from app.adaptadores.llm_falso import LLMFalso
 from app.adaptadores.mensageria_falsa import MensageriaFalsa
 from app.comum.log import obter_logger
 from app.fila import repository as fila_repository
+from app.modulos.atendimento import service as atendimento_service
 from app.modulos.conversa import service as conversa_service
 from app.modulos.hospedagem import service as hospedagem_service
 from app.portas.llm import LLMProvider
@@ -57,7 +58,10 @@ def processar_uma_passagem(
             )
         elif trabalho["tipo"] == "classificar_mensagem":
             conversa_service.processar_trabalho_classificar_mensagem(
-                conexao, trabalho=trabalho, llm=porta_llm
+                conexao,
+                trabalho=trabalho,
+                llm=porta_llm,
+                completar_janela=atendimento_service.completar_janela_se_resposta,
             )
         elif trabalho["tipo"] == "responder_duvida":
             conversa_service.processar_trabalho_responder_duvida(
@@ -66,6 +70,24 @@ def processar_uma_passagem(
                 llm=porta_llm,
                 catalogo=porta_catalogo or CatalogoBanco(conexao),
                 gateway=gateway,
+            )
+        elif trabalho["tipo"] == "registrar_pedido_servico":
+            conversa_service.processar_trabalho_registrar_pedido(
+                conexao,
+                trabalho=trabalho,
+                gateway=gateway,
+                abrir_servico=atendimento_service.abrir_servico,
+            )
+        elif trabalho["tipo"] == "abrir_chamado_reclamacao":
+            conversa_service.processar_trabalho_abrir_chamado(
+                conexao,
+                trabalho=trabalho,
+                gateway=gateway,
+                abrir_reclamacao=atendimento_service.abrir_reclamacao,
+            )
+        elif trabalho["tipo"] == "enviar_confirmacao_resolucao":
+            conversa_service.processar_trabalho_enviar_confirmacao_resolucao(
+                conexao, trabalho=trabalho, gateway=gateway
             )
         else:
             fila_repository.marcar_falha(

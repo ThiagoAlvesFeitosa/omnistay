@@ -347,3 +347,300 @@ def test_segundo_trabalho_responder_da_mesma_mensagem_e_recusado(conexao):
         _inserir_trabalho_responder(conexao, id_hotel, id_reserva, id_mensagem=7)
 
     assert "uq_trabalho_responder_duvida_mensagem" in str(erro.value)
+
+
+def _inserir_trabalho_registrar_pedido(
+    conexao, id_hotel: int, id_reserva: int, id_mensagem: int = 1
+) -> None:
+    conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, 'registrar_pedido_servico',"
+            " CAST(:payload AS jsonb), 'pendente')"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "payload": (
+                '{"id_reserva": %s, "id_mensagem": %s}'
+                % (id_reserva, id_mensagem)
+            ),
+        },
+    )
+
+
+@pytest.mark.postgres
+def test_tipo_registrar_pedido_servico_e_aceito_pelo_check(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+
+    _inserir_trabalho_registrar_pedido(conexao, id_hotel, id_reserva)
+
+    tipo = conexao.execute(
+        text(
+            "SELECT tipo FROM trabalho WHERE tipo = 'registrar_pedido_servico'"
+        )
+    ).scalar_one()
+    assert tipo == "registrar_pedido_servico"
+
+
+@pytest.mark.postgres
+def test_segundo_trabalho_registrar_pedido_da_mesma_mensagem_e_recusado(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    _inserir_trabalho_registrar_pedido(conexao, id_hotel, id_reserva, id_mensagem=7)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_trabalho_registrar_pedido(
+            conexao, id_hotel, id_reserva, id_mensagem=7
+        )
+
+    assert "uq_trabalho_registrar_pedido_servico_mensagem" in str(erro.value)
+
+
+def _inserir_mensagem_recebida(conexao, id_reserva: int, conteudo: str = "toalha") -> int:
+    return conexao.execute(
+        text(
+            "INSERT INTO mensagem (id_reserva, direcao, conteudo) "
+            "VALUES (:id_reserva, 'recebida', :conteudo) RETURNING id_mensagem"
+        ),
+        {"id_reserva": id_reserva, "conteudo": conteudo},
+    ).scalar()
+
+
+@pytest.mark.postgres
+def test_segunda_solicitacao_da_mesma_mensagem_origem_e_recusada(conexao):
+    id_reserva = criar_reserva(conexao, criar_hotel(conexao))
+    id_mensagem = _inserir_mensagem_recebida(conexao, id_reserva)
+    conexao.execute(
+        text(
+            "INSERT INTO solicitacao (id_reserva, id_mensagem_origem, tipo, descricao) "
+            "VALUES (:id_reserva, :id_mensagem, 'servico', 'toalha extra')"
+        ),
+        {"id_reserva": id_reserva, "id_mensagem": id_mensagem},
+    )
+
+    with pytest.raises(DBAPIError) as erro:
+        conexao.execute(
+            text(
+                "INSERT INTO solicitacao (id_reserva, id_mensagem_origem, tipo, descricao) "
+                "VALUES (:id_reserva, :id_mensagem, 'servico', 'toalha extra')"
+            ),
+            {"id_reserva": id_reserva, "id_mensagem": id_mensagem},
+        )
+
+    assert "uq_solicitacao_mensagem_origem" in str(erro.value)
+
+
+def _inserir_trabalho_abrir_chamado(
+    conexao, id_hotel: int, id_reserva: int, id_mensagem: int = 1
+) -> None:
+    conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, 'abrir_chamado_reclamacao',"
+            " CAST(:payload AS jsonb), 'pendente')"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "payload": (
+                '{"id_reserva": %s, "id_mensagem": %s}'
+                % (id_reserva, id_mensagem)
+            ),
+        },
+    )
+
+
+@pytest.mark.postgres
+def test_tipo_abrir_chamado_reclamacao_e_aceito_pelo_check(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+
+    _inserir_trabalho_abrir_chamado(conexao, id_hotel, id_reserva)
+
+    tipo = conexao.execute(
+        text(
+            "SELECT tipo FROM trabalho WHERE tipo = 'abrir_chamado_reclamacao'"
+        )
+    ).scalar_one()
+    assert tipo == "abrir_chamado_reclamacao"
+
+
+@pytest.mark.postgres
+def test_segundo_trabalho_abrir_chamado_da_mesma_mensagem_e_recusado(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    _inserir_trabalho_abrir_chamado(conexao, id_hotel, id_reserva, id_mensagem=7)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_trabalho_abrir_chamado(
+            conexao, id_hotel, id_reserva, id_mensagem=7
+        )
+
+    assert "uq_trabalho_abrir_chamado_reclamacao_mensagem" in str(erro.value)
+
+
+def _inserir_trabalho_confirmacao_resolucao(
+    conexao, id_hotel: int, id_reserva: int, id_solicitacao: int = 1
+) -> None:
+    conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, 'enviar_confirmacao_resolucao',"
+            " CAST(:payload AS jsonb), 'pendente')"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "payload": (
+                '{"id_reserva": %s, "id_solicitacao": %s, "id_mensagem": 1}'
+                % (id_reserva, id_solicitacao)
+            ),
+        },
+    )
+
+
+def _criar_usuario(conexao, id_hotel: int) -> int:
+    return conexao.execute(
+        text(
+            "INSERT INTO usuario (id_hotel, nome, email, senha_hash, perfil) "
+            "VALUES (:id_hotel, 'Staff Teste', :email, 'hash', 'staff') "
+            "RETURNING id_usuario"
+        ),
+        {"id_hotel": id_hotel, "email": f"staff-{id_hotel}@exemplo.com"},
+    ).scalar()
+
+
+def _inserir_solicitacao_aberta(conexao, id_reserva: int, tipo: str = "reclamacao") -> int:
+    return conexao.execute(
+        text(
+            "INSERT INTO solicitacao (id_reserva, tipo, descricao, status) "
+            "VALUES (:id_reserva, :tipo, 'problema no quarto', 'aberta') "
+            "RETURNING id_solicitacao"
+        ),
+        {"id_reserva": id_reserva, "tipo": tipo},
+    ).scalar()
+
+
+@pytest.mark.postgres
+def test_tipo_enviar_confirmacao_resolucao_e_aceito_pelo_check(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+
+    _inserir_trabalho_confirmacao_resolucao(conexao, id_hotel, id_reserva)
+
+    tipo = conexao.execute(
+        text(
+            "SELECT tipo FROM trabalho WHERE tipo = 'enviar_confirmacao_resolucao'"
+        )
+    ).scalar_one()
+    assert tipo == "enviar_confirmacao_resolucao"
+
+
+@pytest.mark.postgres
+def test_segundo_trabalho_confirmacao_resolucao_da_mesma_solicitacao_e_recusado(
+    conexao,
+):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    _inserir_trabalho_confirmacao_resolucao(
+        conexao, id_hotel, id_reserva, id_solicitacao=7
+    )
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_trabalho_confirmacao_resolucao(
+            conexao, id_hotel, id_reserva, id_solicitacao=7
+        )
+
+    assert "uq_trabalho_enviar_confirmacao_resolucao_solicitacao" in str(erro.value)
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize("origem", ["aberta", "em_andamento"])
+def test_transicao_solicitacao_para_resolvida_e_aceita(conexao, origem):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    id_usuario = _criar_usuario(conexao, id_hotel)
+    id_solicitacao = conexao.execute(
+        text(
+            "INSERT INTO solicitacao (id_reserva, tipo, descricao, status) "
+            "VALUES (:id_reserva, 'reclamacao', 'problema no quarto', :status) "
+            "RETURNING id_solicitacao"
+        ),
+        {"id_reserva": id_reserva, "status": origem},
+    ).scalar()
+
+    conexao.execute(
+        text(
+            "UPDATE solicitacao SET status = 'resolvida',"
+            " resolvida_em = now(), id_usuario_responsavel = :uid"
+            " WHERE id_solicitacao = :id"
+        ),
+        {"uid": id_usuario, "id": id_solicitacao},
+    )
+
+    status = conexao.execute(
+        text("SELECT status FROM solicitacao WHERE id_solicitacao = :id"),
+        {"id": id_solicitacao},
+    ).scalar()
+    assert status == "resolvida"
+
+
+@pytest.mark.postgres
+def test_transicao_solicitacao_resolvida_para_aberta_e_recusada(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    id_usuario = _criar_usuario(conexao, id_hotel)
+    id_solicitacao = _inserir_solicitacao_aberta(conexao, id_reserva)
+    conexao.execute(
+        text(
+            "UPDATE solicitacao SET status = 'resolvida',"
+            " resolvida_em = now(), id_usuario_responsavel = :uid"
+            " WHERE id_solicitacao = :id"
+        ),
+        {"uid": id_usuario, "id": id_solicitacao},
+    )
+
+    with pytest.raises(DBAPIError) as erro:
+        conexao.execute(
+            text(
+                "UPDATE solicitacao SET status = 'aberta'"
+                " WHERE id_solicitacao = :id"
+            ),
+            {"id": id_solicitacao},
+        )
+
+    assert "Transicao de status invalida" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_transicao_solicitacao_aberta_para_cancelada_e_recusada(conexao):
+    id_reserva = criar_reserva(conexao, criar_hotel(conexao))
+    id_solicitacao = _inserir_solicitacao_aberta(conexao, id_reserva)
+
+    with pytest.raises(DBAPIError) as erro:
+        conexao.execute(
+            text(
+                "UPDATE solicitacao SET status = 'cancelada'"
+                " WHERE id_solicitacao = :id"
+            ),
+            {"id": id_solicitacao},
+        )
+
+    assert "Transicao de status invalida" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_solicitacao_resolvida_sem_responsavel_e_recusada(conexao):
+    id_reserva = criar_reserva(conexao, criar_hotel(conexao))
+    id_solicitacao = _inserir_solicitacao_aberta(conexao, id_reserva)
+
+    with pytest.raises(DBAPIError) as erro:
+        conexao.execute(
+            text(
+                "UPDATE solicitacao SET status = 'resolvida',"
+                " resolvida_em = now()"
+                " WHERE id_solicitacao = :id"
+            ),
+            {"id": id_solicitacao},
+        )
+
+    assert "ck_solicitacao_resolvida_tem_responsavel" in str(erro.value)

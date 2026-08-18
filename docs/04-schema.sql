@@ -98,7 +98,8 @@ COMMENT ON TABLE parametro_hotel IS
     'horas_corte_antes_checkin, periodicidade_coleta_mercado, horas_minimas_para_pulso, '
     'duracao_sessao_recepcao_horas, duracao_sessao_staff_horas, duracao_sessao_gestor_horas, '
     'contato_responsavel_dados, tentativas_max_envio_mensagem, boas_vindas_cafe, '
-    'boas_vindas_wifi, boas_vindas_checkout, horas_validade_boas_vindas.';
+    'boas_vindas_wifi, boas_vindas_checkout, horas_validade_boas_vindas, '
+    'horas_destaque_chamado_aberto.';
 
 
 CREATE TABLE catalogo_item (
@@ -307,7 +308,8 @@ CREATE TABLE trabalho (
     CONSTRAINT ck_trabalho_tipo CHECK (
         tipo IN ('enviar_coleta', 'interpretar_ficha', 'enviar_lembrete',
                  'enviar_boas_vindas', 'classificar_mensagem',
-                 'responder_duvida')
+                 'responder_duvida', 'registrar_pedido_servico',
+                 'abrir_chamado_reclamacao', 'enviar_confirmacao_resolucao')
     ),
     CONSTRAINT ck_trabalho_status CHECK (
         status IN ('pendente', 'processando', 'concluido', 'falha')
@@ -341,6 +343,18 @@ CREATE UNIQUE INDEX uq_trabalho_classificar_mensagem_mensagem
 CREATE UNIQUE INDEX uq_trabalho_responder_duvida_mensagem
     ON trabalho ( ((payload->>'id_mensagem')::bigint) )
     WHERE tipo = 'responder_duvida';
+
+CREATE UNIQUE INDEX uq_trabalho_registrar_pedido_servico_mensagem
+    ON trabalho ( ((payload->>'id_mensagem')::bigint) )
+    WHERE tipo = 'registrar_pedido_servico';
+
+CREATE UNIQUE INDEX uq_trabalho_abrir_chamado_reclamacao_mensagem
+    ON trabalho ( ((payload->>'id_mensagem')::bigint) )
+    WHERE tipo = 'abrir_chamado_reclamacao';
+
+CREATE UNIQUE INDEX uq_trabalho_enviar_confirmacao_resolucao_solicitacao
+    ON trabalho ( ((payload->>'id_solicitacao')::bigint) )
+    WHERE tipo = 'enviar_confirmacao_resolucao';
 
 CREATE INDEX ix_trabalho_claim
     ON trabalho (status, proxima_tentativa_em)
@@ -385,7 +399,9 @@ CREATE TABLE solicitacao (
     CONSTRAINT ck_solicitacao_status
         CHECK (status IN ('aberta', 'em_andamento', 'resolvida', 'cancelada')),
     CONSTRAINT ck_solicitacao_resolvida_tem_data
-        CHECK (status <> 'resolvida' OR resolvida_em IS NOT NULL)
+        CHECK (status <> 'resolvida' OR resolvida_em IS NOT NULL),
+    CONSTRAINT ck_solicitacao_resolvida_tem_responsavel
+        CHECK (status <> 'resolvida' OR id_usuario_responsavel IS NOT NULL)
 );
 
 COMMENT ON TABLE solicitacao IS
@@ -404,6 +420,9 @@ CREATE INDEX ix_solicitacao_fila
 CREATE INDEX ix_solicitacao_abertas_antigas
     ON solicitacao (aberta_em)
     WHERE status = 'aberta';
+CREATE UNIQUE INDEX uq_solicitacao_mensagem_origem
+    ON solicitacao (id_mensagem_origem)
+    WHERE id_mensagem_origem IS NOT NULL;
 
 
 CREATE TABLE consumo (
@@ -532,6 +551,35 @@ CREATE TRIGGER tg_valida_transicao_reserva
 COMMENT ON FUNCTION fn_valida_transicao_reserva() IS
     'Impede corrupcao do ciclo de vida da reserva por script de correcao ou importacao. '
     'Deixar a regra apenas na aplicacao nao protege o dado.';
+
+
+CREATE OR REPLACE FUNCTION fn_valida_transicao_solicitacao()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF OLD.status = NEW.status THEN
+        RETURN NEW;
+    END IF;
+
+    IF NOT (
+        OLD.status IN ('aberta', 'em_andamento') AND NEW.status = 'resolvida'
+    ) THEN
+        RAISE EXCEPTION
+            'Transicao de status invalida na solicitacao %: % -> %',
+            OLD.id_solicitacao, OLD.status, NEW.status;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tg_valida_transicao_solicitacao
+    BEFORE UPDATE OF status ON solicitacao
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_valida_transicao_solicitacao();
+
+COMMENT ON FUNCTION fn_valida_transicao_solicitacao() IS
+    'Nesta fatia so admite aberta ou em_andamento para resolvida. '
+    'Reabrir ou cancelar pelo banco e recusado; a aplicacao devolve 409.';
 
 
 -- ---------------------------------------------------------------------
