@@ -21,6 +21,7 @@ from app.portas.llm import (
     FalhaDeClassificacao,
     FalhaDeConversacao,
     FalhaDeExtracao,
+    FalhaDeIdentificacao,
     LLMProvider,
     ResultadoExtracao,
 )
@@ -1178,6 +1179,7 @@ def _enviar_resposta_sessao(
     id_enviada: int,
     corpo: str,
     id_reserva: int,
+    evento_especifico_falha: str | None = None,
 ) -> None:
     from app.fila import repository as fila_repo
     from app.fila import service as fila_svc
@@ -1222,7 +1224,21 @@ def _enviar_resposta_sessao(
             destino,
             erro.codigo,
         )
-        if trabalho.get("tipo") == "registrar_pedido_servico":
+        if evento_especifico_falha:
+            origem = (trabalho.get("payload") or {}).get("id_mensagem")
+            logger.info(
+                "%s id_trabalho=%s id_mensagem=%s id_hotel=%s"
+                " resultado=envio_falhou codigo=%s",
+                evento_especifico_falha,
+                id_trabalho,
+                origem,
+                id_hotel,
+                erro.codigo,
+            )
+        if (
+            trabalho.get("tipo") == "registrar_pedido_servico"
+            and evento_especifico_falha != "consumo_envio_falhou"
+        ):
             origem = (trabalho.get("payload") or {}).get("id_mensagem")
             logger.info(
                 "pedido_envio_falhou id_trabalho=%s id_mensagem=%s id_hotel=%s"
@@ -1304,10 +1320,22 @@ def processar_trabalho_registrar_pedido(
     trabalho: dict,
     gateway: MensageriaGateway,
     abrir_servico,
+    abrir_consumo=None,
+    listar_itens_ativos=None,
+    identificar=None,
+    ler_preco=None,
     repositorio=repositorio_padrao,
 ) -> None:
+    from decimal import Decimal
+
     from app.fila import repository as fila_repo
     from app.modulos.atendimento.quarto import extrair_numero_quarto
+    from app.modulos.conversa.texto_aviso_identificacao import (
+        montar_aviso_identificacao,
+    )
+    from app.modulos.conversa.texto_confirmacao_consumo import (
+        montar_confirmacao_consumo,
+    )
     from app.modulos.conversa.texto_confirmacao_pedido import (
         montar_confirmacao_pedido,
     )
@@ -1322,21 +1350,41 @@ def processar_trabalho_registrar_pedido(
     existente = _json_classificacao(
         mensagem.get("classificacao_bruta") if mensagem else None
     )
-    if (
-        existente
-        and existente.get("resposta") == "confirmacao_pedido"
-        and existente.get("id_solicitacao")
+    resposta_existente = existente.get("resposta") if existente else None
+    if resposta_existente in {
+        "confirmacao_pedido",
+        "confirmacao_consumo",
+        "aviso_identificacao",
+    } and (
+        resposta_existente == "aviso_identificacao"
+        or existente.get("id_solicitacao")
     ):
         id_enviada = int(existente["id_mensagem_resposta"])
         enviada = repositorio.ler_mensagem(conexao, id_mensagem=id_enviada)
+        evento = (
+            "consumo_ja_registrado"
+            if resposta_existente == "confirmacao_consumo"
+            else (
+                "identificacao_humana"
+                if resposta_existente == "aviso_identificacao"
+                else "pedido_ja_registrado"
+            )
+        )
+        resultado = (
+            "ja_avisado"
+            if resposta_existente == "aviso_identificacao"
+            else "ja_registrado"
+        )
         if enviada and enviada.get("status_envio") == "pendente":
             logger.info(
-                "pedido_ja_registrado id_trabalho=%s id_mensagem=%s"
-                " id_hotel=%s id_solicitacao=%s resultado=ja_registrado",
+                "%s id_trabalho=%s id_mensagem=%s id_hotel=%s"
+                " id_solicitacao=%s resultado=%s",
+                evento,
                 id_trabalho,
                 id_mensagem,
                 id_hotel,
                 existente.get("id_solicitacao"),
+                resultado,
             )
             _enviar_resposta_sessao(
                 conexao,
@@ -1346,16 +1394,23 @@ def processar_trabalho_registrar_pedido(
                 id_enviada=id_enviada,
                 corpo=enviada["conteudo"],
                 id_reserva=id_reserva,
+                evento_especifico_falha=(
+                    "consumo_envio_falhou"
+                    if resposta_existente == "confirmacao_consumo"
+                    else None
+                ),
             )
             return
         fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
         logger.info(
-            "pedido_ja_registrado id_trabalho=%s id_mensagem=%s id_hotel=%s"
-            " id_solicitacao=%s resultado=ja_registrado",
+            "%s id_trabalho=%s id_mensagem=%s id_hotel=%s"
+            " id_solicitacao=%s resultado=%s",
+            evento,
             id_trabalho,
             id_mensagem,
             id_hotel,
             existente.get("id_solicitacao"),
+            resultado,
         )
         return
 
@@ -1366,28 +1421,164 @@ def processar_trabalho_registrar_pedido(
     ler_nome = getattr(repositorio, "ler_nome_titular", None)
     if ler_nome is not None:
         nome = ler_nome(conexao, id_reserva=id_reserva) or "hospede"
-    corpo = montar_confirmacao_pedido(nome_completo=nome)
+
+    def _caminho_servico() -> None:
+        corpo = montar_confirmacao_pedido(nome_completo=nome)
+        id_enviada = repositorio.inserir_mensagem_enviada_pendente(
+            conexao, id_reserva=id_reserva, conteudo=corpo
+        )
+        id_solicitacao = abrir_servico(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            id_mensagem=id_mensagem,
+            descricao=descricao,
+            numero_quarto=numero_quarto,
+            urgencia=urgencia,
+        )
+        repositorio.gravar_confirmacao_pedido(
+            conexao,
+            id_hotel=id_hotel,
+            id_mensagem=id_mensagem,
+            id_mensagem_resposta=id_enviada,
+            id_solicitacao=id_solicitacao,
+        )
+        logger.info(
+            "pedido_registrado id_trabalho=%s id_mensagem=%s id_reserva=%s"
+            " id_hotel=%s id_solicitacao=%s resultado=registrado",
+            id_trabalho,
+            id_mensagem,
+            id_reserva,
+            id_hotel,
+            id_solicitacao,
+        )
+        _enviar_resposta_sessao(
+            conexao,
+            trabalho=trabalho,
+            gateway=gateway,
+            repositorio=repositorio,
+            id_enviada=id_enviada,
+            corpo=corpo,
+            id_reserva=id_reserva,
+        )
+
+    def _caminho_humano(desfecho: str) -> None:
+        corpo = montar_aviso_identificacao(nome_completo=nome)
+        id_enviada = repositorio.inserir_mensagem_enviada_pendente(
+            conexao, id_reserva=id_reserva, conteudo=corpo
+        )
+        gravar_aviso = getattr(repositorio, "gravar_aviso_identificacao", None)
+        if gravar_aviso is not None:
+            gravar_aviso(
+                conexao,
+                id_hotel=id_hotel,
+                id_mensagem=id_mensagem,
+                id_mensagem_resposta=id_enviada,
+                desfecho=desfecho,
+            )
+        logger.info(
+            "identificacao_humana id_trabalho=%s id_mensagem=%s id_hotel=%s"
+            " resultado=%s",
+            id_trabalho,
+            id_mensagem,
+            id_hotel,
+            desfecho,
+        )
+        _enviar_resposta_sessao(
+            conexao,
+            trabalho=trabalho,
+            gateway=gateway,
+            repositorio=repositorio,
+            id_enviada=id_enviada,
+            corpo=corpo,
+            id_reserva=id_reserva,
+        )
+
+    itens = ()
+    if listar_itens_ativos is not None:
+        itens = tuple(listar_itens_ativos(conexao, id_hotel=id_hotel) or ())
+    ids_validos = {par[0] for par in itens}
+
+    if not itens or identificar is None:
+        _caminho_servico()
+        return
+
+    try:
+        resultado = identificar(descricao, itens)
+    except FalhaDeIdentificacao:
+        _caminho_humano("identificacao_indisponivel")
+        return
+
+    desfecho = getattr(resultado, "desfecho", None)
+    if desfecho == "nenhum":
+        _caminho_servico()
+        return
+    if desfecho == "ambiguo":
+        _caminho_humano("item_ambiguo")
+        return
+    if desfecho != "unico":
+        _caminho_humano("identificacao_indisponivel")
+        return
+
+    id_item = getattr(resultado, "id_item_vendavel", None)
+    try:
+        quantidade = int(resultado.quantidade)
+    except (TypeError, ValueError):
+        _caminho_humano("identificacao_indisponivel")
+        return
+    if id_item not in ids_validos or quantidade < 1:
+        _caminho_humano("identificacao_indisponivel")
+        return
+
+    preco = None
+    if ler_preco is not None:
+        preco = ler_preco(
+            conexao, id_hotel=id_hotel, id_item_vendavel=id_item
+        )
+    if preco is None:
+        _caminho_humano("identificacao_indisponivel")
+        return
+    if not isinstance(preco, Decimal):
+        preco = Decimal(str(preco))
+    valor_praticado = preco * quantidade
+    nome_item = next(par[1] for par in itens if par[0] == id_item)
+
+    if abrir_consumo is None:
+        _caminho_servico()
+        return
+
+    corpo = montar_confirmacao_consumo(
+        nome_completo=nome,
+        descricao_item=nome_item,
+        valor_praticado=valor_praticado,
+    )
     id_enviada = repositorio.inserir_mensagem_enviada_pendente(
         conexao, id_reserva=id_reserva, conteudo=corpo
     )
-    id_solicitacao = abrir_servico(
+    id_solicitacao = abrir_consumo(
         conexao,
         id_hotel=id_hotel,
         id_reserva=id_reserva,
         id_mensagem=id_mensagem,
         descricao=descricao,
+        descricao_item=nome_item,
+        valor_praticado=valor_praticado,
         numero_quarto=numero_quarto,
         urgencia=urgencia,
     )
-    repositorio.gravar_confirmacao_pedido(
-        conexao,
-        id_hotel=id_hotel,
-        id_mensagem=id_mensagem,
-        id_mensagem_resposta=id_enviada,
-        id_solicitacao=id_solicitacao,
-    )
+    gravar_consumo = getattr(repositorio, "gravar_confirmacao_consumo", None)
+    if gravar_consumo is not None:
+        gravar_consumo(
+            conexao,
+            id_hotel=id_hotel,
+            id_mensagem=id_mensagem,
+            id_mensagem_resposta=id_enviada,
+            id_solicitacao=id_solicitacao,
+            id_item_vendavel=id_item,
+            quantidade=quantidade,
+        )
     logger.info(
-        "pedido_registrado id_trabalho=%s id_mensagem=%s id_reserva=%s"
+        "consumo_registrado id_trabalho=%s id_mensagem=%s id_reserva=%s"
         " id_hotel=%s id_solicitacao=%s resultado=registrado",
         id_trabalho,
         id_mensagem,
@@ -1403,6 +1594,7 @@ def processar_trabalho_registrar_pedido(
         id_enviada=id_enviada,
         corpo=corpo,
         id_reserva=id_reserva,
+        evento_especifico_falha="consumo_envio_falhou",
     )
 
 

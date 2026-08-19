@@ -1,6 +1,9 @@
 """Textos e eixos de pedido de servico (F3.4).
 
-F3.6 fecha o pedido via POST /solicitacoes/{id}/resolucao.
+F3.7 faz fork no mesmo trabalho `registrar_pedido_servico`: item vendavel unico
+vira consumo faturavel; identificacao `nenhum` (ou lista vazia) permanece o
+servico operacional desta fatia — toalha extra, sem preco. F3.6 fecha o pedido
+via POST /solicitacoes/{id}/resolucao.
 """
 
 from testes.suporte.classificacao import resultado_valido

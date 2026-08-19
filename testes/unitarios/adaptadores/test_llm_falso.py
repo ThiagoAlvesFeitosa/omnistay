@@ -7,8 +7,10 @@ from app.portas.llm import (
     FalhaDeClassificacao,
     FalhaDeConversacao,
     FalhaDeExtracao,
+    FalhaDeIdentificacao,
     ResultadoClassificacao,
     ResultadoExtracao,
+    ResultadoIdentificacao,
     ResultadoResposta,
 )
 
@@ -115,3 +117,32 @@ def test_configurar_resposta_devolve_o_configurado():
 
     resultado = porta.responder_duvida("cafe", (item_cafe(),))
     assert resultado.coberta is False
+
+
+def test_identificar_sem_config_devolve_nenhum():
+    porta = LLMFalso()
+    itens = ((3, "Cerveja"),)
+    resultado = porta.identificar_item_vendavel("uma cerveja", itens)
+    assert resultado.desfecho == "nenhum"
+    assert porta.chamadas_identificar == [("uma cerveja", itens)]
+
+
+def test_identificar_unico_configurado_devolve_id_e_quantidade():
+    porta = LLMFalso()
+    porta.configurar_identificacao(
+        ResultadoIdentificacao(desfecho="unico", id_item_vendavel=3, quantidade=1)
+    )
+    resultado = porta.identificar_item_vendavel("uma cerveja", ((3, "Cerveja"),))
+    assert resultado.desfecho == "unico"
+    assert resultado.id_item_vendavel == 3
+    assert resultado.quantidade == 1
+
+
+def test_identificar_ambiguo_e_falha_sao_configuraveis():
+    porta = LLMFalso()
+    porta.configurar_identificacao(ResultadoIdentificacao(desfecho="ambiguo"))
+    assert porta.identificar_item_vendavel("algo", ((1, "Agua"),)).desfecho == "ambiguo"
+    porta.falhar_identificacao = True
+    with pytest.raises(FalhaDeIdentificacao) as erro:
+        porta.identificar_item_vendavel("algo", ((1, "Agua"),))
+    assert erro.value.codigo == "indisponivel"

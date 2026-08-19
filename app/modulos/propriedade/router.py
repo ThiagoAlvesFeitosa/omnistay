@@ -15,6 +15,10 @@ from app.modulos.propriedade.schema import (
     ItemCatalogoEntrada,
     ItemCatalogoPatch,
     ItemCatalogoResposta,
+    ItemVendavelEntrada,
+    ItemVendavelPatch,
+    ItemVendavelResposta,
+    ListaItensVendaveisResposta,
     ListaManutencaoResposta,
 )
 
@@ -147,3 +151,83 @@ def gravar_boas_vindas(
             detail=str(erro),
         ) from erro
     return BoasVindasResposta(**gravados)
+
+
+@roteador.post(
+    "/itens-vendaveis",
+    response_model=ItemVendavelResposta,
+    status_code=status.HTTP_201_CREATED,
+)
+def criar_item_vendavel(
+    entrada: ItemVendavelEntrada,
+    conexao: Conexao,
+    sessao: Annotated[SessaoAtual, Depends(exigir_operacao("alterar_catalogo"))],
+) -> ItemVendavelResposta:
+    try:
+        criado = catalogo.criar_item_vendavel(
+            conexao,
+            id_hotel=sessao.id_hotel,
+            nome=entrada.nome,
+            preco_atual=entrada.preco_atual,
+        )
+    except catalogo.DadosInvalidos as erro:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(erro),
+        ) from erro
+    except catalogo.ItemVendavelDuplicado as erro:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ja existe item vendavel ativo com este nome.",
+        ) from erro
+    return criado.para_resposta()
+
+
+@roteador.get("/itens-vendaveis", response_model=ListaItensVendaveisResposta)
+def listar_itens_vendaveis(
+    conexao: Conexao,
+    sessao: Annotated[SessaoAtual, Depends(exigir_operacao("ler_catalogo"))],
+) -> ListaItensVendaveisResposta:
+    itens = catalogo.listar_itens_vendaveis_manutencao(
+        conexao, id_hotel=sessao.id_hotel
+    )
+    return ListaItensVendaveisResposta(
+        itens=[item.para_resposta() for item in itens]
+    )
+
+
+@roteador.patch(
+    "/itens-vendaveis/{id_item_vendavel}",
+    response_model=ItemVendavelResposta,
+)
+def alterar_item_vendavel(
+    id_item_vendavel: int,
+    entrada: ItemVendavelPatch,
+    conexao: Conexao,
+    sessao: Annotated[SessaoAtual, Depends(exigir_operacao("alterar_catalogo"))],
+) -> ItemVendavelResposta:
+    try:
+        alterado = catalogo.atualizar_item_vendavel(
+            conexao,
+            id_hotel=sessao.id_hotel,
+            id_item_vendavel=id_item_vendavel,
+            nome=entrada.nome,
+            preco_atual=entrada.preco_atual,
+            ativo=entrada.ativo,
+        )
+    except catalogo.DadosInvalidos as erro:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(erro),
+        ) from erro
+    except catalogo.ItemVendavelNaoEncontrado as erro:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Item vendavel nao encontrado.",
+        ) from erro
+    except catalogo.ItemVendavelDuplicado as erro:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ja existe item vendavel ativo com este nome.",
+        ) from erro
+    return alterado.para_resposta()

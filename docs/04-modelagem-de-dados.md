@@ -86,8 +86,8 @@ candidatos a entidade:
 | Candidato | Origem | Exemplo |
 | --- | --- | --- |
 | Reclamação técnica | `reclamacao_tecnica` com sentimento negativo | Ar-condicionado não gela |
-| Serviço operacional | `pedido_de_servico` sem cobrança | Toalha extra, travesseiro |
-| Consumo faturável | `pedido_de_servico` com cobrança | Bar, impressão, lavanderia |
+| Serviço operacional | `pedido_de_servico` sem item vendável único | Toalha extra, travesseiro |
+| Consumo faturável | `pedido_de_servico` identificado em item ativo | Bar, impressão, lavanderia |
 
 ### 3.1 Análise
 
@@ -186,6 +186,7 @@ erDiagram
     usuario ||--o{ sessao : "autentica"
     hotel ||--o{ parametro_hotel : "configura"
     hotel ||--o{ catalogo_item : "descreve"
+    hotel ||--o{ item_vendavel : "cobra"
     hotel ||--o{ reserva : "recebe"
     hotel ||--o{ concorrente : "monitora"
 
@@ -359,7 +360,7 @@ WhatsApp. A questão foi levantada na seção 8 do Artefato 3 e resolvida aqui n
 | Tabela `quarto` | O número do quarto vive no PMS. O OmniStay o recebe como texto na solicitação, e não gerencia inventário de quartos |
 | Tabela de fatura ou conta | A conta é do PMS. `consumo` registra o que passou pelo chat, nada além |
 | Foto do documento | Decisão de minimização de dados do Artefato 1 |
-| Preço de tabela dos serviços | `consumo` guarda o valor praticado no momento. Referenciar uma tabela de preços faria o histórico mudar sozinho a cada reajuste |
+| FK de `consumo` para preço vigente | `item_vendavel` existe (F3.7) como fonte do preço **atual**. `consumo.valor_praticado` é retrato; ligar os dois reescreveria o histórico a cada reajuste |
 
 A última merece ênfase: **`valor_praticado` é um dado histórico, não uma referência.** Se o
 hotel reajusta a diária da lavanderia em setembro, o consumo de agosto precisa continuar
@@ -602,9 +603,22 @@ levantada na seção 8 do Artefato 3 — sem depender de lógica de aplicação 
 | `lancado_em` | `TIMESTAMPTZ` | | OP | |
 
 **`status_lancamento` é a mitigação da quarta travessia humana.** Todo consumo nasce
-`pendente` e só sai da fila do painel quando alguém confirma o lançamento no PMS. Sem esse
-campo, o hotel entrega o serviço e não cobra — e ninguém percebe, porque o hóspede não
-reclama de um item que não foi cobrado.
+`pendente` e só sai da fila do painel quando alguém confirma o lançamento no PMS (ou
+dispensa). A máquina é `pendente` → `lancado` | `dispensado`; o banco recusa reabrir.
+Resolver o quarto (F3.6/F3.7) **não** altera este campo.
+
+**`item_vendavel`** — cadastro da propriedade (módulo `propriedade`, não é `catalogo_item`)
+
+| Campo | Tipo | Restrições | Classe | Descrição |
+| --- | --- | --- | --- | --- |
+| `id_item_vendavel` | `BIGSERIAL` | PK | OP | Identificador no prompt e no resultado da porta |
+| `id_hotel` | `BIGINT` | FK, NOT NULL | OP | Artigo XIV |
+| `nome` | `VARCHAR(160)` | NOT NULL | OP | Rótulo; vira `consumo.descricao_item` no instante |
+| `preco_atual` | `NUMERIC(10,2)` | NOT NULL, CHECK >= 0 | OP | Vigente; a identificação **não** emite este número |
+| `ativo` | `BOOLEAN` | NOT NULL, default TRUE | OP | Inativo sai da identificação e permanece na manutenção |
+| `atualizado_em` | `TIMESTAMPTZ` | NOT NULL, default `now()` | OP | |
+
+Único parcial `(id_hotel, lower(nome)) WHERE ativo`. Sem FK de `consumo` para cá.
 
 ### 6.6 Tabelas de feedback e mercado
 

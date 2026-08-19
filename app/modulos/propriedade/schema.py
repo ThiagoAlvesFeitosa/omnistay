@@ -1,5 +1,8 @@
 """Contratos de entrada e saida do catalogo da propriedade."""
 
+from datetime import datetime
+from decimal import Decimal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -58,3 +61,30 @@ class BoasVindasResposta(BaseModel):
     cafe: str | None = None
     wifi: str | None = None
     checkout: str | None = None
+
+
+class ItemVendavelEntrada(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nome: str = Field(min_length=1, max_length=160)
+    preco_atual: Decimal = Field(ge=0)
+
+
+class ItemVendavelPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nome: str | None = Field(default=None, min_length=1, max_length=160)
+    preco_atual: Decimal | None = Field(default=None, ge=0)
+    ativo: bool | None = None
+
+
+class ItemVendavelResposta(BaseModel):
+    id_item_vendavel: int
+    nome: str
+    preco_atual: Decimal
+    ativo: bool
+    atualizado_em: datetime
+
+
+class ListaItensVendaveisResposta(BaseModel):
+    itens: list[ItemVendavelResposta]

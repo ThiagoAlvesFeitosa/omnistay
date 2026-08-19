@@ -17,7 +17,6 @@ from testes.integracao.test_webhook_estadia import _criar_hospedada
 from testes.suporte.resolucao import (
     DETALHE_JA_RESOLVIDA,
     DETALHE_NAO_ENCONTRADA,
-    DETALHE_TIPO_CONSUMO,
 )
 from worker.consumidor import processar_uma_passagem_na_engine
 
@@ -220,7 +219,7 @@ def test_falha_ao_agendar_desfaz_e_envio_falho_nao_reabre(
 
 
 @pytest.mark.postgres
-def test_consumo_recusado_em_andamento_e_encerrado_aceitam(app_sobre_ambiente):
+def test_consumo_aberto_resolve_sem_lancar_e_encerrado_aceita(app_sobre_ambiente):
     cliente, ambiente = app_sobre_ambiente
     id_consumo = _criar_hospedada(cliente, ambiente, telefone="11987654106")
     id_andamento = _criar_hospedada(cliente, ambiente, telefone="11987654107")
@@ -236,6 +235,13 @@ def test_consumo_recusado_em_andamento_e_encerrado_aceitam(app_sobre_ambiente):
             ),
             {"r": id_consumo},
         ).scalar_one()
+        conexao.execute(
+            text(
+                "INSERT INTO consumo (id_solicitacao, descricao_item, valor_praticado)"
+                " VALUES (:id, 'frigobar', 12.00)"
+            ),
+            {"id": id_sol_consumo},
+        )
         id_msg = conexao.execute(
             text(
                 "INSERT INTO mensagem (id_reserva, direcao, conteudo)"
@@ -266,9 +272,29 @@ def test_consumo_recusado_em_andamento_e_encerrado_aceitam(app_sobre_ambiente):
     cliente.cookies.clear()
     _login(cliente, ambiente.propriedade_a.usuarios["staff"])
     consumo = cliente.post(f"/solicitacoes/{id_sol_consumo}/resolucao")
-    assert consumo.status_code == 409
-    assert consumo.json()["detail"] == DETALHE_TIPO_CONSUMO
+    assert consumo.status_code == 200
+    assert consumo.json()["status"] == "resolvida"
+    assert consumo.json()["tipo"] == "consumo"
+    assert id_sol_consumo not in _ids_solicitacao(cliente)
 
+    with ambiente.conexao() as conexao:
+        status_lancamento = conexao.execute(
+            text(
+                "SELECT status_lancamento FROM consumo WHERE id_solicitacao = :id"
+            ),
+            {"id": id_sol_consumo},
+        ).scalar_one()
+    assert status_lancamento == "pendente"
+
+    cliente.cookies.clear()
+    _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
+    pendentes = cliente.get("/consumos/pendentes")
+    assert pendentes.status_code == 200
+    ids_pendentes = [i["id_solicitacao"] for i in pendentes.json()["itens"]]
+    assert id_sol_consumo in ids_pendentes
+
+    cliente.cookies.clear()
+    _login(cliente, ambiente.propriedade_a.usuarios["staff"])
     andamento = cliente.post(f"/solicitacoes/{id_sol_andamento}/resolucao")
     assert andamento.status_code == 200
     assert andamento.json()["status"] == "resolvida"

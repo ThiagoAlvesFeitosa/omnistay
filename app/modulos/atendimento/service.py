@@ -7,7 +7,7 @@ from sqlalchemy.engine import Connection
 from app.comum import relogio as relogio_padrao
 from app.comum.log import obter_logger
 from app.modulos.atendimento import repository as repositorio_padrao
-from app.modulos.atendimento.schema import ResolucaoResposta
+from app.modulos.atendimento.schema import LancamentoResposta, ResolucaoResposta
 from app.modulos.conversa import service as conversa_service
 from app.modulos.atendimento.janela import (
     extrair_janela_preferencia,
@@ -38,12 +38,20 @@ class ResolucaoNaoPermitida(Exception):
         self.tipo = tipo
 
 
+class LancamentoNaoPermitido(Exception):
+    """Consumo ja deixou a fila de pendentes."""
+
+    def __init__(self, detalhe: str, *, status_lancamento: str):
+        super().__init__(detalhe)
+        self.detalhe = detalhe
+        self.status_lancamento = status_lancamento
+
+
 DETALHE_JA_RESOLVIDA = "Esta solicitacao ja foi resolvida."
-DETALHE_TIPO_CONSUMO = (
-    "Solicitacao deste tipo nao pode ser resolvida nesta operacao."
-)
 DETALHE_CANCELADA = "Solicitacao cancelada nao pode ser resolvida."
 DETALHE_ESTADO = "O estado atual da solicitacao nao admite resolucao."
+DETALHE_JA_LANCADO = "Este consumo ja foi lancado."
+DETALHE_JA_DISPENSADO = "Este consumo ja foi dispensado."
 
 
 def abrir_servico(
@@ -93,6 +101,34 @@ def abrir_reclamacao(
         numero_quarto=numero_quarto,
         urgencia=urgencia or URGENCIA_PADRAO,
         janela_preferencia=janela_preferencia,
+    )
+
+
+def abrir_consumo(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    descricao: str,
+    descricao_item: str,
+    valor_praticado,
+    numero_quarto: str | None,
+    urgencia: str | None,
+    repositorio=repositorio_padrao,
+) -> int:
+    hotel = repositorio.hotel_da_reserva(conexao, id_reserva=id_reserva)
+    if hotel != id_hotel:
+        raise HotelIncompativel()
+    return repositorio.inserir_consumo(
+        conexao,
+        id_reserva=id_reserva,
+        id_mensagem=id_mensagem,
+        descricao=descricao,
+        descricao_item=descricao_item,
+        valor_praticado=valor_praticado,
+        numero_quarto=numero_quarto,
+        urgencia=urgencia or URGENCIA_PADRAO,
     )
 
 
@@ -170,6 +206,8 @@ def listar_abertas(
                 "status": item["status"],
                 "aberta_em": item["aberta_em"],
                 "janela_preferencia": item.get("janela_preferencia"),
+                "valor_praticado": item.get("valor_praticado"),
+                "status_lancamento": item.get("status_lancamento"),
                 "destaque_tempo_excedido": _destaque_excedido(
                     tipo=item["tipo"],
                     aberta_em=item["aberta_em"],
@@ -182,8 +220,6 @@ def listar_abertas(
 
 
 def _detalhe_de_recusa(*, status: str, tipo: str) -> str:
-    if tipo == "consumo":
-        return DETALHE_TIPO_CONSUMO
     if status == "resolvida":
         return DETALHE_JA_RESOLVIDA
     if status == "cancelada":
@@ -192,8 +228,6 @@ def _detalhe_de_recusa(*, status: str, tipo: str) -> str:
 
 
 def _resultado_de_recusa(*, status: str, tipo: str) -> str:
-    if tipo == "consumo":
-        return "tipo_incompativel"
     if status == "resolvida":
         return "ja_resolvida"
     return "estado_incompativel"
@@ -267,4 +301,129 @@ def resolver(
         resolvida_em=atualizada["resolvida_em"],
         id_usuario_responsavel=atualizada["id_usuario_responsavel"],
         confirmacao=desfecho,
+    )
+
+
+def listar_pendentes(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    repositorio=repositorio_padrao,
+) -> list[dict]:
+    itens = []
+    for item in repositorio.listar_pendentes(conexao, id_hotel=id_hotel):
+        itens.append(
+            {
+                "id_solicitacao": item["id_solicitacao"],
+                "id_reserva": item["id_reserva"],
+                "descricao": item["descricao"],
+                "descricao_item": item["descricao_item"],
+                "numero_quarto": item["numero_quarto"],
+                "valor_praticado": item["valor_praticado"],
+                "status_lancamento": item["status_lancamento"],
+                "aberta_em": item["aberta_em"],
+                "resolvida_em": item.get("resolvida_em"),
+            }
+        )
+    return itens
+
+
+def _aplicar_lancamento(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_solicitacao: int,
+    id_usuario: int,
+    status_destino: str,
+    evento: str,
+    repositorio,
+    relogio,
+) -> LancamentoResposta:
+    instante = relogio.agora()
+    atualizada = repositorio.marcar_lancamento(
+        conexao,
+        id_hotel=id_hotel,
+        id_solicitacao=id_solicitacao,
+        id_usuario=id_usuario,
+        lancado_em=instante,
+        status_destino=status_destino,
+    )
+    if atualizada is None:
+        existente = repositorio.ler_consumo_do_hotel(
+            conexao, id_hotel=id_hotel, id_solicitacao=id_solicitacao
+        )
+        if existente is None:
+            logger.info(
+                "%s id_solicitacao=%s id_hotel=%s resultado=nao_encontrada",
+                evento,
+                id_solicitacao,
+                id_hotel,
+            )
+            raise SolicitacaoNaoEncontrada
+        status = existente["status_lancamento"]
+        detalhe = (
+            DETALHE_JA_LANCADO if status == "lancado" else DETALHE_JA_DISPENSADO
+        )
+        logger.info(
+            "%s id_solicitacao=%s id_hotel=%s resultado=ja_terminal",
+            evento,
+            id_solicitacao,
+            id_hotel,
+        )
+        raise LancamentoNaoPermitido(detalhe, status_lancamento=status)
+    logger.info(
+        "%s id_solicitacao=%s id_hotel=%s id_usuario=%s resultado=%s",
+        evento,
+        atualizada["id_solicitacao"],
+        id_hotel,
+        id_usuario,
+        status_destino,
+    )
+    return LancamentoResposta(
+        id_solicitacao=atualizada["id_solicitacao"],
+        status_lancamento=atualizada["status_lancamento"],
+        id_usuario_lancamento=atualizada["id_usuario_lancamento"],
+        lancado_em=atualizada["lancado_em"],
+    )
+
+
+def lancar(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_solicitacao: int,
+    id_usuario: int,
+    repositorio=repositorio_padrao,
+    relogio=relogio_padrao,
+) -> LancamentoResposta:
+    return _aplicar_lancamento(
+        conexao,
+        id_hotel=id_hotel,
+        id_solicitacao=id_solicitacao,
+        id_usuario=id_usuario,
+        status_destino="lancado",
+        evento="consumo_lancado",
+        repositorio=repositorio,
+        relogio=relogio,
+    )
+
+
+def dispensar(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_solicitacao: int,
+    id_usuario: int,
+    repositorio=repositorio_padrao,
+    relogio=relogio_padrao,
+) -> LancamentoResposta:
+    return _aplicar_lancamento(
+        conexao,
+        id_hotel=id_hotel,
+        id_solicitacao=id_solicitacao,
+        id_usuario=id_usuario,
+        status_destino="dispensado",
+        evento="consumo_dispensado",
+        repositorio=repositorio,
+        relogio=relogio,
     )

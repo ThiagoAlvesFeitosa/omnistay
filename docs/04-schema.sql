@@ -122,6 +122,30 @@ CREATE INDEX ix_catalogo_hotel_categoria
     ON catalogo_item (id_hotel, categoria) WHERE ativo;
 
 
+CREATE TABLE item_vendavel (
+    id_item_vendavel BIGSERIAL    PRIMARY KEY,
+    id_hotel         BIGINT       NOT NULL REFERENCES hotel (id_hotel),
+    nome             VARCHAR(160) NOT NULL,
+    preco_atual      NUMERIC(10, 2) NOT NULL,
+    ativo            BOOLEAN      NOT NULL DEFAULT TRUE,
+    atualizado_em    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT ck_item_vendavel_preco_nao_negativo
+        CHECK (preco_atual >= 0)
+);
+
+COMMENT ON TABLE item_vendavel IS
+    'Cadastro de item cobrado da propriedade. Fonte do preco vigente; consumo guarda '
+    'retrato, sem FK para esta tabela.';
+COMMENT ON COLUMN item_vendavel.preco_atual IS
+    'Preco vigente. Nao entra no prompt de identificacao; o dominio le depois.';
+
+CREATE INDEX ix_item_vendavel_hotel_ativo
+    ON item_vendavel (id_hotel) WHERE ativo;
+
+CREATE UNIQUE INDEX uq_item_vendavel_hotel_nome_ativo
+    ON item_vendavel (id_hotel, lower(nome)) WHERE ativo;
+
+
 -- ---------------------------------------------------------------------
 -- 2. Hospedagem
 -- ---------------------------------------------------------------------
@@ -437,8 +461,8 @@ CREATE TABLE consumo (
         CHECK (valor_praticado >= 0),
     CONSTRAINT ck_consumo_status
         CHECK (status_lancamento IN ('pendente', 'lancado', 'dispensado')),
-    CONSTRAINT ck_consumo_lancado_tem_autor
-        CHECK (status_lancamento <> 'lancado'
+    CONSTRAINT ck_consumo_terminal_tem_autor
+        CHECK (status_lancamento = 'pendente'
                OR (id_usuario_lancamento IS NOT NULL AND lancado_em IS NOT NULL))
 );
 
@@ -582,6 +606,94 @@ COMMENT ON FUNCTION fn_valida_transicao_solicitacao() IS
     'Reabrir ou cancelar pelo banco e recusado; a aplicacao devolve 409.';
 
 
+CREATE OR REPLACE FUNCTION fn_consumo_pai_tipo_consumo()
+RETURNS TRIGGER AS $$
+DECLARE
+    tipo_pai VARCHAR(20);
+BEGIN
+    SELECT tipo INTO tipo_pai
+      FROM solicitacao
+     WHERE id_solicitacao = NEW.id_solicitacao;
+    IF tipo_pai IS DISTINCT FROM 'consumo' THEN
+        RAISE EXCEPTION
+            'consumo exige solicitacao tipo consumo (id_solicitacao %)',
+            NEW.id_solicitacao;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tg_consumo_pai_tipo_consumo
+    BEFORE INSERT OR UPDATE ON consumo
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_consumo_pai_tipo_consumo();
+
+COMMENT ON FUNCTION fn_consumo_pai_tipo_consumo() IS
+    'Especializacao exclusiva: linha em consumo so existe se o pai for tipo consumo.';
+
+
+CREATE OR REPLACE FUNCTION fn_solicitacao_consumo_tem_filho()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.tipo = 'consumo' AND NOT EXISTS (
+        SELECT 1 FROM consumo WHERE id_solicitacao = NEW.id_solicitacao
+    ) THEN
+        RAISE EXCEPTION
+            'solicitacao tipo consumo exige linha em consumo (id_solicitacao %)',
+            NEW.id_solicitacao;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER tg_solicitacao_consumo_tem_filho
+    AFTER INSERT ON solicitacao
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    WHEN (NEW.tipo = 'consumo')
+    EXECUTE FUNCTION fn_solicitacao_consumo_tem_filho();
+
+COMMENT ON FUNCTION fn_solicitacao_consumo_tem_filho() IS
+    'Tipo consumo precisa do filho ao commit. INSERT pai+filho na mesma transacao e aceito.';
+
+
+CREATE OR REPLACE FUNCTION fn_valida_transicao_lancamento()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.status_lancamento <> 'pendente' THEN
+            RAISE EXCEPTION
+                'consumo % deve nascer pendente, nao %',
+                NEW.id_solicitacao, NEW.status_lancamento;
+        END IF;
+        RETURN NEW;
+    END IF;
+
+    IF OLD.status_lancamento = NEW.status_lancamento THEN
+        RETURN NEW;
+    END IF;
+
+    IF NOT (
+        OLD.status_lancamento = 'pendente'
+        AND NEW.status_lancamento IN ('lancado', 'dispensado')
+    ) THEN
+        RAISE EXCEPTION
+            'Transicao de lancamento invalida no consumo %: % -> %',
+            NEW.id_solicitacao, OLD.status_lancamento, NEW.status_lancamento;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tg_valida_transicao_lancamento
+    BEFORE INSERT OR UPDATE OF status_lancamento ON consumo
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_valida_transicao_lancamento();
+
+COMMENT ON FUNCTION fn_valida_transicao_lancamento() IS
+    'Nasce pendente. So admite pendente para lancado ou dispensado. Terminal nao reabre.';
+
+
 -- ---------------------------------------------------------------------
 -- 7. Visao de apoio: fila do dia da recepcao
 -- ---------------------------------------------------------------------
@@ -630,7 +742,8 @@ SELECT r.id_hotel,
                  AND mh.classificacao_bruta->>'tipo' = 'classificacao_intencao'
                  AND mh.classificacao_bruta->>'desfecho'
                      IN ('encaminhado_humano', 'formato_invalido', 'indisponivel',
-                         'duvida_nao_coberta')
+                         'duvida_nao_coberta', 'item_ambiguo',
+                         'identificacao_indisponivel')
             )) AS precisa_atendimento_humano
   FROM reserva r
   LEFT JOIN reserva_hospede rh
@@ -656,5 +769,5 @@ COMMENT ON VIEW vw_fila_do_dia IS
     'estado_cadastro (aguardando, completa, parcial, leitura_humana, '
     'sem_cadastro_previo), boas_vindas_nao_enviadas (hospedado sem recado) e '
     'precisa_atendimento_humano (hospedado com mensagem de estadia encaminhada a '
-    'pessoa: classificador falhou, intencao sem ramo proprio ou duvida nao coberta '
-    'pelo catalogo).';
+    'pessoa: classificador falhou, intencao sem ramo proprio, duvida nao coberta '
+    'pelo catalogo, item vendavel ambiguo ou identificacao indisponivel).';

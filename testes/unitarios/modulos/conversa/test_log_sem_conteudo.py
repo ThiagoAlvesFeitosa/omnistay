@@ -435,6 +435,102 @@ def test_registrar_pedido_loga_identificadores_sem_conteudo(monkeypatch):
     assert "5511" not in texto
 
 
+def test_consumo_loga_identificadores_sem_conteudo_nem_valor(monkeypatch):
+    from app.adaptadores.mensageria_falsa import MensageriaFalsa
+    from app.modulos.conversa.texto_confirmacao_consumo import (
+        montar_confirmacao_consumo,
+    )
+    from testes.suporte.consumo import NOME_ITEM, PRECO_ATUAL, TEXTO_PEDIDO_CERVEJA
+    from testes.unitarios.modulos.conversa.test_registrar_consumo import (
+        Identificador,
+        LerPreco,
+        Listar,
+        RepoConsumo,
+        _processar as processar_consumo,
+    )
+    from testes.unitarios.modulos.conversa.test_registrar_pedido import EspiaoAbrir
+
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(conversa.logger, "info", fake_info)
+    recado = montar_confirmacao_consumo(
+        nome_completo="Maria Silva",
+        descricao_item=NOME_ITEM,
+        valor_praticado=PRECO_ATUAL,
+    )
+    repo = RepoConsumo(conteudo=TEXTO_PEDIDO_CERVEJA)
+    processar_consumo(
+        monkeypatch,
+        repo,
+        abrir_consumo=EspiaoAbrir(repo, id_solicitacao=80),
+        listar=Listar(),
+        identificar=Identificador(),
+        ler_preco=LerPreco(),
+    )
+    repo_ja = RepoConsumo(
+        classificacao={
+            "tipo": "classificacao_intencao",
+            "desfecho": "classificado",
+            "intencao": "pedido_de_servico",
+            "resposta": "confirmacao_consumo",
+            "id_mensagem_resposta": 20,
+            "id_solicitacao": 80,
+        },
+        enviadas={
+            20: {
+                "id_mensagem": 20,
+                "id_reserva": 1,
+                "conteudo": recado,
+                "classificacao_bruta": None,
+                "status_envio": "enviada",
+            }
+        },
+    )
+    processar_consumo(
+        monkeypatch,
+        repo_ja,
+        abrir_consumo=EspiaoAbrir(repo_ja, id_solicitacao=80),
+        listar=Listar(),
+        identificar=Identificador(),
+        ler_preco=LerPreco(),
+    )
+    repo_falha = RepoConsumo(conteudo=TEXTO_PEDIDO_CERVEJA)
+    gateway = MensageriaFalsa()
+    gateway.falhar_sempre = True
+    processar_consumo(
+        monkeypatch,
+        repo_falha,
+        abrir_consumo=EspiaoAbrir(repo_falha, id_solicitacao=80),
+        listar=Listar(),
+        identificar=Identificador(),
+        ler_preco=LerPreco(),
+        gateway=gateway,
+    )
+    repo_humano = RepoConsumo(conteudo=TEXTO_PEDIDO_CERVEJA)
+    processar_consumo(
+        monkeypatch,
+        repo_humano,
+        abrir_consumo=EspiaoAbrir(repo_humano, id_solicitacao=80),
+        listar=Listar(),
+        identificar=Identificador(falhar=True),
+        ler_preco=LerPreco(),
+    )
+    texto = " ".join(registros)
+    assert "consumo_registrado" in texto
+    assert "consumo_ja_registrado" in texto
+    assert "consumo_envio_falhou" in texto
+    assert "identificacao_humana" in texto
+    assert "resultado=registrado" in texto
+    assert TEXTO_PEDIDO_CERVEJA not in texto
+    assert recado not in texto
+    assert "12,00" not in texto
+    assert "12.00" not in texto
+    assert "Maria" not in texto
+
+
 def test_abrir_chamado_loga_identificadores_sem_conteudo(monkeypatch):
     from app.adaptadores.mensageria_falsa import MensageriaFalsa
     from app.modulos.conversa.texto_confirmacao_reclamacao import (

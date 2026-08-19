@@ -127,6 +127,11 @@ def test_pedido_com_quarto_confirma_e_abre_servico_sem_consumo(cenario):
     assert contagens["status"] == "hospedado"
     _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
     assert _item_fila(cliente, id_reserva)["precisa_atendimento_humano"] is False
+    pendentes = cliente.get("/consumos/pendentes")
+    assert pendentes.status_code == 200
+    assert all(
+        i["id_reserva"] != id_reserva for i in pendentes.json()["itens"]
+    )
 
 
 @pytest.mark.postgres

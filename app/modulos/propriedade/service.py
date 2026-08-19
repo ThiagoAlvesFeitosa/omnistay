@@ -1,13 +1,14 @@
 """Criacao inicial da propriedade e leitura de parametros operacionais."""
 
 from dataclasses import dataclass
+from decimal import Decimal
 
 from sqlalchemy.engine import Connection
 
 from app.comum.log import obter_logger
 from app.modulos.acesso import service as acesso_service
 from app.modulos.propriedade import repository as propriedade_repository
-from app.modulos.propriedade.schema import ItemCatalogoResposta
+from app.modulos.propriedade.schema import ItemCatalogoResposta, ItemVendavelResposta
 
 logger = obter_logger(__name__)
 
@@ -135,6 +136,14 @@ class DadosInvalidos(ValueError):
 
 
 class ItemNaoEncontrado(Exception):
+    pass
+
+
+class ItemVendavelNaoEncontrado(Exception):
+    pass
+
+
+class ItemVendavelDuplicado(Exception):
     pass
 
 
@@ -337,3 +346,158 @@ def gravar_textos_de_boas_vindas(
         repositorio.upsert_parametro(conexao, id_hotel, chave, limpos[campo])
     logger.info("textos_de_boas_vindas_gravados id_hotel=%s", id_hotel)
     return limpos
+
+
+@dataclass(frozen=True)
+class ItemVendavel:
+    id_item_vendavel: int
+    id_hotel: int
+    nome: str
+    preco_atual: Decimal
+    ativo: bool
+    atualizado_em: object
+
+    def para_resposta(self) -> ItemVendavelResposta:
+        return ItemVendavelResposta(
+            id_item_vendavel=self.id_item_vendavel,
+            nome=self.nome,
+            preco_atual=self.preco_atual,
+            ativo=self.ativo,
+            atualizado_em=self.atualizado_em,
+        )
+
+
+def _item_vendavel_da_linha(linha: dict) -> ItemVendavel:
+    preco = linha["preco_atual"]
+    if not isinstance(preco, Decimal):
+        preco = Decimal(str(preco))
+    return ItemVendavel(
+        id_item_vendavel=linha["id_item_vendavel"],
+        id_hotel=linha["id_hotel"],
+        nome=linha["nome"],
+        preco_atual=preco,
+        ativo=linha["ativo"],
+        atualizado_em=linha["atualizado_em"],
+    )
+
+
+def _validar_nome_e_preco(nome: str, preco_atual: Decimal) -> tuple[str, Decimal]:
+    nome_limpo = nome.strip()
+    if not nome_limpo:
+        raise DadosInvalidos("Informe o nome.")
+    if len(nome_limpo) > TITULO_MAXIMO:
+        raise DadosInvalidos("O nome deve ter no maximo 160 caracteres.")
+    if preco_atual < 0:
+        raise DadosInvalidos("O preco nao pode ser negativo.")
+    return nome_limpo, preco_atual
+
+
+def criar_item_vendavel(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    nome: str,
+    preco_atual: Decimal,
+    repositorio=propriedade_repository,
+) -> ItemVendavel:
+    nome_limpo, preco = _validar_nome_e_preco(nome, preco_atual)
+    if repositorio.existe_nome_ativo(conexao, id_hotel=id_hotel, nome=nome_limpo):
+        raise ItemVendavelDuplicado
+    linha = repositorio.inserir_item_vendavel(
+        conexao, id_hotel=id_hotel, nome=nome_limpo, preco_atual=preco
+    )
+    item = _item_vendavel_da_linha(linha)
+    logger.info(
+        "item_vendavel_criado id_item_vendavel=%s id_hotel=%s",
+        item.id_item_vendavel,
+        item.id_hotel,
+    )
+    return item
+
+
+def atualizar_item_vendavel(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_item_vendavel: int,
+    nome: str | None = None,
+    preco_atual: Decimal | None = None,
+    ativo: bool | None = None,
+    repositorio=propriedade_repository,
+) -> ItemVendavel:
+    if nome is None and preco_atual is None and ativo is None:
+        raise DadosInvalidos("Informe nome, preco_atual ou ativo.")
+    nome_limpo = None
+    if nome is not None:
+        nome_limpo, _ = _validar_nome_e_preco(nome, Decimal("0"))
+        if repositorio.existe_nome_ativo(
+            conexao,
+            id_hotel=id_hotel,
+            nome=nome_limpo,
+            exceto_id=id_item_vendavel,
+        ):
+            raise ItemVendavelDuplicado
+    if preco_atual is not None and preco_atual < 0:
+        raise DadosInvalidos("O preco nao pode ser negativo.")
+    linha = repositorio.atualizar_item_vendavel(
+        conexao,
+        id_hotel=id_hotel,
+        id_item_vendavel=id_item_vendavel,
+        nome=nome_limpo,
+        preco_atual=preco_atual,
+        ativo=ativo,
+    )
+    if linha is None:
+        raise ItemVendavelNaoEncontrado
+    item = _item_vendavel_da_linha(linha)
+    logger.info(
+        "item_vendavel_alterado id_item_vendavel=%s id_hotel=%s",
+        item.id_item_vendavel,
+        item.id_hotel,
+    )
+    return item
+
+
+def listar_itens_vendaveis_manutencao(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    repositorio=propriedade_repository,
+) -> list[ItemVendavel]:
+    return [
+        _item_vendavel_da_linha(linha)
+        for linha in repositorio.listar_itens_vendaveis_manutencao(
+            conexao, id_hotel=id_hotel
+        )
+    ]
+
+
+def listar_itens_vendaveis_ativos(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    repositorio=propriedade_repository,
+) -> tuple[tuple[int, str], ...]:
+    return tuple(
+        (int(linha["id_item_vendavel"]), linha["nome"])
+        for linha in repositorio.listar_itens_vendaveis_ativos(
+            conexao, id_hotel=id_hotel
+        )
+    )
+
+
+def ler_preco_item_ativo(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_item_vendavel: int,
+    repositorio=propriedade_repository,
+) -> Decimal | None:
+    bruto = repositorio.ler_preco_item_ativo(
+        conexao, id_hotel=id_hotel, id_item_vendavel=id_item_vendavel
+    )
+    if bruto is None:
+        return None
+    if isinstance(bruto, Decimal):
+        return bruto
+    return Decimal(str(bruto))

@@ -1,6 +1,6 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 18/08/2026
+**Atualizado em:** 19/08/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
 
 ---
@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 15 de 24 fatias concluídas.
+**Progresso:** 16 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -28,7 +28,8 @@
 | F3.4 Registrar pedido de serviço | ✅ Concluída — worker consome `registrar_pedido_servico`, confirmação antes da `solicitacao` tipo `servico` (sem `consumo`), `GET /solicitacoes` sem ficha, revisão `0012_registrar_pedido_servico` |
 | F3.5 Abrir chamado de reclamação | ✅ Concluída — worker consome `abrir_chamado_reclamacao`, confirmação antes da `solicitacao` tipo `reclamacao` (sem `consumo`), janela + destaque no `GET /solicitacoes`, revisão `0013_abrir_chamado_reclamacao` |
 | F3.6 Resolver chamado e confirmar | ✅ Concluída — `POST /solicitacoes/{id}/resolucao` grava `resolvida` (autor + instante) e agenda `enviar_confirmacao_resolucao`; worker só envia; revisão `0014_resolver_chamado` |
-| Demais 9 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F3.7** (registrar consumo faturável). Não há F2.3 no backlog |
+| F3.7 Consumo faturável e fila de lançamento | ✅ Concluída — fork em `registrar_pedido_servico`, tabela `item_vendavel`, `GET /consumos/pendentes`, POST lançamento/dispensa; resolver consumo não lança; revisão `0015_consumo_faturavel` |
+| Demais 8 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F3.8** (pulso do segundo dia). Não há F2.3 no backlog |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -89,7 +90,7 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Catálogo | Fatos em texto por categoria; desativar não apaga; consulta ativa agrupa as cinco chaves | F2.1 |
 | Porta `CatalogoRepository` | `listar_ativos` na mesma transação; HTTP de manutenção não passa pela porta | F2.1 |
 | `ler_catalogo` | Recepção e gestão leem; só recepção altera; operação recusada | F2.1 |
-| Preço estruturado | **Adiado para F3.7.** F2.1 não cria coluna nem item vendável — o recado de boas-vindas não carrega catálogo | F2.1 |
+| Preço estruturado | **Entregue na F3.7.** `item_vendavel` com `preco_atual`; a identificação devolve id, o domínio lê o preço no banco. F2.1 não criou a tabela | F3.7 |
 | Recado de boas-vindas | **Mensagem curta, não o catálogo.** Variável de template recusa quebra de linha, tabulação e mais de 4 espaços seguidos: catálogo inteiro numa variável não é enviável. O recado confirma a chegada, leva três informações de entrada e convida a perguntar; o catálogo responde sob demanda na janela de 24h (F3.3) | F2.2 (spec) |
 | Informações de entrada | Três chaves em `parametro_hotel` — `boas_vindas_cafe`, `boas_vindas_wifi`, `boas_vindas_checkout`. Obrigatórias, semeadas no bootstrap, validadas **na gravação** (vazio, quebra de linha, tabulação, >4 espaços). Validar só no envio faria a falha coincidir com a chegada | F2.2 (spec) |
 | Slot vazio na confirmação | Check-in ocorre, recado **não** sai, reserva sinalizada na fila do dia. Nunca variável em branco | F2.2 (spec) |
@@ -126,6 +127,10 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Resolução no clique | `POST /solicitacoes/{id}/resolucao` (`resolver_solicitacao`: recepção e staff; gestão `403`). UPDATE `resolvida` + autor + instante **antes** do recado. Segundo clique `409`. Outro hotel `404` uniforme | F3.6 |
 | Recado de conclusão | Trabalho `enviar_confirmacao_resolucao` (unicidade por `id_solicitacao`). Worker só chama `enviar_texto_sessao`. Falha de envio **não** reabre. Sem template Utility | F3.6 |
 | Janela de 24h | O recado de resolução usa sessão, não Utility. Se a janela estiver fechada, o envio falha e é retomado; o chamado permanece resolvido. Limitação honesta desta fatia | F3.6 |
+| Fork no mesmo trabalho | Não nasce tipo novo na fila. `registrar_pedido_servico` identifica item ativo; `unico` abre `consumo` pendente; `nenhum` ou lista vazia permanece F3.4 | F3.7 |
+| Preço fora do prompt | Porta recebe `(id, nome)`; `valor_praticado = preco_atual * quantidade` lido no banco na mesma TX da confirmação | F3.7 |
+| Fila de lançamento | `GET /consumos/pendentes` (`ler_solicitacao_atribuida`). Inclui consumo já resolvido no quarto. Toalha não entra | F3.7 |
+| Clique financeiro | `POST .../lancamento` e `.../dispensa` (`lancar_consumo`, só recepção). Sem recado ao hóspede. Resolver o quarto não altera `status_lancamento` | F3.7 |
 
 ## Onde ficam os arquivos
 
@@ -213,35 +218,11 @@ visível, mas não a eliminam. Isso é assumido no documento.
 | Comissão sobre serviços | Reduzida de 20% para 8% da receita — depende de lançamento manual no PMS |
 | Dados como ativo | **Não** se apoia no conteúdo das conversas. O ativo é o catálogo da propriedade |
 
-## Catálogo e preços — fechado na F2.1 por adiamento
+## Catálogo e preços — fechado na F3.7
 
-**Decisão (14/08/2026):** F2.1 entrega fato afirmável em texto (`catalogo_item` já existente).
-Item vendável com preço em campo próprio fica para a F3.7, quando existir consumo faturável.
-Incluir preço nesta fatia inflaria o esquema sem consumidor (Artigo XI).
+**Decisão (14/08/2026, cumprida em 19/08/2026):** F2.1 entregou fato afirmável em texto (`catalogo_item`). F3.7 criou `item_vendavel` com preço em campo próprio, revisão `0015`. A IA identifica o item; o sistema lê o preço no banco.
 
-O desenho proposto abaixo permanece válido para a F3.7 — não foi descartado, só não entra agora.
-
-**Problema.** `catalogo_item` guarda `conteudo` como texto livre. Isso serve bem para horário,
-regra e programação, mas não para item vendável: não dá para alterar um preço sem reescrever o
-bloco, e a IA teria de extrair o número do texto corrido. Como `consumo.valor_praticado` alimenta
-a cobrança, um erro de leitura vira hóspede informado de um preço e cobrado de outro — justamente
-o risco que a F3.7 marca como o de consequência financeira.
-
-**Desenho proposto — a IA nunca escreve preço.** Ela identifica *qual* item foi pedido; o sistema
-lê o preço no banco e monta a mensagem. Modelo que não emite número não erra número.
-
-| Mecanismo | Para que serve |
-| --- | --- |
-| Item vendável em linha própria, com preço em coluna | Recepção edita um campo, sem reescrever texto |
-| Cada item leva **identificador** no prompt; a IA devolve o id, não o nome | Elimina confusão por sinônimo, apelido ou grafia |
-| Preço consultado no banco **depois** da identificação | Mensagem ao hóspede e `consumo` leem a mesma fonte no mesmo instante |
-| Prompt montado na hora a partir das linhas ativas | Nenhuma cópia intermediária pode ficar velha |
-| Remoção é desativação (`ativo = FALSE`) | Pedido antigo continua íntegro; `valor_praticado` já é retrato do momento |
-
-**Compatível com o que está fechado.** "Catálogo inteiro no prompt" continua valendo — a diferença
-é que o texto passa a ser *gerado* a partir das linhas, em vez de digitado.
-
-**Custo na F3.7:** uma tabela (ou colunas) e tela a mais, com revisão Alembic. Não na F2.1.
+**Problema resolvido.** `catalogo_item.conteudo` em texto livre não serve para cobrar: reajuste exigiria reescrever o bloco, e a IA teria de extrair o número. `consumo.valor_praticado` é retrato, sem FK para o cadastro vigente. A identificação recebe `(id, nome)` sem preço.
 
 ## Categorias de mensagem do WhatsApp — referência rápida
 
@@ -340,9 +321,7 @@ Lacunas encontradas no backlog (agosto/2026) — nenhuma tem fatia dedicada:
 - [x] ~~**`parametro_hotel` é lido por três fatias e escrito por nenhuma.**~~ F1.4 semeia
       `horas_ate_reenvio` e `horas_corte_antes_checkin` no bootstrap e na `0007`. Continua
       **sem tela** de edição (SQL no MVP), escolha registrada
-- [x] ~~**Fechar o desenho de catálogo e preços**~~ F2.1 adia preço estruturado para F3.7.
-      Catálogo ativo (fatos em texto) está entregue. Reabrir na fatia de consumo, se o texto
-      corrido for insuficiente para cobrar
+- [x] ~~**Fechar o desenho de catálogo e preços**~~ F3.7 entregou `item_vendavel` e o retrato em `consumo.valor_praticado`. Catálogo de fatos (F2.1) permanece texto.
 - [ ] **Contenção de tentativa repetida de senha** — fora da F0.3 de propósito (painel ainda não
       publicado). Precisa entrar antes de qualquer exposição contínua; a sessão longa do staff
       amplifica a consequência

@@ -349,3 +349,25 @@ def test_falha_de_envio_preserva_pedido_e_reagenda(monkeypatch):
     assert concluidos == []
     assert falhas == []
     assert reagendados
+
+
+def test_lista_vazia_nao_chama_identificador(monkeypatch):
+    from testes.unitarios.modulos.conversa.test_registrar_consumo import (
+        Identificador,
+        Listar,
+        _processar as processar_consumo,
+    )
+
+    repo = RepoPedido()
+    abrir = EspiaoAbrir(repo)
+    identificar = Identificador()
+    processar_consumo(
+        monkeypatch,
+        repo,
+        abrir_servico=abrir,
+        listar=Listar(itens=()),
+        identificar=identificar,
+    )
+    assert identificar.chamadas == []
+    assert abrir.chamadas
+    assert repo.mensagens[8]["classificacao_bruta"]["resposta"] == "confirmacao_pedido"

@@ -644,3 +644,234 @@ def test_solicitacao_resolvida_sem_responsavel_e_recusada(conexao):
         )
 
     assert "ck_solicitacao_resolvida_tem_responsavel" in str(erro.value)
+
+
+def _inserir_item_vendavel(conexao, id_hotel: int, *, nome="Cerveja", preco=12.00):
+    return conexao.execute(
+        text(
+            "INSERT INTO item_vendavel (id_hotel, nome, preco_atual) "
+            "VALUES (:id_hotel, :nome, :preco) RETURNING id_item_vendavel"
+        ),
+        {"id_hotel": id_hotel, "nome": nome, "preco": preco},
+    ).scalar()
+
+
+def _inserir_consumo_completo(
+    conexao,
+    id_reserva: int,
+    *,
+    valor=8.50,
+    status="pendente",
+    id_usuario=None,
+    lancado_em=None,
+):
+    id_solicitacao = conexao.execute(
+        text(
+            "INSERT INTO solicitacao (id_reserva, tipo, descricao) "
+            "VALUES (:id_reserva, 'consumo', 'Agua mineral') "
+            "RETURNING id_solicitacao"
+        ),
+        {"id_reserva": id_reserva},
+    ).scalar()
+    conexao.execute(
+        text(
+            "INSERT INTO consumo (id_solicitacao, descricao_item, valor_praticado,"
+            " status_lancamento, id_usuario_lancamento, lancado_em) "
+            "VALUES (:id, 'Agua mineral', :valor, :status, :uid, :quando)"
+        ),
+        {
+            "id": id_solicitacao,
+            "valor": valor,
+            "status": status,
+            "uid": id_usuario,
+            "quando": lancado_em,
+        },
+    )
+    return id_solicitacao
+
+
+@pytest.mark.postgres
+def test_item_vendavel_com_preco_nao_negativo_e_aceito(conexao):
+    id_hotel = criar_hotel(conexao)
+
+    id_item = _inserir_item_vendavel(conexao, id_hotel, preco=0)
+    outro = _inserir_item_vendavel(conexao, id_hotel, nome="Agua", preco=12.00)
+
+    assert id_item
+    assert outro != id_item
+
+
+@pytest.mark.postgres
+def test_item_vendavel_com_preco_negativo_e_recusado(conexao):
+    id_hotel = criar_hotel(conexao)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_item_vendavel(conexao, id_hotel, preco=-0.01)
+
+    assert "ck_item_vendavel_preco_nao_negativo" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_segundo_item_ativo_com_mesmo_nome_no_hotel_e_recusado(conexao):
+    id_hotel = criar_hotel(conexao)
+    _inserir_item_vendavel(conexao, id_hotel, nome="Cerveja")
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_item_vendavel(conexao, id_hotel, nome="cerveja")
+
+    assert "uq_item_vendavel_hotel_nome_ativo" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_consumo_cujo_pai_e_servico_e_recusado(conexao):
+    id_reserva = criar_reserva(conexao, criar_hotel(conexao))
+    id_solicitacao = conexao.execute(
+        text(
+            "INSERT INTO solicitacao (id_reserva, tipo, descricao) "
+            "VALUES (:id_reserva, 'servico', 'toalha extra') "
+            "RETURNING id_solicitacao"
+        ),
+        {"id_reserva": id_reserva},
+    ).scalar()
+
+    with pytest.raises(DBAPIError) as erro:
+        conexao.execute(
+            text(
+                "INSERT INTO consumo (id_solicitacao, descricao_item, valor_praticado) "
+                "VALUES (:id, 'toalha extra', 0)"
+            ),
+            {"id": id_solicitacao},
+        )
+
+    assert "fn_consumo_pai_tipo_consumo" in str(erro.value) or "tipo consumo" in str(
+        erro.value
+    ).casefold()
+
+
+@pytest.mark.postgres
+def test_solicitacao_consumo_sem_filho_e_recusada_no_commit(conexao):
+    id_reserva = criar_reserva(conexao, criar_hotel(conexao))
+    conexao.execute(
+        text(
+            "INSERT INTO solicitacao (id_reserva, tipo, descricao) "
+            "VALUES (:id_reserva, 'consumo', 'Agua mineral')"
+        ),
+        {"id_reserva": id_reserva},
+    )
+
+    with pytest.raises(DBAPIError) as erro:
+        conexao.commit()
+
+    mensagem = str(erro.value).casefold()
+    assert "consumo" in mensagem
+
+
+@pytest.mark.postgres
+def test_pai_consumo_com_filho_na_mesma_transacao_e_aceito(conexao):
+    id_reserva = criar_reserva(conexao, criar_hotel(conexao))
+    id_solicitacao = _inserir_consumo_completo(conexao, id_reserva)
+
+    conexao.commit()
+    status = conexao.execute(
+        text("SELECT status_lancamento FROM consumo WHERE id_solicitacao = :id"),
+        {"id": id_solicitacao},
+    ).scalar()
+    assert status == "pendente"
+
+
+@pytest.mark.postgres
+def test_lancado_ou_dispensado_sem_autor_e_recusado(conexao):
+    id_reserva = criar_reserva(conexao, criar_hotel(conexao))
+    id_solicitacao = _inserir_consumo_completo(conexao, id_reserva)
+
+    with pytest.raises(DBAPIError) as erro:
+        conexao.execute(
+            text(
+                "UPDATE consumo SET status_lancamento = 'lancado'"
+                " WHERE id_solicitacao = :id"
+            ),
+            {"id": id_solicitacao},
+        )
+    assert "ck_consumo_terminal_tem_autor" in str(erro.value)
+
+    conexao.rollback()
+    id_solicitacao = _inserir_consumo_completo(
+        conexao, criar_reserva(conexao, criar_hotel(conexao))
+    )
+    with pytest.raises(DBAPIError) as erro:
+        conexao.execute(
+            text(
+                "UPDATE consumo SET status_lancamento = 'dispensado'"
+                " WHERE id_solicitacao = :id"
+            ),
+            {"id": id_solicitacao},
+        )
+    assert "ck_consumo_terminal_tem_autor" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_pendente_para_lancado_e_dispensado_com_autor_e_aceito(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_usuario = _criar_usuario(conexao, id_hotel)
+    id_lancado = _inserir_consumo_completo(
+        conexao, criar_reserva(conexao, id_hotel)
+    )
+    id_dispensado = _inserir_consumo_completo(
+        conexao, criar_reserva(conexao, id_hotel)
+    )
+
+    conexao.execute(
+        text(
+            "UPDATE consumo SET status_lancamento = 'lancado',"
+            " id_usuario_lancamento = :uid, lancado_em = now()"
+            " WHERE id_solicitacao = :id"
+        ),
+        {"id": id_lancado, "uid": id_usuario},
+    )
+    conexao.execute(
+        text(
+            "UPDATE consumo SET status_lancamento = 'dispensado',"
+            " id_usuario_lancamento = :uid, lancado_em = now()"
+            " WHERE id_solicitacao = :id"
+        ),
+        {"id": id_dispensado, "uid": id_usuario},
+    )
+
+    assert conexao.execute(
+        text("SELECT status_lancamento FROM consumo WHERE id_solicitacao = :id"),
+        {"id": id_lancado},
+    ).scalar() == "lancado"
+    assert conexao.execute(
+        text("SELECT status_lancamento FROM consumo WHERE id_solicitacao = :id"),
+        {"id": id_dispensado},
+    ).scalar() == "dispensado"
+
+
+@pytest.mark.postgres
+def test_lancado_nao_volta_para_pendente(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_usuario = _criar_usuario(conexao, id_hotel)
+    id_solicitacao = _inserir_consumo_completo(
+        conexao, criar_reserva(conexao, id_hotel)
+    )
+    conexao.execute(
+        text(
+            "UPDATE consumo SET status_lancamento = 'lancado',"
+            " id_usuario_lancamento = :uid, lancado_em = now()"
+            " WHERE id_solicitacao = :id"
+        ),
+        {"id": id_solicitacao, "uid": id_usuario},
+    )
+
+    with pytest.raises(DBAPIError) as erro:
+        conexao.execute(
+            text(
+                "UPDATE consumo SET status_lancamento = 'pendente'"
+                " WHERE id_solicitacao = :id"
+            ),
+            {"id": id_solicitacao},
+        )
+
+    assert "fn_valida_transicao_lancamento" in str(erro.value) or "transicao" in str(
+        erro.value
+    ).casefold()

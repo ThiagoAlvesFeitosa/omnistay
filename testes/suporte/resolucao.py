@@ -2,9 +2,6 @@
 
 DETALHE_JA_RESOLVIDA = "Esta solicitacao ja foi resolvida."
 DETALHE_NAO_ENCONTRADA = "Solicitacao nao encontrada."
-DETALHE_TIPO_CONSUMO = (
-    "Solicitacao deste tipo nao pode ser resolvida nesta operacao."
-)
 DETALHE_CANCELADA = "Solicitacao cancelada nao pode ser resolvida."
 DETALHE_ESTADO = "O estado atual da solicitacao nao admite resolucao."
 

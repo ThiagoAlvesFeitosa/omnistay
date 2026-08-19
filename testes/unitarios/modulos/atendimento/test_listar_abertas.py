@@ -37,6 +37,8 @@ CHAVES_ESPERADAS = {
     "aberta_em",
     "janela_preferencia",
     "destaque_tempo_excedido",
+    "valor_praticado",
+    "status_lancamento",
 }
 
 

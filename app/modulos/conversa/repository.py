@@ -270,6 +270,78 @@ def gravar_confirmacao_pedido(
     return resultado.rowcount or 0
 
 
+def gravar_confirmacao_consumo(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_mensagem: int,
+    id_mensagem_resposta: int,
+    id_solicitacao: int,
+    id_item_vendavel: int,
+    quantidade: int,
+) -> int:
+    import json
+
+    extra = {
+        "resposta": "confirmacao_consumo",
+        "id_mensagem_resposta": id_mensagem_resposta,
+        "id_solicitacao": id_solicitacao,
+        "id_item_vendavel": id_item_vendavel,
+        "quantidade": quantidade,
+    }
+    resultado = conexao.execute(
+        text(
+            "UPDATE mensagem m SET"
+            " classificacao_bruta = COALESCE(m.classificacao_bruta, '{}'::jsonb)"
+            " || CAST(:extra AS jsonb)"
+            " FROM reserva r"
+            " WHERE m.id_mensagem = :id"
+            " AND m.id_reserva = r.id_reserva"
+            " AND r.id_hotel = :id_hotel"
+        ),
+        {
+            "extra": json.dumps(extra),
+            "id": id_mensagem,
+            "id_hotel": id_hotel,
+        },
+    )
+    return resultado.rowcount or 0
+
+
+def gravar_aviso_identificacao(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_mensagem: int,
+    id_mensagem_resposta: int,
+    desfecho: str,
+) -> int:
+    import json
+
+    extra = {
+        "resposta": "aviso_identificacao",
+        "desfecho": desfecho,
+        "id_mensagem_resposta": id_mensagem_resposta,
+    }
+    resultado = conexao.execute(
+        text(
+            "UPDATE mensagem m SET"
+            " classificacao_bruta = COALESCE(m.classificacao_bruta, '{}'::jsonb)"
+            " || CAST(:extra AS jsonb)"
+            " FROM reserva r"
+            " WHERE m.id_mensagem = :id"
+            " AND m.id_reserva = r.id_reserva"
+            " AND r.id_hotel = :id_hotel"
+        ),
+        {
+            "extra": json.dumps(extra),
+            "id": id_mensagem,
+            "id_hotel": id_hotel,
+        },
+    )
+    return resultado.rowcount or 0
+
+
 def gravar_confirmacao_reclamacao(
     conexao: Connection,
     *,

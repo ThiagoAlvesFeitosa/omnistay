@@ -30,3 +30,16 @@ def test_confirmacao_de_servico_fala_de_pedido_atendido():
     assert "atendido" in compacto
     for palavra in proibicoes_do_recado():
         assert palavra not in compacto
+
+
+def test_confirmacao_de_consumo_nao_cita_valor_nem_lancamento():
+    texto = montar_confirmacao_resolucao(
+        nome_completo="Maria Silva", tipo="consumo"
+    )
+    compacto = texto.casefold()
+    assert "pedido" in compacto
+    assert "atendido" in compacto
+    assert "r$" not in compacto
+    assert "lancad" not in compacto
+    for palavra in proibicoes_do_recado():
+        assert palavra not in compacto

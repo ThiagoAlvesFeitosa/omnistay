@@ -4,8 +4,10 @@ from app.portas.llm import (
     FalhaDeClassificacao,
     FalhaDeConversacao,
     FalhaDeExtracao,
+    FalhaDeIdentificacao,
     ResultadoClassificacao,
     ResultadoExtracao,
+    ResultadoIdentificacao,
     ResultadoResposta,
 )
 
@@ -15,12 +17,15 @@ class LLMFalso:
         self.chamadas: list[str] = []
         self.chamadas_classificar: list[str] = []
         self.chamadas_responder: list[tuple] = []
+        self.chamadas_identificar: list[tuple] = []
         self.proximo: ResultadoExtracao | None = None
         self.proximo_classificacao: ResultadoClassificacao | None = None
         self.proximo_resposta: ResultadoResposta | None = None
+        self.proximo_identificacao: ResultadoIdentificacao | None = None
         self.falhar_sempre = False
         self.falhar_classificacao = False
         self.falhar_conversacao = False
+        self.falhar_identificacao = False
         self.falhas_restantes = 0
 
     def configurar(self, resultado: ResultadoExtracao) -> None:
@@ -31,6 +36,9 @@ class LLMFalso:
 
     def configurar_resposta(self, resultado: ResultadoResposta) -> None:
         self.proximo_resposta = resultado
+
+    def configurar_identificacao(self, resultado: ResultadoIdentificacao) -> None:
+        self.proximo_identificacao = resultado
 
     def extrair_ficha(self, texto: str) -> ResultadoExtracao:
         self.chamadas.append(texto)
@@ -74,3 +82,13 @@ class LLMFalso:
             texto=trecho,
             trechos_citados=(trecho,),
         )
+
+    def identificar_item_vendavel(
+        self, texto: str, itens_ativos: tuple
+    ) -> ResultadoIdentificacao:
+        self.chamadas_identificar.append((texto, itens_ativos))
+        if self.falhar_identificacao:
+            raise FalhaDeIdentificacao("indisponivel")
+        if self.proximo_identificacao is not None:
+            return self.proximo_identificacao
+        return ResultadoIdentificacao(desfecho="nenhum")

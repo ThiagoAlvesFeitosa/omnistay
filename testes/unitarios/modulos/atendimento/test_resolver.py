@@ -106,6 +106,35 @@ def test_resolver_grava_snapshot_e_agenda_depois_do_update():
     ]
 
 
+def test_resolver_consumo_agenda_recado_de_pedido_atendido():
+    instante = datetime(2026, 8, 18, 14, 32, tzinfo=UTC)
+    repo = Repo(
+        resultado={
+            "id_solicitacao": 7,
+            "id_reserva": 42,
+            "tipo": "consumo",
+            "status": "resolvida",
+            "resolvida_em": instante,
+            "id_usuario_responsavel": 3,
+        }
+    )
+    agendador = Agendador()
+
+    saida = atendimento.resolver(
+        object(),
+        id_hotel=1,
+        id_solicitacao=7,
+        id_usuario=3,
+        repositorio=repo,
+        agendar_confirmacao=agendador,
+        relogio=Relogio(instante),
+    )
+
+    assert saida.tipo == "consumo"
+    assert saida.status == "resolvida"
+    assert agendador.chamadas[0]["tipo"] == "consumo"
+
+
 def test_inexistente_no_hotel_nao_agenda():
     repo = Repo(resultado=None, existente=None)
     agendador = Agendador()
@@ -127,7 +156,7 @@ def test_inexistente_no_hotel_nao_agenda():
     "existente",
     [
         {"status": "resolvida", "tipo": "reclamacao"},
-        {"status": "aberta", "tipo": "consumo"},
+        {"status": "cancelada", "tipo": "servico"},
     ],
 )
 def test_recusa_nao_agenda(existente):

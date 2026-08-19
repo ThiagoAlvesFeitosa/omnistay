@@ -10,6 +10,7 @@ from app.fila import repository as fila_repository
 from app.modulos.atendimento import service as atendimento_service
 from app.modulos.conversa import service as conversa_service
 from app.modulos.hospedagem import service as hospedagem_service
+from app.modulos.propriedade import service as propriedade_service
 from app.portas.llm import LLMProvider
 from app.portas.mensageria import MensageriaGateway
 
@@ -77,6 +78,10 @@ def processar_uma_passagem(
                 trabalho=trabalho,
                 gateway=gateway,
                 abrir_servico=atendimento_service.abrir_servico,
+                abrir_consumo=atendimento_service.abrir_consumo,
+                listar_itens_ativos=propriedade_service.listar_itens_vendaveis_ativos,
+                identificar=porta_llm.identificar_item_vendavel,
+                ler_preco=propriedade_service.ler_preco_item_ativo,
             )
         elif trabalho["tipo"] == "abrir_chamado_reclamacao":
             conversa_service.processar_trabalho_abrir_chamado(

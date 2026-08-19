@@ -50,6 +50,14 @@ class FalhaDeConversacao(Exception):
         super().__init__(codigo)
 
 
+class FalhaDeIdentificacao(Exception):
+    """Identificador de item indisponivel, recusa ou tempo esgotado — sem eco do texto."""
+
+    def __init__(self, codigo: str) -> None:
+        self.codigo = codigo
+        super().__init__(codigo)
+
+
 @dataclass(frozen=True)
 class ResultadoClassificacao:
     """Eixos da mensagem de estadia. Valores podem ser invalidos; o dominio valida."""
@@ -69,9 +77,21 @@ class ResultadoResposta:
     trechos_citados: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class ResultadoIdentificacao:
+    """Item vendavel reconhecido. O dominio valida id e quantidade; o preco vem do banco."""
+
+    desfecho: str  # unico | nenhum | ambiguo
+    id_item_vendavel: int | None = None
+    quantidade: int | None = None
+
+
 class LLMProvider(Protocol):
     def extrair_ficha(self, texto: str) -> ResultadoExtracao: ...
     def classificar(self, texto: str) -> ResultadoClassificacao: ...
     def responder_duvida(
         self, pergunta: str, itens_ativos: tuple
     ) -> ResultadoResposta: ...
+    def identificar_item_vendavel(
+        self, texto: str, itens_ativos: tuple
+    ) -> ResultadoIdentificacao: ...
