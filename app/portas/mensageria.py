@@ -66,3 +66,13 @@ class MensageriaGateway(Protocol):
         id_mensagem: int,
         id_reserva: int,
     ) -> ResultadoEnvio: ...
+
+    def enviar_pesquisa_saida(
+        self,
+        *,
+        telefone_destino: str,
+        primeiro_nome: str,
+        corpo: str,
+        id_mensagem: int,
+        id_reserva: int,
+    ) -> ResultadoEnvio: ...

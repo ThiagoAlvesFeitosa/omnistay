@@ -983,3 +983,123 @@ def test_lancado_nao_volta_para_pendente(conexao):
     assert "fn_valida_transicao_lancamento" in str(erro.value) or "transicao" in str(
         erro.value
     ).casefold()
+
+
+def _inserir_trabalho_enviar_pesquisa_saida(
+    conexao, id_hotel: int, id_reserva: int
+) -> None:
+    conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, 'enviar_pesquisa_saida',"
+            " CAST(:payload AS jsonb), 'pendente')"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "payload": '{"id_reserva": %s, "id_mensagem": 1}' % id_reserva,
+        },
+    )
+
+
+def _inserir_trabalho_interpretar_pesquisa_saida(
+    conexao, id_hotel: int, id_reserva: int, id_mensagem: int = 1
+) -> None:
+    conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, 'interpretar_pesquisa_saida',"
+            " CAST(:payload AS jsonb), 'pendente')"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "payload": (
+                '{"id_reserva": %s, "id_mensagem": %s}'
+                % (id_reserva, id_mensagem)
+            ),
+        },
+    )
+
+
+@pytest.mark.postgres
+def test_tipo_enviar_pesquisa_saida_e_aceito_pelo_check(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+
+    _inserir_trabalho_enviar_pesquisa_saida(conexao, id_hotel, id_reserva)
+
+    tipo = conexao.execute(
+        text("SELECT tipo FROM trabalho WHERE tipo = 'enviar_pesquisa_saida'")
+    ).scalar_one()
+    assert tipo == "enviar_pesquisa_saida"
+
+
+@pytest.mark.postgres
+def test_segundo_trabalho_de_pesquisa_saida_da_mesma_reserva_e_recusado(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    _inserir_trabalho_enviar_pesquisa_saida(conexao, id_hotel, id_reserva)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_trabalho_enviar_pesquisa_saida(conexao, id_hotel, id_reserva)
+
+    assert "uq_trabalho_enviar_pesquisa_saida_reserva" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_tipo_interpretar_pesquisa_saida_e_aceito_pelo_check(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+
+    _inserir_trabalho_interpretar_pesquisa_saida(conexao, id_hotel, id_reserva)
+
+    tipo = conexao.execute(
+        text(
+            "SELECT tipo FROM trabalho WHERE tipo = 'interpretar_pesquisa_saida'"
+        )
+    ).scalar_one()
+    assert tipo == "interpretar_pesquisa_saida"
+
+
+@pytest.mark.postgres
+def test_segunda_interpretacao_da_mesma_mensagem_e_recusada(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    _inserir_trabalho_interpretar_pesquisa_saida(
+        conexao, id_hotel, id_reserva, id_mensagem=7
+    )
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_trabalho_interpretar_pesquisa_saida(
+            conexao, id_hotel, id_reserva, id_mensagem=7
+        )
+
+    assert "uq_trabalho_interpretar_pesquisa_saida_mensagem" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_avaliacao_de_checkout_sem_nota_e_recusada(conexao):
+    id_reserva = criar_reserva(conexao, criar_hotel(conexao))
+
+    with pytest.raises(DBAPIError) as erro:
+        conexao.execute(
+            text(
+                "INSERT INTO avaliacao (id_reserva, origem, comentario) "
+                "VALUES (:id_reserva, 'checkout', 'ok')"
+            ),
+            {"id_reserva": id_reserva},
+        )
+
+    assert "ck_avaliacao_checkout_tem_nota" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_avaliacao_de_pulso_com_nota_nula_continua_aceita(conexao):
+    id_reserva = criar_reserva(conexao, criar_hotel(conexao))
+    _inserir_avaliacao_pulso(conexao, id_reserva)
+    origem = conexao.execute(
+        text(
+            "SELECT origem FROM avaliacao WHERE id_reserva = :id"
+        ),
+        {"id": id_reserva},
+    ).scalar_one()
+    assert origem == "pulso_segundo_dia"

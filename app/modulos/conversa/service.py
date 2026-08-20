@@ -19,6 +19,7 @@ from app.modulos.conversa.texto_pulso import (
     montar_pergunta_pulso,
     montar_reconhecimento_pulso,
 )
+from app.modulos.conversa.texto_pesquisa_saida import montar_texto_pesquisa_saida
 from app.modulos.conversa.validacao_ficha import refinar_resultado
 from app.modulos.propriedade import repository as propriedade_repository
 from app.modulos.propriedade import service as propriedade_service
@@ -29,6 +30,7 @@ from app.portas.llm import (
     FalhaDeIdentificacao,
     LLMProvider,
     ResultadoExtracao,
+    ResultadoPesquisaSaida,
 )
 from app.portas.mensageria import FalhaDeEnvio, MensageriaGateway
 from app.modulos.conversa.fidelidade import resposta_fiel_ao_catalogo
@@ -212,6 +214,46 @@ def agendar_pulso(
         return "ja_agendado"
     logger.info(
         "pulso_agendado id_reserva=%s id_mensagem=%s id_hotel=%s",
+        id_reserva,
+        id_mensagem,
+        id_hotel,
+    )
+    return "agendada"
+
+
+CHAVE_ATRIBUICAO_PESQUISA = "horas_atribuicao_pesquisa_saida"
+
+
+def agendar_pesquisa_saida(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    nome_completo: str,
+    repositorio=repositorio_padrao,
+    enfileirar=fila_service.enfileirar_enviar_pesquisa_saida,
+) -> str:
+    texto = montar_texto_pesquisa_saida(nome_completo=nome_completo)
+    try:
+        with _savepoint(conexao):
+            id_mensagem = repositorio.inserir_mensagem_enviada_pendente(
+                conexao, id_reserva=id_reserva, conteudo=texto
+            )
+            enfileirar(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=id_reserva,
+                id_mensagem=id_mensagem,
+            )
+    except IntegrityError:
+        logger.info(
+            "pesquisa_saida_ja_agendada id_reserva=%s id_hotel=%s",
+            id_reserva,
+            id_hotel,
+        )
+        return "ja_agendada"
+    logger.info(
+        "pesquisa_saida_agendada id_reserva=%s id_mensagem=%s id_hotel=%s",
         id_reserva,
         id_mensagem,
         id_hotel,
@@ -550,6 +592,7 @@ def receber_evento_entrada(
     repositorio=repositorio_padrao,
     enfileirar=fila_service.enfileirar_interpretar_ficha,
     enfileirar_estadia=fila_service.enfileirar_classificar_mensagem,
+    enfileirar_pesquisa=fila_service.enfileirar_interpretar_pesquisa_saida,
 ) -> dict:
     """Grava evento (+ mensagem/trabalho se elegivel). Nao chama LLM."""
     payload = {
@@ -585,10 +628,59 @@ def receber_evento_entrada(
         )
         destino = "estadia"
     if reserva is None:
-        logger.info(
-            "webhook_sem_reserva id_evento=%s id_hotel=%s", id_evento, id_hotel
+        resolver_pesquisa = getattr(
+            repositorio, "resolver_reserva_encerrada_pesquisa", None
         )
-        return {"status": "sem_reserva", "id_evento": id_evento}
+        if resolver_pesquisa is not None:
+            reserva = resolver_pesquisa(
+                conexao, id_hotel=id_hotel, telefone_contato=telefone
+            )
+        destino = "pesquisa"
+    if reserva is None:
+        resolver_encerrada = getattr(
+            repositorio, "resolver_reserva_encerrada", None
+        )
+        if resolver_encerrada is not None:
+            reserva = resolver_encerrada(
+                conexao, id_hotel=id_hotel, telefone_contato=telefone
+            )
+        if reserva is None:
+            logger.info(
+                "webhook_sem_reserva id_evento=%s id_hotel=%s",
+                id_evento,
+                id_hotel,
+            )
+            return {"status": "sem_reserva", "id_evento": id_evento}
+        id_mensagem = repositorio.inserir_mensagem_recebida(
+            conexao,
+            id_reserva=reserva["id_reserva"],
+            conteudo=evento.texto,
+            id_externo=evento.id_mensagem_canal,
+            enviada_em=evento.instante_origem,
+        )
+        gravar = getattr(repositorio, "gravar_classificacao_bruta", None)
+        if gravar is not None:
+            gravar(
+                conexao,
+                id_mensagem=id_mensagem,
+                classificacao={
+                    "tipo": "pesquisa_saida",
+                    "desfecho": "fora_da_janela",
+                },
+            )
+        logger.info(
+            "webhook_encerrada_sem_trabalho id_evento=%s id_mensagem=%s"
+            " id_reserva=%s",
+            id_evento,
+            id_mensagem,
+            reserva["id_reserva"],
+        )
+        return {
+            "status": "registrada",
+            "id_evento": id_evento,
+            "id_mensagem": id_mensagem,
+            "id_reserva": reserva["id_reserva"],
+        }
 
     id_mensagem = repositorio.inserir_mensagem_recebida(
         conexao,
@@ -597,15 +689,25 @@ def receber_evento_entrada(
         id_externo=evento.id_mensagem_canal,
         enviada_em=evento.instante_origem,
     )
-    enfileirar_fn = enfileirar if destino == "ficha" else enfileirar_estadia
     try:
-        id_trabalho = enfileirar_fn(
-            conexao,
-            id_hotel=id_hotel,
-            id_reserva=reserva["id_reserva"],
-            id_mensagem=id_mensagem,
-            id_evento=id_evento,
-        )
+        if destino == "pesquisa":
+            id_trabalho = enfileirar_pesquisa(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=reserva["id_reserva"],
+                id_mensagem=id_mensagem,
+            )
+        else:
+            enfileirar_fn = (
+                enfileirar if destino == "ficha" else enfileirar_estadia
+            )
+            id_trabalho = enfileirar_fn(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=reserva["id_reserva"],
+                id_mensagem=id_mensagem,
+                id_evento=id_evento,
+            )
     except IntegrityError:
         logger.info(
             "webhook_trabalho_duplicado id_evento=%s id_mensagem=%s",
@@ -2189,3 +2291,232 @@ def processar_trabalho_registrar_resposta_pulso(
         corpo=corpo,
         id_reserva=id_reserva,
     )
+
+
+def processar_trabalho_enviar_pesquisa_saida(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    gateway: MensageriaGateway,
+    repositorio=repositorio_padrao,
+) -> None:
+    from app.fila import repository as fila_repo
+    from app.fila import service as fila_svc
+
+    id_trabalho = trabalho["id_trabalho"]
+    id_hotel = trabalho["id_hotel"]
+    payload = trabalho["payload"]
+    id_mensagem = int(payload["id_mensagem"])
+    id_reserva = int(payload["id_reserva"])
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    if mensagem is None:
+        fila_repo.marcar_falha(
+            conexao,
+            id_trabalho=id_trabalho,
+            tentativas=(trabalho.get("tentativas") or 0) + 1,
+            erro="mensagem_ausente",
+        )
+        return
+    if mensagem.get("status_envio") == "enviada":
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        return
+    telefone = repositorio.ler_telefone_da_reserva(
+        conexao, id_reserva=id_reserva
+    )
+    if not telefone:
+        fila_repo.marcar_falha(
+            conexao,
+            id_trabalho=id_trabalho,
+            tentativas=(trabalho.get("tentativas") or 0) + 1,
+            erro="telefone_ausente",
+        )
+        marcar_envio_falha(
+            conexao, id_mensagem=id_mensagem, repositorio=repositorio
+        )
+        return
+    nome = "hospede"
+    ler_nome = getattr(repositorio, "ler_nome_titular", None)
+    if ler_nome is not None:
+        nome = ler_nome(conexao, id_reserva=id_reserva) or "hospede"
+    try:
+        prenome = primeiro_nome(nome)
+    except ValueError:
+        prenome = "hospede"
+    try:
+        resultado = gateway.enviar_pesquisa_saida(
+            telefone_destino=telefone,
+            primeiro_nome=prenome,
+            corpo=mensagem["conteudo"],
+            id_mensagem=id_mensagem,
+            id_reserva=id_reserva,
+        )
+    except FalhaDeEnvio as erro:
+        destino = fila_svc.registrar_falha_de_envio(
+            conexao,
+            id_trabalho=id_trabalho,
+            id_hotel=id_hotel,
+            tentativas_atuais=trabalho.get("tentativas") or 0,
+            codigo_erro=erro.codigo,
+        )
+        if destino == "falha":
+            marcar_envio_falha(
+                conexao, id_mensagem=id_mensagem, repositorio=repositorio
+            )
+        logger.info(
+            "envio_tentativa_falhou id_trabalho=%s tipo=enviar_pesquisa_saida"
+            " destino=%s codigo=%s",
+            id_trabalho,
+            destino,
+            erro.codigo,
+        )
+        return
+    marcar_envio_sucesso(
+        conexao,
+        id_mensagem=id_mensagem,
+        id_externo=resultado.id_externo,
+        repositorio=repositorio,
+    )
+    fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+    logger.info(
+        "pesquisa_saida_enviada id_trabalho=%s id_mensagem=%s"
+        " id_reserva=%s id_hotel=%s",
+        id_trabalho,
+        id_mensagem,
+        id_reserva,
+        id_hotel,
+    )
+
+
+def _prazo_atribuicao_em_horas(valor: str | None) -> int | None:
+    if valor is None:
+        return None
+    try:
+        horas = int(valor)
+    except (TypeError, ValueError):
+        return None
+    if horas < 1:
+        return None
+    return horas
+
+
+def _nota_valida(nota) -> int | None:
+    try:
+        numero = int(nota)
+    except (TypeError, ValueError):
+        return None
+    if numero < 1 or numero > 5:
+        return None
+    return numero
+
+
+def processar_trabalho_interpretar_pesquisa_saida(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    llm,
+    repositorio=repositorio_padrao,
+    repositorio_propriedade=propriedade_repository,
+    agora=None,
+) -> None:
+    from datetime import UTC, timedelta
+
+    from app.comum import relogio as relogio_padrao
+    from app.fila import repository as fila_repo
+    from app.modulos.feedback import service as feedback
+    from app.modulos.hospedagem import service as hospedagem
+
+    id_trabalho = trabalho["id_trabalho"]
+    id_hotel = trabalho["id_hotel"]
+    payload = trabalho["payload"]
+    id_mensagem = int(payload["id_mensagem"])
+    id_reserva = int(payload["id_reserva"])
+    instante = agora if agora is not None else relogio_padrao.agora()
+    if instante.tzinfo is None:
+        instante = instante.replace(tzinfo=UTC)
+
+    def _concluir(desfecho: str) -> None:
+        repositorio.gravar_classificacao_bruta(
+            conexao,
+            id_mensagem=id_mensagem,
+            classificacao={"tipo": "pesquisa_saida", "desfecho": desfecho},
+        )
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        logger.info(
+            "pesquisa_saida_interpretada id_trabalho=%s id_mensagem=%s"
+            " id_reserva=%s desfecho=%s",
+            id_trabalho,
+            id_mensagem,
+            id_reserva,
+            desfecho,
+        )
+
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    if mensagem is None:
+        fila_repo.marcar_falha(
+            conexao,
+            id_trabalho=id_trabalho,
+            tentativas=(trabalho.get("tentativas") or 0) + 1,
+            erro="mensagem_ausente",
+        )
+        return
+    reserva = repositorio.ler_checkout_da_reserva(
+        conexao, id_reserva=id_reserva
+    )
+    checkout_em = (reserva or {}).get("checkout_em")
+    valor = repositorio_propriedade.ler_parametro(
+        conexao, id_hotel, CHAVE_ATRIBUICAO_PESQUISA
+    )
+    horas = _prazo_atribuicao_em_horas(valor)
+    if horas is None:
+        logger.info(
+            "prazo_ausente id_trabalho=%s id_reserva=%s id_hotel=%s",
+            id_trabalho,
+            id_reserva,
+            id_hotel,
+        )
+        _concluir("prazo_ausente")
+        return
+    if checkout_em is not None:
+        if checkout_em.tzinfo is None:
+            checkout_em = checkout_em.replace(tzinfo=UTC)
+        if instante - checkout_em > timedelta(hours=horas):
+            _concluir("fora_da_janela")
+            return
+    try:
+        bruto = llm.interpretar_pesquisa_saida(mensagem["conteudo"])
+    except FalhaDeExtracao:
+        _concluir("indisponivel")
+        return
+    desfecho_porta = getattr(bruto, "desfecho", None)
+    if desfecho_porta == "irreconhecivel":
+        _concluir("irreconhecivel")
+        return
+    if desfecho_porta not in ("completo", "parcial"):
+        _concluir("formato_invalido")
+        return
+    nota = _nota_valida(getattr(bruto, "nota", None))
+    comentario = getattr(bruto, "comentario", None)
+    aceite = getattr(bruto, "aceite", None)
+    if aceite is not None and not isinstance(aceite, bool):
+        aceite = None
+    if nota is not None:
+        feedback.gravar_avaliacao_checkout(
+            conexao,
+            id_reserva=id_reserva,
+            nota=nota,
+            comentario=comentario,
+        )
+    if isinstance(aceite, bool):
+        hospedagem.registrar_consentimento_pesquisa(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            concedido=aceite,
+        )
+    if nota is not None and isinstance(aceite, bool):
+        _concluir("completo")
+        return
+    if nota is not None or isinstance(aceite, bool) or comentario:
+        _concluir("parcial")
+        return
+    _concluir("formato_invalido")

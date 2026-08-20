@@ -171,3 +171,14 @@ class MensageriaWhatsapp:
         mensagens = dados.get("messages") or []
         id_externo = mensagens[0].get("id") if mensagens else None
         return ResultadoEnvio(id_externo=id_externo)
+
+    def enviar_pesquisa_saida(
+        self,
+        *,
+        telefone_destino: str,
+        primeiro_nome: str,
+        corpo: str,
+        id_mensagem: int,
+        id_reserva: int,
+    ) -> ResultadoEnvio:
+        raise NotImplementedError("template pesquisa_saida ainda nao cadastrado")

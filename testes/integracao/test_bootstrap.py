@@ -184,3 +184,33 @@ def test_bootstrap_semeia_prazo_minimo_do_pulso(banco_migrado, monkeypatch):
         engine.dispose()
 
     assert valor == "24"
+
+
+@pytest.mark.postgres
+def test_bootstrap_semeia_prazo_de_atribuicao_da_pesquisa_saida(
+    banco_migrado, monkeypatch
+):
+    from app.bootstrap import executar_bootstrap
+
+    monkeypatch.setenv("BOOTSTRAP_SENHA_INICIAL", "senha-inicial-do-gestor")
+    resultado = executar_bootstrap(
+        nome_hotel="Hotel Exemplo",
+        telefone_whatsapp="+5511999999999",
+        nome_gestor="Thiago Feitosa",
+        email_gestor="gestor@hotel.com.br",
+    )
+    assert resultado.ok
+
+    engine = create_engine(banco_migrado)
+    try:
+        with engine.connect() as conexao:
+            valor = conexao.execute(
+                text(
+                    "SELECT valor FROM parametro_hotel "
+                    "WHERE chave = 'horas_atribuicao_pesquisa_saida'"
+                )
+            ).scalar_one()
+    finally:
+        engine.dispose()
+
+    assert valor == "24"

@@ -86,6 +86,16 @@ class ResultadoIdentificacao:
     quantidade: int | None = None
 
 
+@dataclass(frozen=True)
+class ResultadoPesquisaSaida:
+    """Leitura da pesquisa de saida. O dominio valida nota e nao promove silencio a recusa."""
+
+    desfecho: str  # completo | parcial | irreconhecivel
+    nota: int | None = None
+    comentario: str | None = None
+    aceite: bool | None = None
+
+
 class LLMProvider(Protocol):
     def extrair_ficha(self, texto: str) -> ResultadoExtracao: ...
     def classificar(self, texto: str) -> ResultadoClassificacao: ...
@@ -95,3 +105,4 @@ class LLMProvider(Protocol):
     def identificar_item_vendavel(
         self, texto: str, itens_ativos: tuple
     ) -> ResultadoIdentificacao: ...
+    def interpretar_pesquisa_saida(self, texto: str) -> ResultadoPesquisaSaida: ...

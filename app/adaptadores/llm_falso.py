@@ -8,6 +8,7 @@ from app.portas.llm import (
     ResultadoClassificacao,
     ResultadoExtracao,
     ResultadoIdentificacao,
+    ResultadoPesquisaSaida,
     ResultadoResposta,
 )
 
@@ -18,14 +19,17 @@ class LLMFalso:
         self.chamadas_classificar: list[str] = []
         self.chamadas_responder: list[tuple] = []
         self.chamadas_identificar: list[tuple] = []
+        self.chamadas_pesquisa_saida: list[str] = []
         self.proximo: ResultadoExtracao | None = None
         self.proximo_classificacao: ResultadoClassificacao | None = None
         self.proximo_resposta: ResultadoResposta | None = None
         self.proximo_identificacao: ResultadoIdentificacao | None = None
+        self.proximo_pesquisa_saida: ResultadoPesquisaSaida | None = None
         self.falhar_sempre = False
         self.falhar_classificacao = False
         self.falhar_conversacao = False
         self.falhar_identificacao = False
+        self.falhar_pesquisa_saida = False
         self.falhas_restantes = 0
 
     def configurar(self, resultado: ResultadoExtracao) -> None:
@@ -39,6 +43,9 @@ class LLMFalso:
 
     def configurar_identificacao(self, resultado: ResultadoIdentificacao) -> None:
         self.proximo_identificacao = resultado
+
+    def configurar_pesquisa_saida(self, resultado: ResultadoPesquisaSaida) -> None:
+        self.proximo_pesquisa_saida = resultado
 
     def extrair_ficha(self, texto: str) -> ResultadoExtracao:
         self.chamadas.append(texto)
@@ -92,3 +99,11 @@ class LLMFalso:
         if self.proximo_identificacao is not None:
             return self.proximo_identificacao
         return ResultadoIdentificacao(desfecho="nenhum")
+
+    def interpretar_pesquisa_saida(self, texto: str) -> ResultadoPesquisaSaida:
+        self.chamadas_pesquisa_saida.append(texto)
+        if self.falhar_pesquisa_saida:
+            raise FalhaDeExtracao("llm_indisponivel")
+        if self.proximo_pesquisa_saida is not None:
+            return self.proximo_pesquisa_saida
+        return ResultadoPesquisaSaida(desfecho="irreconhecivel")

@@ -12,6 +12,8 @@ class RepoFake:
         self.proximo_msg = 1
         self.reserva = {"id_reserva": 10, "id_hotel": 1, "status": "aguardando_cadastro"}
         self.reserva_hospedada = None
+        self.reserva_pesquisa = None
+        self.reserva_encerrada = None
 
     def inserir_evento_webhook(self, conexao, *, id_externo, payload):
         if id_externo in self.eventos:
@@ -30,6 +32,23 @@ class RepoFake:
         if self.reserva_hospedada and telefone_contato == "5511987654321":
             return self.reserva_hospedada
         return None
+
+    def resolver_reserva_encerrada_pesquisa(
+        self, conexao, *, id_hotel, telefone_contato
+    ):
+        if self.reserva_pesquisa and telefone_contato == "5511987654321":
+            return self.reserva_pesquisa
+        return None
+
+    def resolver_reserva_encerrada(self, conexao, *, id_hotel, telefone_contato):
+        if self.reserva_encerrada and telefone_contato == "5511987654321":
+            return self.reserva_encerrada
+        return None
+
+    def gravar_classificacao_bruta(self, conexao, *, id_mensagem, classificacao):
+        for mensagem in self.mensagens:
+            if mensagem["id_mensagem"] == id_mensagem:
+                mensagem["classificacao"] = classificacao
 
     def inserir_mensagem_recebida(
         self, conexao, *, id_reserva, conteudo, id_externo=None, enviada_em=None
@@ -268,3 +287,91 @@ def test_hospedado_id_externo_repetido_nao_duplica():
     assert segundo["status"] == "duplicado"
     assert len(repo.mensagens) == 1
     assert len(estadias) == 1
+
+
+def test_encerrada_com_pesquisa_incompleta_enfileira_interpretacao():
+    repo = RepoFake()
+    repo.reserva = None
+    repo.reserva_pesquisa = {
+        "id_reserva": 30,
+        "id_hotel": 1,
+        "status": "encerrado",
+    }
+    pesquisas = []
+    estadias = []
+
+    resultado = conversa.receber_evento_entrada(
+        object(),
+        evento=EventoEntrada(
+            id_externo="ps-1",
+            telefone_origem="11987654321",
+            texto="5 e sim",
+            tem_texto_utilizavel=True,
+        ),
+        id_hotel=1,
+        repositorio=repo,
+        enfileirar=lambda *a, **k: 1,
+        enfileirar_estadia=lambda *a, **k: estadias.append(1) or 1,
+        enfileirar_pesquisa=lambda *a, **k: pesquisas.append(k) or 9,
+    )
+    assert resultado["status"] == "enfileirado"
+    assert resultado["id_reserva"] == 30
+    assert len(pesquisas) == 1
+    assert pesquisas[0]["id_reserva"] == 30
+    assert "id_evento" not in pesquisas[0]
+    assert estadias == []
+
+
+def test_encerrada_sem_pesquisa_grava_mensagem_sem_trabalho():
+    repo = RepoFake()
+    repo.reserva = None
+    repo.reserva_encerrada = {
+        "id_reserva": 40,
+        "id_hotel": 1,
+        "status": "encerrado",
+    }
+    pesquisas = []
+
+    resultado = conversa.receber_evento_entrada(
+        object(),
+        evento=EventoEntrada(
+            id_externo="ps-2",
+            telefone_origem="11987654321",
+            texto="oi",
+            tem_texto_utilizavel=True,
+        ),
+        id_hotel=1,
+        repositorio=repo,
+        enfileirar_pesquisa=lambda *a, **k: pesquisas.append(1) or 1,
+    )
+    assert resultado["status"] == "registrada"
+    assert len(repo.mensagens) == 1
+    assert pesquisas == []
+
+
+def test_ficha_prevalece_sobre_pesquisa_pendente():
+    repo = RepoFake()
+    repo.reserva_pesquisa = {
+        "id_reserva": 30,
+        "id_hotel": 1,
+        "status": "encerrado",
+    }
+    fichas = []
+    pesquisas = []
+
+    resultado = conversa.receber_evento_entrada(
+        object(),
+        evento=EventoEntrada(
+            id_externo="ambos-ps",
+            telefone_origem="11987654321",
+            texto="1. Maria",
+            tem_texto_utilizavel=True,
+        ),
+        id_hotel=1,
+        repositorio=repo,
+        enfileirar=lambda *a, **k: fichas.append(1) or 1,
+        enfileirar_pesquisa=lambda *a, **k: pesquisas.append(1) or 1,
+    )
+    assert resultado["id_reserva"] == 10
+    assert len(fichas) == 1
+    assert pesquisas == []

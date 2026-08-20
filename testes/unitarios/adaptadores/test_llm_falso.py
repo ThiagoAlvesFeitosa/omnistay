@@ -11,6 +11,7 @@ from app.portas.llm import (
     ResultadoClassificacao,
     ResultadoExtracao,
     ResultadoIdentificacao,
+    ResultadoPesquisaSaida,
     ResultadoResposta,
 )
 
@@ -146,3 +147,26 @@ def test_identificar_ambiguo_e_falha_sao_configuraveis():
     with pytest.raises(FalhaDeIdentificacao) as erro:
         porta.identificar_item_vendavel("algo", ((1, "Agua"),))
     assert erro.value.codigo == "indisponivel"
+
+
+def test_interpretar_pesquisa_saida_devolve_fixture():
+    porta = LLMFalso()
+    porta.configurar_pesquisa_saida(
+        ResultadoPesquisaSaida(
+            desfecho="completo", nota=5, comentario="otimo", aceite=True
+        )
+    )
+    resultado = porta.interpretar_pesquisa_saida("5 e sim")
+    assert resultado.desfecho == "completo"
+    assert resultado.nota == 5
+    assert resultado.aceite is True
+    assert porta.chamadas_pesquisa_saida == ["5 e sim"]
+
+
+def test_interpretar_pesquisa_saida_falha_sem_eco_do_texto():
+    porta = LLMFalso()
+    porta.falhar_pesquisa_saida = True
+    with pytest.raises(FalhaDeExtracao) as erro:
+        porta.interpretar_pesquisa_saida("comentario secreto")
+    assert erro.value.codigo == "llm_indisponivel"
+    assert "secreto" not in str(erro.value)

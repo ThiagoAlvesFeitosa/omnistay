@@ -193,6 +193,38 @@ def enfileirar_registrar_resposta_pulso(
     )
 
 
+def enfileirar_enviar_pesquisa_saida(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    return repositorio.enfileirar_enviar_pesquisa_saida(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_mensagem=id_mensagem,
+    )
+
+
+def enfileirar_interpretar_pesquisa_saida(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    return repositorio.enfileirar_interpretar_pesquisa_saida(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_mensagem=id_mensagem,
+    )
+
+
 def tentativas_maximas(
     conexao: Connection,
     *,

@@ -531,11 +531,14 @@ A unicidade do titular é garantida por índice único parcial — `WHERE titula
 | `finalidade` | `VARCHAR(40)` | NOT NULL, CHECK | OP | `comunicacao_marketing` no MVP |
 | `concedido` | `BOOLEAN` | NOT NULL | OP | `false` registra a **revogação** |
 | `momento` | `TIMESTAMPTZ` | NOT NULL, default `now()` | OP | |
-| `origem` | `VARCHAR(40)` | NOT NULL | OP | `pesquisa_checkout` no MVP |
+| `origem` | `VARCHAR(40)` | NOT NULL | OP | `pesquisa_checkout` (worker da pesquisa de saida), `painel`, `solicitacao_titular` |
 
 **Nunca se atualiza uma linha desta tabela — insere-se outra.** O estado atual é a linha mais
 recente por hóspede e finalidade. É o que permite responder "qual era o consentimento em
-março?", pergunta que um campo booleano não responde.
+março?", pergunta que um campo booleano não responde. O **primeiro escritor** é a pesquisa
+de checkout (F4.1): o worker insere `origem = pesquisa_checkout` quando o aceite é sim ou
+não; silêncio e nota alta **não** inserem. Recepção e gestão inserem `painel` ou
+`solicitacao_titular` pela rota do painel. Lista de pedidos feitos pelo chat continua F4.2.
 
 ### 6.4 Tabelas de conversa
 
@@ -630,14 +633,17 @@ Resolver o quarto (F3.6/F3.7) **não** altera este campo.
 
 O primeiro escritor desta tabela é o pulso do segundo dia (F3.8): `origem =
 pulso_segundo_dia`, `nota` nula nesta fatia, `comentario` com o texto da resposta
-(ou nulo no encerramento humano). Pesquisa de checkout continua F4.1.
+(ou nulo no encerramento humano). A pesquisa de checkout (F4.1) grava uma segunda
+linha, `origem = checkout`, com **nota obrigatória** (1–5); comentário opcional
+completa a mesma linha. Pulso e checkout convivem (`uq_avaliacao_reserva_origem`).
+CHECK: `origem <> 'checkout' OR nota IS NOT NULL` — pulso continua com nota nula.
 
 | Campo | Tipo | Restrições | Classe | Descrição |
 | --- | --- | --- | --- | --- |
 | `id_avaliacao` | `BIGSERIAL` | PK | OP | |
 | `id_reserva` | `BIGINT` | FK, NOT NULL | OP | |
 | `origem` | `VARCHAR(20)` | NOT NULL, CHECK | OP | `pulso_segundo_dia`, `checkout` |
-| `nota` | `SMALLINT` | CHECK entre 1 e 5 | OP | |
+| `nota` | `SMALLINT` | CHECK entre 1 e 5; checkout exige NOT NULL | OP | Pulso admite nulo |
 | `comentario` | `TEXT` | | **DPC** | Conteúdo livre |
 | `respondida_em` | `TIMESTAMPTZ` | NOT NULL, default `now()` | OP | |
 
@@ -707,7 +713,13 @@ recebida. A coluna `precisa_atendimento_humano` é verdadeira quando a reserva e
 e desfecho `encaminhado_humano`, `formato_invalido`, `indisponivel` ou
 `duvida_nao_coberta`. Não se reutiliza `leitura_humana` — esse valor é da ficha em
 `aguardando_cadastro`. Dúvida geral coberta pelo catálogo permanece `classificado` e
-não liga o flag.
+não liga o flag. A coluna `saida_nao_confirmada` é verdadeira quando a reserva está
+`hospedado` e `data_checkout_prevista < CURRENT_DATE`. Encerrada **limpa** continua
+fora da visão (exceção da F1.1); encerrada com `pesquisa_saida_leitura_humana`
+(desfecho `irreconhecivel`, `indisponivel`, `formato_invalido` ou `prazo_ausente` na
+mensagem `tipo = pesquisa_saida`) permanece no turno. O prazo
+`horas_atribuicao_pesquisa_saida` (semeado `24`) limita a atribuição da resposta ao
+eixo `checkout_em`; ausência da chave não inventa 24.
 
 **A tabela `trabalho` é a fila durável do Artefato 5.** O cadastro de reserva grava, na mesma
 transação, a mensagem de coleta (`status_envio = pendente`) e um trabalho `enviar_coleta`; o
@@ -828,7 +840,7 @@ Ainda abertas:
 - [ ] Testar colagem no PMS real
 - [ ] Mecanismo de acesso do staff ao Alert Center pelo celular
 - [ ] Confirmar junto à Meta a categoria do template de pulso do segundo dia
-- [ ] Redigir a pergunta de opt-in da pesquisa de checkout
+- [x] Redigir a pergunta de opt-in da pesquisa de checkout
 - [ ] Cadastrar a lista de concorrentes por propriedade
 - [ ] Material do MVP de usuário, ainda não enviado
 

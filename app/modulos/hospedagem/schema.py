@@ -33,6 +33,8 @@ class ItemFilaDoDia(BaseModel):
     chegada_nao_confirmada: bool
     boas_vindas_nao_enviadas: bool = False
     precisa_atendimento_humano: bool = False
+    saida_nao_confirmada: bool = False
+    pesquisa_saida_leitura_humana: bool = False
     status_envio_coleta: str | None = None
     estado_cadastro: str | None = None
 
@@ -67,3 +69,24 @@ class ChegadaResposta(BaseModel):
     status: str
     checkin_em: datetime
     boas_vindas: str
+
+
+class SaidaResposta(BaseModel):
+    id_reserva: int
+    status: str
+    checkout_em: datetime
+    pesquisa: str
+
+
+class ConsentimentoResposta(BaseModel):
+    id_hospede: int
+    finalidade: str
+    concedido: bool
+    momento: datetime | None
+    origem: str | None
+    em: datetime
+
+
+class ConsentimentoEntrada(BaseModel):
+    concedido: bool
+    origem: str = Field(pattern="^(painel|solicitacao_titular)$")

@@ -47,6 +47,10 @@ PARAMETROS_PULSO_PADRAO = {
     "horas_minimas_para_pulso": "24",
 }
 
+PARAMETROS_PESQUISA_SAIDA_PADRAO = {
+    "horas_atribuicao_pesquisa_saida": "24",
+}
+
 CHAVES_SLOTS_BOAS_VINDAS = {
     "cafe": "boas_vindas_cafe",
     "wifi": "boas_vindas_wifi",
@@ -113,6 +117,8 @@ def criar_instalacao_inicial(
     for chave, valor in PARAMETROS_CHAMADO_PADRAO.items():
         repositorio.inserir_parametro(conexao, id_hotel, chave, valor)
     for chave, valor in PARAMETROS_PULSO_PADRAO.items():
+        repositorio.inserir_parametro(conexao, id_hotel, chave, valor)
+    for chave, valor in PARAMETROS_PESQUISA_SAIDA_PADRAO.items():
         repositorio.inserir_parametro(conexao, id_hotel, chave, valor)
 
     return InstalacaoCriada(id_hotel=id_hotel, email_gestor=email_gestor)

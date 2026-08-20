@@ -511,3 +511,80 @@ def gravar_resposta_pulso(
         },
     )
     return resultado.rowcount or 0
+
+
+def resolver_reserva_encerrada_pesquisa(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    telefone_contato: str,
+) -> dict | None:
+    linha = conexao.execute(
+        text(
+            "SELECT r.id_reserva, r.id_hotel, r.status, r.telefone_contato,"
+            " r.checkout_em"
+            " FROM reserva r"
+            " WHERE r.id_hotel = :id_hotel"
+            " AND r.telefone_contato = :telefone"
+            " AND r.status = 'encerrado'"
+            " AND EXISTS ("
+            "   SELECT 1 FROM trabalho t"
+            "    WHERE t.tipo = 'enviar_pesquisa_saida'"
+            "      AND (t.payload->>'id_reserva')::bigint = r.id_reserva"
+            " )"
+            " AND NOT ("
+            "   EXISTS ("
+            "     SELECT 1 FROM avaliacao a"
+            "      WHERE a.id_reserva = r.id_reserva"
+            "        AND a.origem = 'checkout'"
+            "        AND a.nota IS NOT NULL"
+            "   )"
+            "   AND EXISTS ("
+            "     SELECT 1 FROM consentimento c"
+            "     JOIN reserva_hospede rh"
+            "       ON rh.id_hospede = c.id_hospede AND rh.titular"
+            "      WHERE rh.id_reserva = r.id_reserva"
+            "        AND c.origem = 'pesquisa_checkout'"
+            "        AND c.momento >= r.checkout_em"
+            "   )"
+            " )"
+            " ORDER BY r.id_reserva DESC"
+            " LIMIT 1"
+        ),
+        {"id_hotel": id_hotel, "telefone": telefone_contato},
+    ).mappings().first()
+    return dict(linha) if linha else None
+
+
+def resolver_reserva_encerrada(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    telefone_contato: str,
+) -> dict | None:
+    linha = conexao.execute(
+        text(
+            "SELECT id_reserva, id_hotel, status, telefone_contato, checkout_em"
+            " FROM reserva"
+            " WHERE id_hotel = :id_hotel"
+            " AND telefone_contato = :telefone"
+            " AND status = 'encerrado'"
+            " ORDER BY id_reserva DESC"
+            " LIMIT 1"
+        ),
+        {"id_hotel": id_hotel, "telefone": telefone_contato},
+    ).mappings().first()
+    return dict(linha) if linha else None
+
+
+def ler_checkout_da_reserva(
+    conexao: Connection, *, id_reserva: int
+) -> dict | None:
+    linha = conexao.execute(
+        text(
+            "SELECT id_reserva, id_hotel, status, checkout_em"
+            " FROM reserva WHERE id_reserva = :id"
+        ),
+        {"id": id_reserva},
+    ).mappings().first()
+    return dict(linha) if linha else None

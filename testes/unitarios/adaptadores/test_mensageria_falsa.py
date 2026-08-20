@@ -60,3 +60,34 @@ def test_enviar_pulso_falha_sem_eco_do_corpo():
         )
     assert erro.value.codigo == "mensageria_indisponivel"
     assert "segredo" not in str(erro.value)
+
+
+def test_enviar_pesquisa_saida_registra_tipo_distinto():
+    porta = MensageriaFalsa()
+    resultado = porta.enviar_pesquisa_saida(
+        telefone_destino="5511999999999",
+        primeiro_nome="Marina",
+        corpo="De 1 a 5, que nota voce da?",
+        id_mensagem=12,
+        id_reserva=5,
+    )
+    assert resultado.id_externo == "fake-12"
+    assert porta.envios[0]["tipo"] == "pesquisa_saida"
+    assert porta.envios[0]["tipo"] != "pulso"
+    assert porta.envios[0]["tipo"] != "boas_vindas"
+    assert porta.envios[0]["tipo"] != "sessao"
+
+
+def test_enviar_pesquisa_saida_falha_sem_eco_do_corpo():
+    porta = MensageriaFalsa()
+    porta.falhar_sempre = True
+    with pytest.raises(FalhaDeEnvio) as erro:
+        porta.enviar_pesquisa_saida(
+            telefone_destino="5511999999999",
+            primeiro_nome="Marina",
+            corpo="segredo da pesquisa",
+            id_mensagem=1,
+            id_reserva=1,
+        )
+    assert erro.value.codigo == "mensageria_indisponivel"
+    assert "segredo" not in str(erro.value)

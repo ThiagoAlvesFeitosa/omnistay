@@ -105,6 +105,16 @@ def processar_uma_passagem(
                 gateway=gateway,
                 abrir_reclamacao=atendimento_service.abrir_reclamacao,
             )
+        elif trabalho["tipo"] == "enviar_pesquisa_saida":
+            conversa_service.processar_trabalho_enviar_pesquisa_saida(
+                conexao, trabalho=trabalho, gateway=gateway
+            )
+        elif trabalho["tipo"] == "interpretar_pesquisa_saida":
+            conversa_service.processar_trabalho_interpretar_pesquisa_saida(
+                conexao,
+                trabalho=trabalho,
+                llm=porta_llm,
+            )
         else:
             fila_repository.marcar_falha(
                 conexao,

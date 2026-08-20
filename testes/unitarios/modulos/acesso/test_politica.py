@@ -22,6 +22,8 @@ OPERACOES_ESPERADAS = {
     "ler_indicadores": {"recepcao", "gestor"},
     "alterar_texto_de_boas_vindas": {"recepcao"},
     "ler_texto_de_boas_vindas": {"recepcao", "gestor"},
+    "ler_consentimento": {"recepcao", "gestor"},
+    "registrar_consentimento": {"recepcao", "gestor"},
 }
 
 
@@ -78,6 +80,13 @@ def test_ler_texto_de_boas_vindas_recepcao_e_gestor():
     assert politica.permitido("recepcao", "ler_texto_de_boas_vindas") is True
     assert politica.permitido("gestor", "ler_texto_de_boas_vindas") is True
     assert politica.permitido("staff", "ler_texto_de_boas_vindas") is False
+
+
+def test_consentimento_recepcao_e_gestor_staff_recusado():
+    for operacao in ("ler_consentimento", "registrar_consentimento"):
+        assert politica.permitido("recepcao", operacao) is True
+        assert politica.permitido("gestor", operacao) is True
+        assert politica.permitido("staff", operacao) is False
 
 
 def test_confirmar_fase_da_reserva_continua_so_recepcao():

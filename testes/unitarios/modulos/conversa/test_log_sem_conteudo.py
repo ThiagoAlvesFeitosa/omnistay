@@ -777,3 +777,39 @@ def test_prazo_ausente_loga_hotel_sem_descricao(monkeypatch):
     assert "ar nao gela" not in texto
     assert "depois das" not in texto
 
+
+def test_confirmar_saida_loga_so_identificadores(monkeypatch):
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    from app.modulos.hospedagem import service as hospedagem
+
+    monkeypatch.setattr(hospedagem.logger, "info", fake_info)
+
+    class Repo:
+        def confirmar_saida(self, conexao, *, id_hotel, id_reserva):
+            from datetime import UTC, datetime
+
+            return {
+                "status": "encerrado",
+                "checkout_em": datetime(2026, 8, 20, tzinfo=UTC),
+            }
+
+        def ler_titular_da_reserva(self, conexao, *, id_hotel, id_reserva):
+            return {"nome_completo": "Marina Duarte"}
+
+    hospedagem.confirmar_saida(
+        object(),
+        id_hotel=3,
+        id_reserva=42,
+        repositorio=Repo(),
+        agendar_pesquisa_saida=lambda *a, **k: "agendada",
+    )
+    texto = " ".join(registros)
+    assert "saida_confirmada" in texto
+    assert "id_reserva=42" in texto
+    assert "Marina" not in texto
+    assert "Duarte" not in texto
+

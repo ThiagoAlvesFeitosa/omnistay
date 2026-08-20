@@ -93,6 +93,7 @@ def _semear_parametros_coleta(
         ("horas_corte_antes_checkin", "12"),
         ("horas_destaque_chamado_aberto", "2"),
         ("horas_minimas_para_pulso", "24"),
+        ("horas_atribuicao_pesquisa_saida", "24"),
     ):
         conexao.execute(
             text(

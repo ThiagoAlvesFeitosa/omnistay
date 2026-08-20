@@ -1,7 +1,7 @@
 """Regras de hospedagem: reserva, fila e contagem. Sem HTTP e sem SQL."""
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Protocol
 
 from app.comum.log import obter_logger
@@ -10,9 +10,11 @@ from app.modulos.conversa import service as conversa_service
 from app.modulos.hospedagem import repository as repositorio_padrao
 from app.modulos.hospedagem.schema import (
     ChegadaResposta,
+    ConsentimentoResposta,
     FichaTitularResposta,
     ItemFilaDoDia,
     ReservaResposta,
+    SaidaResposta,
 )
 
 logger = obter_logger(__name__)
@@ -30,6 +32,16 @@ class ChegadaNaoPermitida(Exception):
     def __init__(self, status_atual: str) -> None:
         self.status_atual = status_atual
         super().__init__(status_atual)
+
+
+class SaidaNaoPermitida(Exception):
+    def __init__(self, status_atual: str) -> None:
+        self.status_atual = status_atual
+        super().__init__(status_atual)
+
+
+class HospedeNaoEncontrado(Exception):
+    pass
 
 
 class RepositorioDeHospedagem(Protocol):
@@ -154,6 +166,10 @@ def listar_fila_do_dia(
             boas_vindas_nao_enviadas=bool(linha.get("boas_vindas_nao_enviadas")),
             precisa_atendimento_humano=bool(
                 linha.get("precisa_atendimento_humano")
+            ),
+            saida_nao_confirmada=bool(linha.get("saida_nao_confirmada")),
+            pesquisa_saida_leitura_humana=bool(
+                linha.get("pesquisa_saida_leitura_humana")
             ),
             status_envio_coleta=linha.get("status_envio_coleta"),
             estado_cadastro=linha.get("estado_cadastro"),
@@ -336,6 +352,54 @@ def confirmar_chegada(
     )
 
 
+def confirmar_saida(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    repositorio=repositorio_padrao,
+    agendar_pesquisa_saida=conversa_service.agendar_pesquisa_saida,
+) -> SaidaResposta:
+    atualizada = repositorio.confirmar_saida(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    if atualizada is None:
+        existente = repositorio.ler_reserva_do_hotel(
+            conexao, id_hotel=id_hotel, id_reserva=id_reserva
+        )
+        if existente is None:
+            raise ReservaNaoEncontrada
+        logger.info(
+            "saida_recusada id_reserva=%s id_hotel=%s status=%s",
+            id_reserva,
+            id_hotel,
+            existente["status"],
+        )
+        raise SaidaNaoPermitida(existente["status"])
+
+    titular = repositorio.ler_titular_da_reserva(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    nome = titular["nome_completo"] if titular else "hospede"
+    desfecho = agendar_pesquisa_saida(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        nome_completo=nome,
+    )
+    logger.info(
+        "saida_confirmada id_reserva=%s id_hotel=%s",
+        id_reserva,
+        id_hotel,
+    )
+    return SaidaResposta(
+        id_reserva=id_reserva,
+        status=atualizada["status"],
+        checkout_em=atualizada["checkout_em"],
+        pesquisa=desfecho,
+    )
+
+
 def listar_hospedados_sem_boas_vindas(
     conexao,
     repositorio=repositorio_padrao,
@@ -348,3 +412,117 @@ def listar_hospedados_sem_pulso(
     repositorio=repositorio_padrao,
 ) -> list[dict]:
     return repositorio.listar_hospedados_sem_pulso(conexao)
+
+
+FINALIDADE_MARKETING = "comunicacao_marketing"
+ORIGENS_PAINEL = frozenset({"painel", "solicitacao_titular"})
+
+
+def registrar_consentimento_pesquisa(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    concedido: bool | None,
+    repositorio=repositorio_padrao,
+) -> dict | None:
+    if concedido is None:
+        return None
+    id_hospede = repositorio.id_titular_da_reserva(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    if id_hospede is None:
+        logger.info(
+            "consentimento_pesquisa_sem_titular id_reserva=%s id_hotel=%s",
+            id_reserva,
+            id_hotel,
+        )
+        return None
+    gravado = repositorio.inserir_consentimento(
+        conexao,
+        id_hospede=id_hospede,
+        concedido=bool(concedido),
+        origem="pesquisa_checkout",
+    )
+    logger.info(
+        "consentimento_pesquisa_registrado id_hospede=%s id_reserva=%s"
+        " concedido=%s",
+        id_hospede,
+        id_reserva,
+        bool(concedido),
+    )
+    return gravado
+
+
+def consultar_consentimento_vigente(
+    conexao,
+    *,
+    id_hotel: int,
+    id_hospede: int,
+    em: datetime | None = None,
+    repositorio=repositorio_padrao,
+) -> ConsentimentoResposta:
+    if not repositorio.hospede_do_hotel(
+        conexao, id_hotel=id_hotel, id_hospede=id_hospede
+    ):
+        raise HospedeNaoEncontrado
+    instante = em or datetime.now(UTC)
+    if instante.tzinfo is None:
+        instante = instante.replace(tzinfo=UTC)
+    linha = repositorio.ler_consentimento_vigente(
+        conexao, id_hospede=id_hospede, em=instante
+    )
+    if linha is None:
+        return ConsentimentoResposta(
+            id_hospede=id_hospede,
+            finalidade=FINALIDADE_MARKETING,
+            concedido=False,
+            momento=None,
+            origem=None,
+            em=instante,
+        )
+    return ConsentimentoResposta(
+        id_hospede=id_hospede,
+        finalidade=linha["finalidade"],
+        concedido=bool(linha["concedido"]),
+        momento=linha["momento"],
+        origem=linha["origem"],
+        em=instante,
+    )
+
+
+def registrar_consentimento_painel(
+    conexao,
+    *,
+    id_hotel: int,
+    id_hospede: int,
+    concedido: bool,
+    origem: str,
+    repositorio=repositorio_padrao,
+) -> ConsentimentoResposta:
+    if origem not in ORIGENS_PAINEL:
+        raise DadosInvalidos("Origem de consentimento invalida.")
+    if not repositorio.hospede_do_hotel(
+        conexao, id_hotel=id_hotel, id_hospede=id_hospede
+    ):
+        raise HospedeNaoEncontrado
+    gravado = repositorio.inserir_consentimento(
+        conexao,
+        id_hospede=id_hospede,
+        concedido=concedido,
+        origem=origem,
+    )
+    logger.info(
+        "consentimento_painel_registrado id_hospede=%s origem=%s concedido=%s",
+        id_hospede,
+        origem,
+        concedido,
+    )
+    return ConsentimentoResposta(
+        id_hospede=id_hospede,
+        finalidade=gravado["finalidade"],
+        concedido=bool(gravado["concedido"]),
+        momento=gravado["momento"],
+        origem=gravado["origem"],
+        em=gravado["momento"],
+    )

@@ -1,6 +1,6 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 19/08/2026
+**Atualizado em:** 20/08/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
 
 ---
@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 17 de 24 fatias concluídas.
+**Progresso:** 18 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -30,7 +30,8 @@
 | F3.6 Resolver chamado e confirmar | ✅ Concluída — `POST /solicitacoes/{id}/resolucao` grava `resolvida` (autor + instante) e agenda `enviar_confirmacao_resolucao`; worker só envia; revisão `0014_resolver_chamado` |
 | F3.7 Consumo faturável e fila de lançamento | ✅ Concluída — fork em `registrar_pedido_servico`, tabela `item_vendavel`, `GET /consumos/pendentes`, POST lançamento/dispensa; resolver consumo não lança; revisão `0015_consumo_faturavel` |
 | F3.8 Pulso do segundo dia | ✅ Concluída — varredura em `worker/agendador.py` (sem APScheduler), módulo `feedback` escreve `avaliacao`, um recado por mensagem, neutro = positivo, só reclamação não resolvida suprime, `horas_minimas_para_pulso=24`; revisão `0016_pulso_segundo_dia` |
-| Demais 7 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F4.1** (confirmar saída e pesquisa). Não há F2.3 no backlog |
+| F4.1 Confirmar saída e pesquisa | ✅ Concluída — clique `POST /reservas/{id}/saida` reusa `confirmar_fase_da_reserva`, pesquisa curta sem classificar, consentimento append-only, visão mantém encerrada só com leitura humana, `horas_atribuicao_pesquisa_saida=24`; revisão `0017_confirmar_saida`. Lista de pedidos fica na F4.2 |
+| Demais 6 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F4.2** (lista de pedidos feitos pelo chat). Não há F2.3 nem F3.9 no backlog |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -136,6 +137,11 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Módulo `feedback` | Primeiro escritor de `avaliacao` (`origem=pulso_segundo_dia`, nota nula). Sem HTTP. Sem import de `conversa` | F3.8 |
 | Um recado por mensagem | Dúvida, pedido ou reclamação na janela do pulso correm F3.3–F3.5; o pulso fecha em silêncio. Neutro usa o mesmo reconhecimento do positivo, sem afirmar satisfação | F3.8 |
 | Só reclamação suprime | Serviço, consumo e `precisa_atendimento_humano` não bloqueiam o pulso. `horas_minimas_para_pulso=24` no bootstrap e na `0016`; ausência loga `prazo_ausente` | F3.8 |
+| Clique de saída | Reusa `confirmar_fase_da_reserva` (só recepção). `hospedado` → `encerrado` com `checkout_em = now()`. Chamado aberto e consumo pendente não bloqueiam. Segundo clique `409` | F4.1 |
+| Pesquisa sem classificar | Trabalho `interpretar_pesquisa_saida` (unicidade por mensagem). Encerrada não gera `classificar_mensagem`. Sem recado de agradecimento, sem lista de pedidos | F4.1 |
+| Consentimento append-only | Primeiro escritor: worker `origem=pesquisa_checkout`. Painel só `painel` / `solicitacao_titular`. Silêncio e nota alta não consentem. GET vigente em `em` | F4.1 |
+| Visão após checkout | Encerrada limpa continua fora (F1.1). Encerrada com `pesquisa_saida_leitura_humana` permanece. `saida_nao_confirmada` = hospedado com checkout previsto anterior a hoje | F4.1 |
+| Prazo da resposta | `horas_atribuicao_pesquisa_saida=24` no bootstrap e na `0017`, eixo `checkout_em`. Ausência loga `prazo_ausente` e sinaliza humano; não inventa 24. Janela vencida conclui sem humano | F4.1 |
 
 ## Onde ficam os arquivos
 
@@ -362,7 +368,7 @@ Ainda abertas:
 - [ ] Confirmar a lista oficial vigente de campos exigidos por lei para registro de hóspede
 - [ ] Testar colagem no PMS real
 - [ ] Confirmar junto à Meta a categoria do template de pulso do segundo dia
-- [ ] Redigir a pergunta de opt-in da pesquisa de checkout
+- [x] Redigir a pergunta de opt-in da pesquisa de checkout
 - [ ] Reconferir as camadas gratuitas, se a hospedagem for retomada
 - [ ] Validar as personas com um recepcionista real, se houver acesso durante o projeto
 - [ ] Material do MVP de usuário, ainda não enviado

@@ -17,6 +17,8 @@ TIPO_ABRIR_CHAMADO_RECLAMACAO = "abrir_chamado_reclamacao"
 TIPO_ENVIAR_CONFIRMACAO_RESOLUCAO = "enviar_confirmacao_resolucao"
 TIPO_ENVIAR_PULSO = "enviar_pulso"
 TIPO_REGISTRAR_RESPOSTA_PULSO = "registrar_resposta_pulso"
+TIPO_ENVIAR_PESQUISA_SAIDA = "enviar_pesquisa_saida"
+TIPO_INTERPRETAR_PESQUISA_SAIDA = "interpretar_pesquisa_saida"
 TIPOS_CONSUMIVEIS = (
     TIPO_ENVIAR_COLETA,
     TIPO_INTERPRETAR_FICHA,
@@ -29,6 +31,8 @@ TIPOS_CONSUMIVEIS = (
     TIPO_ENVIAR_CONFIRMACAO_RESOLUCAO,
     TIPO_ENVIAR_PULSO,
     TIPO_REGISTRAR_RESPOSTA_PULSO,
+    TIPO_ENVIAR_PESQUISA_SAIDA,
+    TIPO_INTERPRETAR_PESQUISA_SAIDA,
 )
 BLOQUEIO_PROCESSANDO = timedelta(minutes=5)
 
@@ -296,6 +300,50 @@ def enfileirar_registrar_resposta_pulso(
     ).scalar_one()
 
 
+def enfileirar_enviar_pesquisa_saida(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+) -> int:
+    payload = json.dumps({"id_reserva": id_reserva, "id_mensagem": id_mensagem})
+    return conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, :tipo, CAST(:payload AS jsonb), 'pendente') "
+            "RETURNING id_trabalho"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "tipo": TIPO_ENVIAR_PESQUISA_SAIDA,
+            "payload": payload,
+        },
+    ).scalar_one()
+
+
+def enfileirar_interpretar_pesquisa_saida(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+) -> int:
+    payload = json.dumps({"id_reserva": id_reserva, "id_mensagem": id_mensagem})
+    return conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, :tipo, CAST(:payload AS jsonb), 'pendente') "
+            "RETURNING id_trabalho"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "tipo": TIPO_INTERPRETAR_PESQUISA_SAIDA,
+            "payload": payload,
+        },
+    ).scalar_one()
+
+
 def reclaim_expirados(
     conexao: Connection,
     *,
@@ -334,7 +382,8 @@ def reclamar_proximo(
             " 'enviar_lembrete', 'enviar_boas_vindas', 'classificar_mensagem',"
             " 'responder_duvida', 'registrar_pedido_servico',"
             " 'abrir_chamado_reclamacao', 'enviar_confirmacao_resolucao',"
-            " 'enviar_pulso', 'registrar_resposta_pulso')"
+            " 'enviar_pulso', 'registrar_resposta_pulso',"
+            " 'enviar_pesquisa_saida', 'interpretar_pesquisa_saida')"
             " AND (proxima_tentativa_em IS NULL OR proxima_tentativa_em <= :agora)"
             " ORDER BY id_trabalho ASC"
             " FOR UPDATE SKIP LOCKED"

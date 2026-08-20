@@ -126,6 +126,28 @@ class MensageriaFalsa:
             id_reserva=id_reserva,
         )
 
+    def enviar_pesquisa_saida(
+        self,
+        *,
+        telefone_destino: str,
+        primeiro_nome: str,
+        corpo: str,
+        id_mensagem: int,
+        id_reserva: int,
+    ) -> ResultadoEnvio:
+        if self.falhar_sempre or self.falhas_restantes > 0:
+            if self.falhas_restantes > 0:
+                self.falhas_restantes -= 1
+            raise FalhaDeEnvio("mensageria_indisponivel")
+        return self._registrar(
+            tipo="pesquisa_saida",
+            telefone_destino=telefone_destino,
+            primeiro_nome=primeiro_nome,
+            corpo=corpo,
+            id_mensagem=id_mensagem,
+            id_reserva=id_reserva,
+        )
+
     def _registrar(
         self,
         *,
