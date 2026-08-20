@@ -108,6 +108,35 @@ def hotel_da_reserva(conexao: Connection, *, id_reserva: int) -> int | None:
     ).scalar_one_or_none()
 
 
+def tem_reclamacao_aberta(conexao: Connection, *, id_reserva: int) -> bool:
+    return bool(
+        conexao.execute(
+            text(
+                "SELECT 1 FROM solicitacao"
+                " WHERE id_reserva = :id"
+                " AND tipo = 'reclamacao'"
+                " AND status IN ('aberta', 'em_andamento')"
+                " LIMIT 1"
+            ),
+            {"id": id_reserva},
+        ).scalar()
+    )
+
+
+def tem_reclamacao_da_mensagem(conexao: Connection, *, id_mensagem: int) -> bool:
+    return bool(
+        conexao.execute(
+            text(
+                "SELECT 1 FROM solicitacao"
+                " WHERE id_mensagem_origem = :id"
+                " AND tipo = 'reclamacao'"
+                " LIMIT 1"
+            ),
+            {"id": id_mensagem},
+        ).scalar()
+    )
+
+
 def listar_abertas(conexao: Connection, *, id_hotel: int) -> list[dict]:
     linhas = conexao.execute(
         text(

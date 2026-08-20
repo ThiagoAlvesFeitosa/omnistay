@@ -333,7 +333,8 @@ CREATE TABLE trabalho (
         tipo IN ('enviar_coleta', 'interpretar_ficha', 'enviar_lembrete',
                  'enviar_boas_vindas', 'classificar_mensagem',
                  'responder_duvida', 'registrar_pedido_servico',
-                 'abrir_chamado_reclamacao', 'enviar_confirmacao_resolucao')
+                 'abrir_chamado_reclamacao', 'enviar_confirmacao_resolucao',
+                 'enviar_pulso', 'registrar_resposta_pulso')
     ),
     CONSTRAINT ck_trabalho_status CHECK (
         status IN ('pendente', 'processando', 'concluido', 'falha')
@@ -379,6 +380,14 @@ CREATE UNIQUE INDEX uq_trabalho_abrir_chamado_reclamacao_mensagem
 CREATE UNIQUE INDEX uq_trabalho_enviar_confirmacao_resolucao_solicitacao
     ON trabalho ( ((payload->>'id_solicitacao')::bigint) )
     WHERE tipo = 'enviar_confirmacao_resolucao';
+
+CREATE UNIQUE INDEX uq_trabalho_enviar_pulso_reserva
+    ON trabalho ( ((payload->>'id_reserva')::bigint) )
+    WHERE tipo = 'enviar_pulso';
+
+CREATE UNIQUE INDEX uq_trabalho_registrar_resposta_pulso_mensagem
+    ON trabalho ( ((payload->>'id_mensagem')::bigint) )
+    WHERE tipo = 'registrar_resposta_pulso';
 
 CREATE INDEX ix_trabalho_claim
     ON trabalho (status, proxima_tentativa_em)

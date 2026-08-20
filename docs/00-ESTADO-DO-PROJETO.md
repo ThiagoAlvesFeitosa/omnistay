@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 16 de 24 fatias concluídas.
+**Progresso:** 17 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -29,7 +29,8 @@
 | F3.5 Abrir chamado de reclamação | ✅ Concluída — worker consome `abrir_chamado_reclamacao`, confirmação antes da `solicitacao` tipo `reclamacao` (sem `consumo`), janela + destaque no `GET /solicitacoes`, revisão `0013_abrir_chamado_reclamacao` |
 | F3.6 Resolver chamado e confirmar | ✅ Concluída — `POST /solicitacoes/{id}/resolucao` grava `resolvida` (autor + instante) e agenda `enviar_confirmacao_resolucao`; worker só envia; revisão `0014_resolver_chamado` |
 | F3.7 Consumo faturável e fila de lançamento | ✅ Concluída — fork em `registrar_pedido_servico`, tabela `item_vendavel`, `GET /consumos/pendentes`, POST lançamento/dispensa; resolver consumo não lança; revisão `0015_consumo_faturavel` |
-| Demais 8 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F3.8** (pulso do segundo dia). Não há F2.3 no backlog |
+| F3.8 Pulso do segundo dia | ✅ Concluída — varredura em `worker/agendador.py` (sem APScheduler), módulo `feedback` escreve `avaliacao`, um recado por mensagem, neutro = positivo, só reclamação não resolvida suprime, `horas_minimas_para_pulso=24`; revisão `0016_pulso_segundo_dia` |
+| Demais 7 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F4.1** (confirmar saída e pesquisa). Não há F2.3 no backlog |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -131,6 +132,10 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Preço fora do prompt | Porta recebe `(id, nome)`; `valor_praticado = preco_atual * quantidade` lido no banco na mesma TX da confirmação | F3.7 |
 | Fila de lançamento | `GET /consumos/pendentes` (`ler_solicitacao_atribuida`). Inclui consumo já resolvido no quarto. Toalha não entra | F3.7 |
 | Clique financeiro | `POST .../lancamento` e `.../dispensa` (`lancar_consumo`, só recepção). Sem recado ao hóspede. Resolver o quarto não altera `status_lancamento` | F3.7 |
+| Agendador de pulso | Sem APScheduler. `verificar_pulsos_pendentes` no `worker/agendador.py`; `--verificar-pulsos`; o loop horário chama depois de cadastros e boas-vindas. `--uma-passagem` não varre | F3.8 |
+| Módulo `feedback` | Primeiro escritor de `avaliacao` (`origem=pulso_segundo_dia`, nota nula). Sem HTTP. Sem import de `conversa` | F3.8 |
+| Um recado por mensagem | Dúvida, pedido ou reclamação na janela do pulso correm F3.3–F3.5; o pulso fecha em silêncio. Neutro usa o mesmo reconhecimento do positivo, sem afirmar satisfação | F3.8 |
+| Só reclamação suprime | Serviço, consumo e `precisa_atendimento_humano` não bloqueiam o pulso. `horas_minimas_para_pulso=24` no bootstrap e na `0016`; ausência loga `prazo_ausente` | F3.8 |
 
 ## Onde ficam os arquivos
 
@@ -327,6 +332,12 @@ Lacunas encontradas no backlog (agosto/2026) — nenhuma tem fatia dedicada:
       amplifica a consequência
 
 Ainda abertas:
+
+- [ ] **Documento de entrega desatualizado.** `Entrega_de_Projeto_OmniStay_v2.docx` é de
+      06/08 e os slides de 11/08 — anteriores a toda a implementação. Dezenas de decisões
+      mudaram o projeto desde então (recado de boas-vindas encurtado por limite da Meta,
+      divisão de poderes gestão x recepção, quatro revisões de esquema). Comparar com o estado
+      atual e atualizar antes da entrega final
 
 - [ ] **Sem limite de tentativas no login (F0.3).** Cada tentativa custa ~0,4 s de CPU pelas
       600 mil iterações — bom contra força bruta, barato como negação de serviço. Aceitável hoje

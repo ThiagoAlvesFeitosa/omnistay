@@ -251,7 +251,7 @@ def ler_reserva_do_hotel(
     linha = conexao.execute(
         text(
             "SELECT id_reserva, id_hotel, status, checkin_em,"
-            " data_checkin_prevista, telefone_contato"
+            " data_checkin_prevista, data_checkout_prevista, telefone_contato"
             " FROM reserva"
             " WHERE id_reserva = :id AND id_hotel = :id_hotel"
         ),
@@ -283,7 +283,8 @@ def confirmar_chegada(
 def listar_hospedados_sem_boas_vindas(conexao: Connection) -> list[dict]:
     linhas = conexao.execute(
         text(
-            "SELECT r.id_reserva, r.id_hotel, r.checkin_em, h.nome_completo"
+            "SELECT r.id_reserva, r.id_hotel, r.checkin_em,"
+            " r.data_checkout_prevista, h.nome_completo"
             " FROM reserva r"
             " JOIN reserva_hospede rh"
             "   ON rh.id_reserva = r.id_reserva AND rh.titular"
@@ -293,6 +294,28 @@ def listar_hospedados_sem_boas_vindas(conexao: Connection) -> list[dict]:
             " AND NOT EXISTS ("
             "   SELECT 1 FROM trabalho t"
             "    WHERE t.tipo = 'enviar_boas_vindas'"
+            "      AND (t.payload->>'id_reserva')::bigint = r.id_reserva"
+            " )"
+            " ORDER BY r.id_reserva ASC"
+        )
+    ).mappings().all()
+    return [dict(linha) for linha in linhas]
+
+
+def listar_hospedados_sem_pulso(conexao: Connection) -> list[dict]:
+    linhas = conexao.execute(
+        text(
+            "SELECT r.id_reserva, r.id_hotel, r.checkin_em,"
+            " r.data_checkout_prevista, h.nome_completo"
+            " FROM reserva r"
+            " JOIN reserva_hospede rh"
+            "   ON rh.id_reserva = r.id_reserva AND rh.titular"
+            " JOIN hospede h ON h.id_hospede = rh.id_hospede"
+            " WHERE r.status = 'hospedado'"
+            " AND r.checkin_em IS NOT NULL"
+            " AND NOT EXISTS ("
+            "   SELECT 1 FROM trabalho t"
+            "    WHERE t.tipo = 'enviar_pulso'"
             "      AND (t.payload->>'id_reserva')::bigint = r.id_reserva"
             " )"
             " ORDER BY r.id_reserva ASC"

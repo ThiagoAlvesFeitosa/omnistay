@@ -247,6 +247,114 @@ def test_tipo_enviar_boas_vindas_e_aceito_pelo_check(conexao):
     assert tipo == "enviar_boas_vindas"
 
 
+def _inserir_trabalho_enviar_pulso(conexao, id_hotel: int, id_reserva: int) -> None:
+    conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, 'enviar_pulso',"
+            " CAST(:payload AS jsonb), 'pendente')"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "payload": '{"id_reserva": %s, "id_mensagem": 1}' % id_reserva,
+        },
+    )
+
+
+def _inserir_trabalho_registrar_resposta_pulso(
+    conexao, id_hotel: int, id_reserva: int, id_mensagem: int = 1
+) -> None:
+    conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, 'registrar_resposta_pulso',"
+            " CAST(:payload AS jsonb), 'pendente')"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "payload": (
+                '{"id_reserva": %s, "id_mensagem": %s}'
+                % (id_reserva, id_mensagem)
+            ),
+        },
+    )
+
+
+def _inserir_avaliacao_pulso(conexao, id_reserva: int) -> None:
+    conexao.execute(
+        text(
+            "INSERT INTO avaliacao (id_reserva, origem, comentario) "
+            "VALUES (:id_reserva, 'pulso_segundo_dia', 'ok')"
+        ),
+        {"id_reserva": id_reserva},
+    )
+
+
+@pytest.mark.postgres
+def test_tipo_enviar_pulso_e_aceito_pelo_check(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+
+    _inserir_trabalho_enviar_pulso(conexao, id_hotel, id_reserva)
+
+    tipo = conexao.execute(
+        text("SELECT tipo FROM trabalho WHERE tipo = 'enviar_pulso'")
+    ).scalar_one()
+    assert tipo == "enviar_pulso"
+
+
+@pytest.mark.postgres
+def test_segundo_trabalho_de_pulso_da_mesma_reserva_e_recusado(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    _inserir_trabalho_enviar_pulso(conexao, id_hotel, id_reserva)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_trabalho_enviar_pulso(conexao, id_hotel, id_reserva)
+
+    assert "uq_trabalho_enviar_pulso_reserva" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_tipo_registrar_resposta_pulso_e_aceito_pelo_check(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+
+    _inserir_trabalho_registrar_resposta_pulso(conexao, id_hotel, id_reserva)
+
+    tipo = conexao.execute(
+        text("SELECT tipo FROM trabalho WHERE tipo = 'registrar_resposta_pulso'")
+    ).scalar_one()
+    assert tipo == "registrar_resposta_pulso"
+
+
+@pytest.mark.postgres
+def test_segunda_resposta_de_pulso_da_mesma_mensagem_e_recusada(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    _inserir_trabalho_registrar_resposta_pulso(
+        conexao, id_hotel, id_reserva, id_mensagem=7
+    )
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_trabalho_registrar_resposta_pulso(
+            conexao, id_hotel, id_reserva, id_mensagem=7
+        )
+
+    assert "uq_trabalho_registrar_resposta_pulso_mensagem" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_segunda_avaliacao_de_pulso_da_mesma_reserva_e_recusada(conexao):
+    id_reserva = criar_reserva(conexao, criar_hotel(conexao))
+    _inserir_avaliacao_pulso(conexao, id_reserva)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_avaliacao_pulso(conexao, id_reserva)
+
+    assert "uq_avaliacao_reserva_origem" in str(erro.value)
+
+
 @pytest.mark.postgres
 def test_segundo_trabalho_de_boas_vindas_da_mesma_reserva_e_recusado(conexao):
     id_hotel = criar_hotel(conexao)

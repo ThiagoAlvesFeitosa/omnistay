@@ -94,6 +94,17 @@ def processar_uma_passagem(
             conversa_service.processar_trabalho_enviar_confirmacao_resolucao(
                 conexao, trabalho=trabalho, gateway=gateway
             )
+        elif trabalho["tipo"] == "enviar_pulso":
+            conversa_service.processar_trabalho_enviar_pulso(
+                conexao, trabalho=trabalho, gateway=gateway
+            )
+        elif trabalho["tipo"] == "registrar_resposta_pulso":
+            conversa_service.processar_trabalho_registrar_resposta_pulso(
+                conexao,
+                trabalho=trabalho,
+                gateway=gateway,
+                abrir_reclamacao=atendimento_service.abrir_reclamacao,
+            )
         else:
             fila_repository.marcar_falha(
                 conexao,

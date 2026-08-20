@@ -12,8 +12,13 @@ from app.modulos.conversa import repository as repositorio_padrao
 from app.modulos.conversa.classificacao import desfecho_de, validar_classificacao
 from app.modulos.conversa.schema import EventoEntrada
 from app.modulos.conversa.texto_boas_vindas import montar_texto_boas_vindas
-from app.modulos.conversa.texto_coleta import montar_texto_coleta
+from app.modulos.conversa.texto_coleta import montar_texto_coleta, primeiro_nome
 from app.modulos.conversa.texto_lembrete import montar_texto_lembrete
+from app.modulos.conversa.texto_pulso import (
+    montar_confirmacao_pulso_negativo,
+    montar_pergunta_pulso,
+    montar_reconhecimento_pulso,
+)
 from app.modulos.conversa.validacao_ficha import refinar_resultado
 from app.modulos.propriedade import repository as propriedade_repository
 from app.modulos.propriedade import service as propriedade_service
@@ -170,6 +175,43 @@ def agendar_boas_vindas(
         return "ja_agendada"
     logger.info(
         "boas_vindas_agendadas id_reserva=%s id_mensagem=%s id_hotel=%s",
+        id_reserva,
+        id_mensagem,
+        id_hotel,
+    )
+    return "agendada"
+
+
+def agendar_pulso(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    nome_completo: str,
+    repositorio=repositorio_padrao,
+    enfileirar=fila_service.enfileirar_enviar_pulso,
+) -> str:
+    texto = montar_pergunta_pulso(nome_completo=nome_completo)
+    try:
+        with _savepoint(conexao):
+            id_mensagem = repositorio.inserir_mensagem_enviada_pendente(
+                conexao, id_reserva=id_reserva, conteudo=texto
+            )
+            enfileirar(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=id_reserva,
+                id_mensagem=id_mensagem,
+            )
+    except IntegrityError:
+        logger.info(
+            "pulso_ja_agendado id_reserva=%s id_hotel=%s",
+            id_reserva,
+            id_hotel,
+        )
+        return "ja_agendado"
+    logger.info(
+        "pulso_agendado id_reserva=%s id_mensagem=%s id_hotel=%s",
         id_reserva,
         id_mensagem,
         id_hotel,
@@ -719,6 +761,7 @@ def processar_trabalho_classificar_mensagem(
     enfileirar_resposta=None,
     enfileirar_pedido=None,
     enfileirar_chamado=None,
+    enfileirar_pulso=None,
     completar_janela=None,
 ) -> None:
     """Classifica mensagem de estadia. Sem envio, sem INSERT de solicitacao."""
@@ -731,6 +774,8 @@ def processar_trabalho_classificar_mensagem(
         enfileirar_pedido = fila_svc.enfileirar_registrar_pedido_servico
     if enfileirar_chamado is None:
         enfileirar_chamado = fila_svc.enfileirar_abrir_chamado_reclamacao
+    if enfileirar_pulso is None:
+        enfileirar_pulso = fila_svc.enfileirar_registrar_resposta_pulso
 
     id_trabalho = trabalho["id_trabalho"]
     id_hotel = trabalho["id_hotel"]
@@ -818,6 +863,25 @@ def processar_trabalho_classificar_mensagem(
                 id_mensagem=id_mensagem,
                 enfileirar=enfileirar_chamado,
             )
+        intencao_existente = existente.get("intencao") or (
+            (mensagem or {}).get("intencao")
+        )
+        if (
+            pulso_aguardando_resposta(
+                conexao, id_reserva=id_reserva, repositorio=repositorio
+            )
+            and intencao_existente
+            not in ("duvida_geral", "pedido_de_servico", "reclamacao_tecnica")
+            and existente.get("resposta")
+            not in ("reconhecimento_pulso", "confirmacao_pulso_negativo")
+        ):
+            _enfileirar_resposta_pulso(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=id_reserva,
+                id_mensagem=id_mensagem,
+                enfileirar=enfileirar_pulso,
+            )
         fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
         logger.info(
             "classificacao_ja_concluida id_trabalho=%s id_mensagem=%s",
@@ -848,6 +912,12 @@ def processar_trabalho_classificar_mensagem(
             id_trabalho,
             id_hotel,
         )
+        _encerrar_pulso_se_aguardando(
+            conexao,
+            id_reserva=id_reserva,
+            comentario=(mensagem or {}).get("conteudo"),
+            repositorio=repositorio,
+        )
         return
 
     try:
@@ -874,6 +944,12 @@ def processar_trabalho_classificar_mensagem(
             id_hotel,
             erro.codigo,
         )
+        _encerrar_pulso_se_aguardando(
+            conexao,
+            id_reserva=id_reserva,
+            comentario=mensagem.get("conteudo"),
+            repositorio=repositorio,
+        )
         return
 
     valida = validar_classificacao(resultado)
@@ -898,6 +974,12 @@ def processar_trabalho_classificar_mensagem(
             id_mensagem,
             id_trabalho,
             id_hotel,
+        )
+        _encerrar_pulso_se_aguardando(
+            conexao,
+            id_reserva=id_reserva,
+            comentario=mensagem.get("conteudo") if mensagem else None,
+            repositorio=repositorio,
         )
         return
 
@@ -941,6 +1023,16 @@ def processar_trabalho_classificar_mensagem(
             id_reserva=id_reserva,
             id_mensagem=id_mensagem,
             enfileirar=enfileirar_chamado,
+        )
+    elif pulso_aguardando_resposta(
+        conexao, id_reserva=id_reserva, repositorio=repositorio
+    ):
+        _enfileirar_resposta_pulso(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            id_mensagem=id_mensagem,
+            enfileirar=enfileirar_pulso,
         )
     fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
     logger.info(
@@ -1026,6 +1118,112 @@ def _enfileirar_chamado_reclamacao(
         )
 
 
+def _enfileirar_resposta_pulso(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    enfileirar,
+) -> None:
+    try:
+        with _savepoint(conexao):
+            enfileirar(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=id_reserva,
+                id_mensagem=id_mensagem,
+            )
+    except IntegrityError:
+        logger.info(
+            "registrar_resposta_pulso_ja_enfileirado id_mensagem=%s id_hotel=%s",
+            id_mensagem,
+            id_hotel,
+        )
+
+
+def pulso_aguardando_resposta(
+    conexao: Connection,
+    *,
+    id_reserva: int,
+    repositorio=repositorio_padrao,
+) -> bool:
+    ler = getattr(repositorio, "pulso_foi_enviado", None)
+    if ler is None:
+        return False
+    if not ler(conexao, id_reserva=id_reserva):
+        return False
+    from app.modulos.feedback import service as feedback
+
+    return not feedback.tem_avaliacao_de_pulso(conexao, id_reserva=id_reserva)
+
+
+def _encerrar_pulso_se_aguardando(
+    conexao,
+    *,
+    id_reserva: int,
+    comentario: str | None,
+    repositorio,
+) -> None:
+    if not pulso_aguardando_resposta(
+        conexao, id_reserva=id_reserva, repositorio=repositorio
+    ):
+        return
+    from app.modulos.feedback import service as feedback
+
+    feedback.encerrar_pulso(
+        conexao, id_reserva=id_reserva, comentario=comentario
+    )
+
+
+def _fechar_pulso_apos_operacional(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    repositorio,
+) -> None:
+    if not pulso_aguardando_resposta(
+        conexao, id_reserva=id_reserva, repositorio=repositorio
+    ):
+        return
+    from app.modulos.atendimento import service as atendimento
+    from app.modulos.feedback import service as feedback
+
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem) or {}
+    feedback.encerrar_pulso_em_silencio(
+        conexao,
+        id_reserva=id_reserva,
+        comentario=mensagem.get("conteudo"),
+    )
+    if mensagem.get("sentimento") != "negativo":
+        return
+    if atendimento.tem_reclamacao_da_mensagem(
+        conexao, id_mensagem=id_mensagem
+    ):
+        return
+    atendimento.abrir_reclamacao(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_mensagem=id_mensagem,
+        descricao=mensagem.get("conteudo") or "",
+        numero_quarto=None,
+        urgencia=mensagem.get("urgencia"),
+        janela_preferencia=None,
+    )
+
+
+TIPOS_OPERACIONAIS_FECHAM_PULSO = frozenset(
+    {
+        "responder_duvida",
+        "registrar_pedido_servico",
+        "abrir_chamado_reclamacao",
+    }
+)
+
+
 def processar_trabalho_responder_duvida(
     conexao: Connection,
     *,
@@ -1073,6 +1271,13 @@ def processar_trabalho_responder_duvida(
             id_mensagem,
             id_hotel,
             existente.get("resposta"),
+        )
+        _fechar_pulso_apos_operacional(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            id_mensagem=id_mensagem,
+            repositorio=repositorio,
         )
         return
 
@@ -1186,6 +1391,17 @@ def _enviar_resposta_sessao(
 
     id_trabalho = trabalho["id_trabalho"]
     id_hotel = trabalho["id_hotel"]
+    payload = trabalho.get("payload") or {}
+    if trabalho.get("tipo") in TIPOS_OPERACIONAIS_FECHAM_PULSO:
+        origem = payload.get("id_mensagem")
+        if origem is not None:
+            _fechar_pulso_apos_operacional(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=id_reserva,
+                id_mensagem=int(origem),
+                repositorio=repositorio,
+            )
     telefone = repositorio.ler_telefone_da_reserva(conexao, id_reserva=id_reserva)
     if not telefone:
         fila_repo.marcar_falha(
@@ -1411,6 +1627,13 @@ def processar_trabalho_registrar_pedido(
             id_hotel,
             existente.get("id_solicitacao"),
             resultado,
+        )
+        _fechar_pulso_apos_operacional(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            id_mensagem=id_mensagem,
+            repositorio=repositorio,
         )
         return
 
@@ -1658,6 +1881,13 @@ def processar_trabalho_abrir_chamado(
             id_hotel,
             existente.get("id_solicitacao"),
         )
+        _fechar_pulso_apos_operacional(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            id_mensagem=id_mensagem,
+            repositorio=repositorio,
+        )
         return
 
     descricao = (mensagem or {}).get("conteudo") or ""
@@ -1699,6 +1929,256 @@ def processar_trabalho_abrir_chamado(
         id_reserva,
         id_hotel,
         id_solicitacao,
+    )
+    _enviar_resposta_sessao(
+        conexao,
+        trabalho=trabalho,
+        gateway=gateway,
+        repositorio=repositorio,
+        id_enviada=id_enviada,
+        corpo=corpo,
+        id_reserva=id_reserva,
+    )
+
+
+def _ainda_elegivel_para_envio_pulso(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    repositorio_propriedade=propriedade_repository,
+) -> bool:
+    from datetime import UTC, datetime
+
+    from app.modulos.atendimento import service as atendimento
+    from app.modulos.feedback import service as feedback
+    from app.modulos.hospedagem import repository as hospedagem_repo
+    from worker.agendador import (
+        CHAVE_MINIMO_PULSO,
+        _inteiro_positivo,
+        horas_restantes_de_estadia,
+    )
+
+    reserva = hospedagem_repo.ler_reserva_do_hotel(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    if reserva is None or reserva.get("status") != "hospedado":
+        return False
+    if feedback.tem_avaliacao_de_pulso(conexao, id_reserva=id_reserva):
+        return False
+    if atendimento.tem_reclamacao_aberta(conexao, id_reserva=id_reserva):
+        return False
+    minimo = _inteiro_positivo(
+        repositorio_propriedade.ler_parametro(
+            conexao, id_hotel, CHAVE_MINIMO_PULSO
+        )
+    )
+    if minimo is None:
+        return False
+    checkout = reserva.get("data_checkout_prevista")
+    if checkout is None:
+        return False
+    restante = horas_restantes_de_estadia(checkout, datetime.now(UTC).date())
+    return restante >= minimo
+
+
+def processar_trabalho_enviar_pulso(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    gateway: MensageriaGateway,
+    repositorio=repositorio_padrao,
+    repositorio_propriedade=propriedade_repository,
+) -> None:
+    from app.fila import repository as fila_repo
+    from app.fila import service as fila_svc
+
+    id_trabalho = trabalho["id_trabalho"]
+    id_hotel = trabalho["id_hotel"]
+    payload = trabalho["payload"]
+    id_mensagem = int(payload["id_mensagem"])
+    id_reserva = int(payload["id_reserva"])
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    if mensagem is None:
+        fila_repo.marcar_falha(
+            conexao,
+            id_trabalho=id_trabalho,
+            tentativas=(trabalho.get("tentativas") or 0) + 1,
+            erro="mensagem_ausente",
+        )
+        return
+    if mensagem.get("status_envio") == "enviada":
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        return
+    if not _ainda_elegivel_para_envio_pulso(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        repositorio_propriedade=repositorio_propriedade,
+    ):
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        logger.info(
+            "pulso_suprimido_na_janela id_trabalho=%s id_reserva=%s id_hotel=%s",
+            id_trabalho,
+            id_reserva,
+            id_hotel,
+        )
+        return
+    telefone = repositorio.ler_telefone_da_reserva(
+        conexao, id_reserva=id_reserva
+    )
+    if not telefone:
+        fila_repo.marcar_falha(
+            conexao,
+            id_trabalho=id_trabalho,
+            tentativas=(trabalho.get("tentativas") or 0) + 1,
+            erro="telefone_ausente",
+        )
+        marcar_envio_falha(
+            conexao, id_mensagem=id_mensagem, repositorio=repositorio
+        )
+        return
+    nome = "hospede"
+    ler_nome = getattr(repositorio, "ler_nome_titular", None)
+    if ler_nome is not None:
+        nome = ler_nome(conexao, id_reserva=id_reserva) or "hospede"
+    try:
+        prenome = primeiro_nome(nome)
+    except ValueError:
+        prenome = "hospede"
+    try:
+        resultado = gateway.enviar_pulso(
+            telefone_destino=telefone,
+            primeiro_nome=prenome,
+            corpo=mensagem["conteudo"],
+            id_mensagem=id_mensagem,
+            id_reserva=id_reserva,
+        )
+    except FalhaDeEnvio as erro:
+        destino = fila_svc.registrar_falha_de_envio(
+            conexao,
+            id_trabalho=id_trabalho,
+            id_hotel=id_hotel,
+            tentativas_atuais=trabalho.get("tentativas") or 0,
+            codigo_erro=erro.codigo,
+        )
+        if destino == "falha":
+            marcar_envio_falha(
+                conexao, id_mensagem=id_mensagem, repositorio=repositorio
+            )
+        logger.info(
+            "envio_tentativa_falhou id_trabalho=%s tipo=enviar_pulso"
+            " destino=%s codigo=%s",
+            id_trabalho,
+            destino,
+            erro.codigo,
+        )
+        return
+    marcar_envio_sucesso(
+        conexao,
+        id_mensagem=id_mensagem,
+        id_externo=resultado.id_externo,
+        repositorio=repositorio,
+    )
+    fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+    logger.info(
+        "pulso_enviado id_trabalho=%s id_mensagem=%s id_reserva=%s id_hotel=%s",
+        id_trabalho,
+        id_mensagem,
+        id_reserva,
+        id_hotel,
+    )
+
+
+def processar_trabalho_registrar_resposta_pulso(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    gateway: MensageriaGateway,
+    abrir_reclamacao,
+    repositorio=repositorio_padrao,
+) -> None:
+    from app.fila import repository as fila_repo
+    from app.modulos.feedback import service as feedback
+
+    id_trabalho = trabalho["id_trabalho"]
+    id_hotel = trabalho["id_hotel"]
+    payload = trabalho["payload"]
+    id_mensagem = int(payload["id_mensagem"])
+    id_reserva = int(payload["id_reserva"])
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    existente = _json_classificacao(
+        mensagem.get("classificacao_bruta") if mensagem else None
+    )
+    if (
+        existente
+        and existente.get("resposta")
+        in ("reconhecimento_pulso", "confirmacao_pulso_negativo")
+        and existente.get("id_mensagem_resposta")
+    ):
+        id_enviada = int(existente["id_mensagem_resposta"])
+        enviada = repositorio.ler_mensagem(conexao, id_mensagem=id_enviada)
+        if enviada and enviada.get("status_envio") == "pendente":
+            _enviar_resposta_sessao(
+                conexao,
+                trabalho=trabalho,
+                gateway=gateway,
+                repositorio=repositorio,
+                id_enviada=id_enviada,
+                corpo=enviada["conteudo"],
+                id_reserva=id_reserva,
+            )
+            return
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        return
+
+    sentimento = (mensagem or {}).get("sentimento")
+    if sentimento == "negativo":
+        corpo = montar_confirmacao_pulso_negativo()
+        chave_resposta = "confirmacao_pulso_negativo"
+    else:
+        corpo = montar_reconhecimento_pulso()
+        chave_resposta = "reconhecimento_pulso"
+
+    id_enviada = repositorio.inserir_mensagem_enviada_pendente(
+        conexao, id_reserva=id_reserva, conteudo=corpo
+    )
+    id_avaliacao = feedback.encerrar_pulso(
+        conexao,
+        id_reserva=id_reserva,
+        comentario=(mensagem or {}).get("conteudo"),
+    )
+    id_solicitacao = None
+    if sentimento == "negativo":
+        id_solicitacao = abrir_reclamacao(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            id_mensagem=id_mensagem,
+            descricao=(mensagem or {}).get("conteudo") or "",
+            numero_quarto=None,
+            urgencia=(mensagem or {}).get("urgencia"),
+            janela_preferencia=None,
+        )
+    gravar = getattr(repositorio, "gravar_resposta_pulso", None)
+    if gravar is not None:
+        gravar(
+            conexao,
+            id_hotel=id_hotel,
+            id_mensagem=id_mensagem,
+            id_mensagem_resposta=id_enviada,
+            resposta=chave_resposta,
+            id_solicitacao=id_solicitacao,
+            id_avaliacao=id_avaliacao,
+        )
+    logger.info(
+        "resposta_pulso_registrada id_trabalho=%s id_mensagem=%s"
+        " id_reserva=%s id_hotel=%s sentimento=%s",
+        id_trabalho,
+        id_mensagem,
+        id_reserva,
+        id_hotel,
+        sentimento,
     )
     _enviar_resposta_sessao(
         conexao,

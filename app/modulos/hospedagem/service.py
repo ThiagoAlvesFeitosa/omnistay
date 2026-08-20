@@ -341,3 +341,10 @@ def listar_hospedados_sem_boas_vindas(
     repositorio=repositorio_padrao,
 ) -> list[dict]:
     return repositorio.listar_hospedados_sem_boas_vindas(conexao)
+
+
+def listar_hospedados_sem_pulso(
+    conexao,
+    repositorio=repositorio_padrao,
+) -> list[dict]:
+    return repositorio.listar_hospedados_sem_pulso(conexao)

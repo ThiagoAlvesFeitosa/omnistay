@@ -98,6 +98,7 @@ def test_criacao_inicial_grava_propriedade_gestor_e_duracoes():
         "boas_vindas_checkout",
         "horas_validade_boas_vindas",
         "horas_destaque_chamado_aberto",
+        "horas_minimas_para_pulso",
     }
     valores = {p["chave"]: p["valor"] for p in propriedade.parametros}
     assert valores["duracao_sessao_recepcao_horas"] == "12"
@@ -117,6 +118,7 @@ def test_criacao_inicial_grava_propriedade_gestor_e_duracoes():
         )
     assert int(valores["horas_validade_boas_vindas"]) > 0
     assert valores["horas_destaque_chamado_aberto"] == "2"
+    assert valores["horas_minimas_para_pulso"] == "24"
 
 
 def test_criacao_inicial_recusa_quando_ja_existe_propriedade():

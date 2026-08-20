@@ -104,6 +104,26 @@ def abrir_reclamacao(
     )
 
 
+def tem_reclamacao_aberta(
+    conexao: Connection,
+    *,
+    id_reserva: int,
+    repositorio=repositorio_padrao,
+) -> bool:
+    return repositorio.tem_reclamacao_aberta(conexao, id_reserva=id_reserva)
+
+
+def tem_reclamacao_da_mensagem(
+    conexao: Connection,
+    *,
+    id_mensagem: int,
+    repositorio=repositorio_padrao,
+) -> bool:
+    return repositorio.tem_reclamacao_da_mensagem(
+        conexao, id_mensagem=id_mensagem
+    )
+
+
 def abrir_consumo(
     conexao: Connection,
     *,

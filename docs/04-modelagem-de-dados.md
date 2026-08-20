@@ -447,6 +447,10 @@ A F1.4 **usa** os dois prazos de silêncio: o bootstrap (e a revisão `0007`) se
 `horas_ate_reenvio=24` e `horas_corte_antes_checkin=12`. Ausência da chave na verificação
 não assume esses números em código.
 
+A F3.8 **usa** `horas_minimas_para_pulso`: bootstrap e revisão `0016` semeiam `24`.
+Ausência ou valor inválido na varredura loga `prazo_ausente` e não inventa 24. Unicidade
+de `enviar_pulso` é por reserva (`uq_trabalho_enviar_pulso_reserva`).
+
 **Isto resolve três pendências abertas de uma vez.** Os parâmetros que estavam "a definir"
 desde o Artefato 1 deixam de ser constantes no código e passam a ser configuração por
 propriedade — que era o requisito original.
@@ -623,6 +627,10 @@ Resolver o quarto (F3.6/F3.7) **não** altera este campo.
 ### 6.6 Tabelas de feedback e mercado
 
 **`avaliacao`**
+
+O primeiro escritor desta tabela é o pulso do segundo dia (F3.8): `origem =
+pulso_segundo_dia`, `nota` nula nesta fatia, `comentario` com o texto da resposta
+(ou nulo no encerramento humano). Pesquisa de checkout continua F4.1.
 
 | Campo | Tipo | Restrições | Classe | Descrição |
 | --- | --- | --- | --- | --- |

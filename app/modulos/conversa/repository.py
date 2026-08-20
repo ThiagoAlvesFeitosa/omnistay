@@ -455,3 +455,59 @@ def tem_mensagem_recebida(conexao: Connection, *, id_reserva: int) -> bool:
             {"id": id_reserva},
         ).scalar()
     )
+
+
+def pulso_foi_enviado(conexao: Connection, *, id_reserva: int) -> bool:
+    return bool(
+        conexao.execute(
+            text(
+                "SELECT 1 FROM trabalho t"
+                " JOIN mensagem m"
+                "   ON m.id_mensagem = (t.payload->>'id_mensagem')::bigint"
+                " WHERE t.tipo = 'enviar_pulso'"
+                " AND (t.payload->>'id_reserva')::bigint = :id"
+                " AND m.status_envio = 'enviada'"
+                " LIMIT 1"
+            ),
+            {"id": id_reserva},
+        ).scalar()
+    )
+
+
+def gravar_resposta_pulso(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_mensagem: int,
+    id_mensagem_resposta: int,
+    resposta: str,
+    id_solicitacao: int | None = None,
+    id_avaliacao: int | None = None,
+) -> int:
+    import json
+
+    extra = {
+        "resposta": resposta,
+        "id_mensagem_resposta": id_mensagem_resposta,
+    }
+    if id_solicitacao is not None:
+        extra["id_solicitacao"] = id_solicitacao
+    if id_avaliacao is not None:
+        extra["id_avaliacao"] = id_avaliacao
+    resultado = conexao.execute(
+        text(
+            "UPDATE mensagem m SET"
+            " classificacao_bruta = COALESCE(m.classificacao_bruta, '{}'::jsonb)"
+            " || CAST(:extra AS jsonb)"
+            " FROM reserva r"
+            " WHERE m.id_mensagem = :id"
+            " AND m.id_reserva = r.id_reserva"
+            " AND r.id_hotel = :id_hotel"
+        ),
+        {
+            "extra": json.dumps(extra),
+            "id": id_mensagem,
+            "id_hotel": id_hotel,
+        },
+    )
+    return resultado.rowcount or 0

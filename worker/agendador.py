@@ -191,3 +191,85 @@ def verificar_boas_vindas_pendentes(
         )
         afetados += 1
     return afetados
+
+
+CHAVE_MINIMO_PULSO = "horas_minimas_para_pulso"
+HORAS_POR_DIA_CIVIL = 24
+
+
+def horas_restantes_de_estadia(data_checkout, hoje) -> int:
+    return HORAS_POR_DIA_CIVIL * (data_checkout - hoje).days
+
+
+def verificar_pulsos_pendentes(
+    conexao: Connection,
+    *,
+    agora=None,
+    repositorio_propriedade=propriedade_repository,
+    tem_reclamacao_aberta=None,
+    agendar=None,
+) -> int:
+    from app.modulos.atendimento import service as atendimento_service
+
+    if agora is None:
+        instante = relogio.agora()
+    elif callable(agora):
+        instante = agora()
+    else:
+        instante = agora
+    if instante.tzinfo is None:
+        instante = instante.replace(tzinfo=UTC)
+
+    if tem_reclamacao_aberta is None:
+        tem_reclamacao_aberta = atendimento_service.tem_reclamacao_aberta
+    if agendar is None:
+        agendar = conversa_service.agendar_pulso
+
+    afetados = 0
+    reservas = hospedagem_service.listar_hospedados_sem_pulso(conexao)
+    cache_minimo: dict[int, int | None] = {}
+    hoje = instante.date()
+    for reserva in reservas:
+        id_hotel = reserva["id_hotel"]
+        id_reserva = reserva["id_reserva"]
+        if id_hotel not in cache_minimo:
+            minimo = _inteiro_positivo(
+                repositorio_propriedade.ler_parametro(
+                    conexao, id_hotel, CHAVE_MINIMO_PULSO
+                )
+            )
+            if minimo is None:
+                logger.info("prazo_ausente id_hotel=%s", id_hotel)
+            cache_minimo[id_hotel] = minimo
+        minimo = cache_minimo[id_hotel]
+        if minimo is None:
+            continue
+        checkin_em = reserva.get("checkin_em")
+        if checkin_em is None:
+            continue
+        if getattr(checkin_em, "tzinfo", None) is None:
+            checkin_em = checkin_em.replace(tzinfo=UTC)
+        if hoje <= checkin_em.date():
+            continue
+        restante = horas_restantes_de_estadia(
+            reserva["data_checkout_prevista"], hoje
+        )
+        if restante < minimo:
+            continue
+        if tem_reclamacao_aberta(conexao, id_reserva=id_reserva):
+            continue
+        desfecho = agendar(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            nome_completo=reserva["nome_completo"],
+        )
+        if desfecho != "agendada":
+            continue
+        logger.info(
+            "pulso_agendado id_reserva=%s id_hotel=%s",
+            id_reserva,
+            id_hotel,
+        )
+        afetados += 1
+    return afetados
