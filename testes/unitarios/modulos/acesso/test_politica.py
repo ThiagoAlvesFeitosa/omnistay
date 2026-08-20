@@ -24,6 +24,7 @@ OPERACOES_ESPERADAS = {
     "ler_texto_de_boas_vindas": {"recepcao", "gestor"},
     "ler_consentimento": {"recepcao", "gestor"},
     "registrar_consentimento": {"recepcao", "gestor"},
+    "ler_pedidos_feitos_pelo_chat": {"recepcao", "gestor"},
 }
 
 
@@ -93,6 +94,12 @@ def test_confirmar_fase_da_reserva_continua_so_recepcao():
     assert politica.permitido("recepcao", "confirmar_fase_da_reserva") is True
     assert politica.permitido("gestor", "confirmar_fase_da_reserva") is False
     assert politica.permitido("staff", "confirmar_fase_da_reserva") is False
+
+
+def test_ler_pedidos_feitos_pelo_chat_recepcao_e_gestor_staff_recusado():
+    assert politica.permitido("recepcao", "ler_pedidos_feitos_pelo_chat") is True
+    assert politica.permitido("gestor", "ler_pedidos_feitos_pelo_chat") is True
+    assert politica.permitido("staff", "ler_pedidos_feitos_pelo_chat") is False
 
 
 def test_nenhuma_operacao_da_matriz_contem_parametro_no_nome():

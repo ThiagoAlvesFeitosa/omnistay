@@ -268,6 +268,25 @@ def listar_pendentes(conexao: Connection, *, id_hotel: int) -> list[dict]:
     return [dict(linha) for linha in linhas]
 
 
+def listar_pedidos_feitos_pelo_chat(
+    conexao: Connection, *, id_hotel: int, id_reserva: int
+) -> list[dict]:
+    linhas = conexao.execute(
+        text(
+            "SELECT s.id_solicitacao, c.descricao_item, c.valor_praticado"
+            " FROM consumo c"
+            " JOIN solicitacao s ON s.id_solicitacao = c.id_solicitacao"
+            " JOIN reserva r ON r.id_reserva = s.id_reserva"
+            " WHERE r.id_hotel = :id_hotel"
+            " AND s.id_reserva = :id_reserva"
+            " AND c.status_lancamento IN ('pendente', 'lancado')"
+            " ORDER BY s.aberta_em ASC, s.id_solicitacao ASC"
+        ),
+        {"id_hotel": id_hotel, "id_reserva": id_reserva},
+    ).mappings().all()
+    return [dict(linha) for linha in linhas]
+
+
 def marcar_lancamento(
     conexao: Connection,
     *,

@@ -806,10 +806,52 @@ def test_confirmar_saida_loga_so_identificadores(monkeypatch):
         id_reserva=42,
         repositorio=Repo(),
         agendar_pesquisa_saida=lambda *a, **k: "agendada",
+        listar_pedidos=lambda *a, **k: [],
     )
     texto = " ".join(registros)
     assert "saida_confirmada" in texto
+    assert "lista_pedidos_ausente" in texto
     assert "id_reserva=42" in texto
     assert "Marina" not in texto
     assert "Duarte" not in texto
+
+
+def test_agendar_lista_loga_so_identificadores(monkeypatch):
+    from decimal import Decimal
+
+    class Repo:
+        def inserir_mensagem_enviada_pendente(self, conexao, *, id_reserva, conteudo):
+            assert "Cerveja" in conteudo
+            return 11
+
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(conversa.logger, "info", fake_info)
+    conversa.agendar_lista_pedidos_chat(
+        object(),
+        id_hotel=3,
+        id_reserva=42,
+        nome_completo="Marina Duarte",
+        itens=[
+            {
+                "id_solicitacao": 7,
+                "descricao_item": "Cerveja",
+                "valor_praticado": Decimal("12.00"),
+            }
+        ],
+        repositorio=Repo(),
+        enfileirar=lambda *a, **k: 99,
+    )
+    texto = " ".join(registros)
+    assert "lista_pedidos_agendada" in texto
+    assert "id_reserva=42" in texto
+    assert "id_hotel=3" in texto
+    assert "quantidade=1" in texto
+    assert "Cerveja" not in texto
+    assert "12,00" not in texto
+    assert "12.00" not in texto
+    assert "Marina" not in texto
 

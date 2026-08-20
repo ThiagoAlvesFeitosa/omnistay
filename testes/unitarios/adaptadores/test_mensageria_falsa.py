@@ -91,3 +91,34 @@ def test_enviar_pesquisa_saida_falha_sem_eco_do_corpo():
         )
     assert erro.value.codigo == "mensageria_indisponivel"
     assert "segredo" not in str(erro.value)
+
+
+def test_enviar_lista_pedidos_chat_registra_tipo_distinto():
+    porta = MensageriaFalsa()
+    resultado = porta.enviar_lista_pedidos_chat(
+        telefone_destino="5511999999999",
+        primeiro_nome="Marina",
+        corpo="Seguem os pedidos feitos pelo chat",
+        id_mensagem=15,
+        id_reserva=6,
+    )
+    assert resultado.id_externo == "fake-15"
+    assert porta.envios[0]["tipo"] == "lista_pedidos_chat"
+    assert porta.envios[0]["tipo"] != "pesquisa_saida"
+    assert porta.envios[0]["tipo"] != "pulso"
+    assert porta.envios[0]["tipo"] != "sessao"
+
+
+def test_enviar_lista_pedidos_chat_falha_sem_eco_do_corpo():
+    porta = MensageriaFalsa()
+    porta.falhar_sempre = True
+    with pytest.raises(FalhaDeEnvio) as erro:
+        porta.enviar_lista_pedidos_chat(
+            telefone_destino="5511999999999",
+            primeiro_nome="Marina",
+            corpo="segredo da lista",
+            id_mensagem=1,
+            id_reserva=1,
+        )
+    assert erro.value.codigo == "mensageria_indisponivel"
+    assert "segredo" not in str(erro.value)

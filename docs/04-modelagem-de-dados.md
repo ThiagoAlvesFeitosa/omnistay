@@ -538,7 +538,14 @@ recente por hóspede e finalidade. É o que permite responder "qual era o consen
 março?", pergunta que um campo booleano não responde. O **primeiro escritor** é a pesquisa
 de checkout (F4.1): o worker insere `origem = pesquisa_checkout` quando o aceite é sim ou
 não; silêncio e nota alta **não** inserem. Recepção e gestão inserem `painel` ou
-`solicitacao_titular` pela rota do painel. Lista de pedidos feitos pelo chat continua F4.2.
+`solicitacao_titular` pela rota do painel.
+
+A lista de **pedidos feitos pelo chat** (F4.2) não é tabela nova: consulta `consumo`
+da reserva com `status_lancamento` em `pendente` ou `lancado`, expondo
+`descricao_item` e `valor_praticado`. Consumo `dispensado` e pedido de serviço
+operacional ficam de fora. O envio ao hóspede é trabalho
+`enviar_lista_pedidos_chat`, único por reserva
+(`uq_trabalho_enviar_lista_pedidos_chat_reserva`).
 
 ### 6.4 Tabelas de conversa
 

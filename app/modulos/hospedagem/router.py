@@ -15,6 +15,7 @@ from app.modulos.hospedagem.schema import (
     ContagemChegadasResposta,
     FichaTitularResposta,
     FilaDoDiaResposta,
+    ListaPedidosFeitosPeloChat,
     ReservaEntrada,
     ReservaResposta,
     SaidaResposta,
@@ -135,6 +136,28 @@ def confirmar_saida(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=_motivo_saida_recusada(erro.status_atual),
+        ) from erro
+
+
+@roteador.get(
+    "/reservas/{id_reserva}/pedidos-feitos-pelo-chat",
+    response_model=ListaPedidosFeitosPeloChat,
+)
+def ler_pedidos_feitos_pelo_chat(
+    id_reserva: int,
+    conexao: Conexao,
+    sessao: Annotated[
+        SessaoAtual, Depends(exigir_operacao("ler_pedidos_feitos_pelo_chat"))
+    ],
+) -> ListaPedidosFeitosPeloChat:
+    try:
+        return hospedagem.consultar_pedidos_feitos_pelo_chat(
+            conexao, id_hotel=sessao.id_hotel, id_reserva=id_reserva
+        )
+    except hospedagem.ReservaNaoEncontrada as erro:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reserva nao encontrada.",
         ) from erro
 
 

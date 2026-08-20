@@ -115,6 +115,10 @@ def processar_uma_passagem(
                 trabalho=trabalho,
                 llm=porta_llm,
             )
+        elif trabalho["tipo"] == "enviar_lista_pedidos_chat":
+            conversa_service.processar_trabalho_enviar_lista_pedidos_chat(
+                conexao, trabalho=trabalho, gateway=gateway
+            )
         else:
             fila_repository.marcar_falha(
                 conexao,

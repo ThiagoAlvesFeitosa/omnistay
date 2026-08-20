@@ -20,6 +20,9 @@ from app.modulos.conversa.texto_pulso import (
     montar_reconhecimento_pulso,
 )
 from app.modulos.conversa.texto_pesquisa_saida import montar_texto_pesquisa_saida
+from app.modulos.conversa.texto_lista_pedidos_chat import (
+    montar_texto_lista_pedidos_chat,
+)
 from app.modulos.conversa.validacao_ficha import refinar_resultado
 from app.modulos.propriedade import repository as propriedade_repository
 from app.modulos.propriedade import service as propriedade_service
@@ -217,6 +220,48 @@ def agendar_pulso(
         id_reserva,
         id_mensagem,
         id_hotel,
+    )
+    return "agendada"
+
+
+def agendar_lista_pedidos_chat(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    nome_completo: str,
+    itens: list,
+    repositorio=repositorio_padrao,
+    enfileirar=fila_service.enfileirar_enviar_lista_pedidos_chat,
+) -> str:
+    texto = montar_texto_lista_pedidos_chat(
+        nome_completo=nome_completo, itens=itens
+    )
+    try:
+        with _savepoint(conexao):
+            id_mensagem = repositorio.inserir_mensagem_enviada_pendente(
+                conexao, id_reserva=id_reserva, conteudo=texto
+            )
+            enfileirar(
+                conexao,
+                id_hotel=id_hotel,
+                id_reserva=id_reserva,
+                id_mensagem=id_mensagem,
+            )
+    except IntegrityError:
+        logger.info(
+            "lista_pedidos_ja_agendada id_reserva=%s id_hotel=%s",
+            id_reserva,
+            id_hotel,
+        )
+        return "ja_agendada"
+    logger.info(
+        "lista_pedidos_agendada id_reserva=%s id_mensagem=%s id_hotel=%s"
+        " quantidade=%s",
+        id_reserva,
+        id_mensagem,
+        id_hotel,
+        len(itens),
     )
     return "agendada"
 
@@ -2379,6 +2424,100 @@ def processar_trabalho_enviar_pesquisa_saida(
     fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
     logger.info(
         "pesquisa_saida_enviada id_trabalho=%s id_mensagem=%s"
+        " id_reserva=%s id_hotel=%s",
+        id_trabalho,
+        id_mensagem,
+        id_reserva,
+        id_hotel,
+    )
+
+
+def processar_trabalho_enviar_lista_pedidos_chat(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    gateway: MensageriaGateway,
+    repositorio=repositorio_padrao,
+) -> None:
+    from app.fila import repository as fila_repo
+    from app.fila import service as fila_svc
+
+    id_trabalho = trabalho["id_trabalho"]
+    id_hotel = trabalho["id_hotel"]
+    payload = trabalho["payload"]
+    id_mensagem = int(payload["id_mensagem"])
+    id_reserva = int(payload["id_reserva"])
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    if mensagem is None:
+        fila_repo.marcar_falha(
+            conexao,
+            id_trabalho=id_trabalho,
+            tentativas=(trabalho.get("tentativas") or 0) + 1,
+            erro="mensagem_ausente",
+        )
+        return
+    if mensagem.get("status_envio") == "enviada":
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        return
+    telefone = repositorio.ler_telefone_da_reserva(
+        conexao, id_reserva=id_reserva
+    )
+    if not telefone:
+        fila_repo.marcar_falha(
+            conexao,
+            id_trabalho=id_trabalho,
+            tentativas=(trabalho.get("tentativas") or 0) + 1,
+            erro="telefone_ausente",
+        )
+        marcar_envio_falha(
+            conexao, id_mensagem=id_mensagem, repositorio=repositorio
+        )
+        return
+    nome = "hospede"
+    ler_nome = getattr(repositorio, "ler_nome_titular", None)
+    if ler_nome is not None:
+        nome = ler_nome(conexao, id_reserva=id_reserva) or "hospede"
+    try:
+        prenome = primeiro_nome(nome)
+    except ValueError:
+        prenome = "hospede"
+    try:
+        resultado = gateway.enviar_lista_pedidos_chat(
+            telefone_destino=telefone,
+            primeiro_nome=prenome,
+            corpo=mensagem["conteudo"],
+            id_mensagem=id_mensagem,
+            id_reserva=id_reserva,
+        )
+    except FalhaDeEnvio as erro:
+        destino = fila_svc.registrar_falha_de_envio(
+            conexao,
+            id_trabalho=id_trabalho,
+            id_hotel=id_hotel,
+            tentativas_atuais=trabalho.get("tentativas") or 0,
+            codigo_erro=erro.codigo,
+        )
+        if destino == "falha":
+            marcar_envio_falha(
+                conexao, id_mensagem=id_mensagem, repositorio=repositorio
+            )
+        logger.info(
+            "envio_tentativa_falhou id_trabalho=%s tipo=enviar_lista_pedidos_chat"
+            " destino=%s codigo=%s",
+            id_trabalho,
+            destino,
+            erro.codigo,
+        )
+        return
+    marcar_envio_sucesso(
+        conexao,
+        id_mensagem=id_mensagem,
+        id_externo=resultado.id_externo,
+        repositorio=repositorio,
+    )
+    fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+    logger.info(
+        "lista_pedidos_enviada id_trabalho=%s id_mensagem=%s"
         " id_reserva=%s id_hotel=%s",
         id_trabalho,
         id_mensagem,

@@ -1,6 +1,7 @@
 """Contratos de entrada e saida do modulo de hospedagem."""
 
 from datetime import date, datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
@@ -76,6 +77,19 @@ class SaidaResposta(BaseModel):
     status: str
     checkout_em: datetime
     pesquisa: str
+    lista: str = "ausente"
+
+
+class ItemPedidoFeitoPeloChat(BaseModel):
+    id_solicitacao: int
+    descricao_item: str
+    valor_praticado: Decimal
+
+
+class ListaPedidosFeitosPeloChat(BaseModel):
+    id_reserva: int
+    itens: list[ItemPedidoFeitoPeloChat]
+    total: Decimal
 
 
 class ConsentimentoResposta(BaseModel):

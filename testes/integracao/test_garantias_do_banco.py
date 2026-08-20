@@ -1103,3 +1103,46 @@ def test_avaliacao_de_pulso_com_nota_nula_continua_aceita(conexao):
         {"id": id_reserva},
     ).scalar_one()
     assert origem == "pulso_segundo_dia"
+
+
+def _inserir_trabalho_enviar_lista_pedidos_chat(
+    conexao, id_hotel: int, id_reserva: int
+) -> None:
+    conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, 'enviar_lista_pedidos_chat',"
+            " CAST(:payload AS jsonb), 'pendente')"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "payload": '{"id_reserva": %s, "id_mensagem": 1}' % id_reserva,
+        },
+    )
+
+
+@pytest.mark.postgres
+def test_tipo_enviar_lista_pedidos_chat_e_aceito_pelo_check(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+
+    _inserir_trabalho_enviar_lista_pedidos_chat(conexao, id_hotel, id_reserva)
+
+    tipo = conexao.execute(
+        text(
+            "SELECT tipo FROM trabalho WHERE tipo = 'enviar_lista_pedidos_chat'"
+        )
+    ).scalar_one()
+    assert tipo == "enviar_lista_pedidos_chat"
+
+
+@pytest.mark.postgres
+def test_segundo_trabalho_de_lista_pedidos_da_mesma_reserva_e_recusado(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    _inserir_trabalho_enviar_lista_pedidos_chat(conexao, id_hotel, id_reserva)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_trabalho_enviar_lista_pedidos_chat(conexao, id_hotel, id_reserva)
+
+    assert "uq_trabalho_enviar_lista_pedidos_chat_reserva" in str(erro.value)

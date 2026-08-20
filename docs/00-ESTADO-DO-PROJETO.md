@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 18 de 24 fatias concluídas.
+**Progresso:** 19 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -30,8 +30,9 @@
 | F3.6 Resolver chamado e confirmar | ✅ Concluída — `POST /solicitacoes/{id}/resolucao` grava `resolvida` (autor + instante) e agenda `enviar_confirmacao_resolucao`; worker só envia; revisão `0014_resolver_chamado` |
 | F3.7 Consumo faturável e fila de lançamento | ✅ Concluída — fork em `registrar_pedido_servico`, tabela `item_vendavel`, `GET /consumos/pendentes`, POST lançamento/dispensa; resolver consumo não lança; revisão `0015_consumo_faturavel` |
 | F3.8 Pulso do segundo dia | ✅ Concluída — varredura em `worker/agendador.py` (sem APScheduler), módulo `feedback` escreve `avaliacao`, um recado por mensagem, neutro = positivo, só reclamação não resolvida suprime, `horas_minimas_para_pulso=24`; revisão `0016_pulso_segundo_dia` |
-| F4.1 Confirmar saída e pesquisa | ✅ Concluída — clique `POST /reservas/{id}/saida` reusa `confirmar_fase_da_reserva`, pesquisa curta sem classificar, consentimento append-only, visão mantém encerrada só com leitura humana, `horas_atribuicao_pesquisa_saida=24`; revisão `0017_confirmar_saida`. Lista de pedidos fica na F4.2 |
-| Demais 6 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F4.2** (lista de pedidos feitos pelo chat). Não há F2.3 nem F3.9 no backlog |
+| F4.1 Confirmar saída e pesquisa | ✅ Concluída — clique `POST /reservas/{id}/saida` reusa `confirmar_fase_da_reserva`, pesquisa curta sem classificar, consentimento append-only, visão mantém encerrada só com leitura humana, `horas_atribuicao_pesquisa_saida=24`; revisão `0017_confirmar_saida` |
+| F4.2 Lista de pedidos feitos pelo chat | ✅ Concluída — o mesmo clique de saída agenda pesquisa **e** lista (mensagem distinta); recorte cobrável (`pendente`+`lancado`); GET ao vivo `pedidos-feitos-pelo-chat`; snapshot na mensagem; operação `ler_pedidos_feitos_pelo_chat`; revisão `0018_lista_pedidos_chat`. Sem React, sem extrato/conta |
+| Demais 5 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F5.1** (cadastro de concorrentes). Não há F2.3 nem F3.9 no backlog |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -142,6 +143,11 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Consentimento append-only | Primeiro escritor: worker `origem=pesquisa_checkout`. Painel só `painel` / `solicitacao_titular`. Silêncio e nota alta não consentem. GET vigente em `em` | F4.1 |
 | Visão após checkout | Encerrada limpa continua fora (F1.1). Encerrada com `pesquisa_saida_leitura_humana` permanece. `saida_nao_confirmada` = hospedado com checkout previsto anterior a hoje | F4.1 |
 | Prazo da resposta | `horas_atribuicao_pesquisa_saida=24` no bootstrap e na `0017`, eixo `checkout_em`. Ausência loga `prazo_ausente` e sinaliza humano; não inventa 24. Janela vencida conclui sem humano | F4.1 |
+| Mesmo clique da saída | Não há segundo botão. `confirmar_saida` agenda a pesquisa e, se houver cobrável, a lista. Recorte vazio → `lista=ausente`, zero trabalho extra | F4.2 |
+| Recorte cobrável | `consumo` com `status_lancamento` em `pendente` ou `lancado`. Serviço operacional e dispensado ficam de fora. Status de lançamento não vaza no recado nem no GET | F4.2 |
+| Snapshot vs consulta | O corpo da mensagem é gravado no enfileiramento. `GET /reservas/{id}/pedidos-feitos-pelo-chat` é consulta ao vivo (recepção e gestão; staff `403`; outro hotel `404` uniforme) | F4.2 |
+| Valor histórico | A lista lê `consumo.valor_praticado`, nunca `item_vendavel.preco_atual`. Reajuste depois do pedido não altera o recado nem o GET | F4.2 |
+| Nomenclatura | Rótulo **pedidos feitos pelo chat**. Sem “extrato”, sem “conta”, sem “está correto?”, sem convite a pagar. Sem tela React nesta fatia | F4.2 |
 
 ## Onde ficam os arquivos
 

@@ -62,6 +62,7 @@ def test_recepcao_confirma_saida_e_agenda_pesquisa_sem_enviar(app_sobre_ambiente
     corpo = resposta.json()
     assert corpo["status"] == "encerrado"
     assert corpo["pesquisa"] == "agendada"
+    assert corpo["lista"] == "ausente"
     assert corpo["checkout_em"]
 
     with ambiente.conexao() as conexao:
@@ -87,6 +88,16 @@ def test_recepcao_confirma_saida_e_agenda_pesquisa_sem_enviar(app_sobre_ambiente
     ) != (0, 0)
     assert envio == "pendente"
     assert _contagens(ambiente, id_reserva)["trabalhos"] == 1
+    with ambiente.conexao() as conexao:
+        listas = conexao.execute(
+            text(
+                "SELECT COUNT(*) FROM trabalho"
+                " WHERE tipo = 'enviar_lista_pedidos_chat'"
+                " AND payload->>'id_reserva' = :id"
+            ),
+            {"id": str(id_reserva)},
+        ).scalar_one()
+    assert listas == 0
 
 
 @pytest.mark.postgres

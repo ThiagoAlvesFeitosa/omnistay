@@ -348,6 +348,27 @@ def listar_pendentes(
     return itens
 
 
+def listar_pedidos_feitos_pelo_chat(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    repositorio=repositorio_padrao,
+) -> list[dict]:
+    itens = []
+    for item in repositorio.listar_pedidos_feitos_pelo_chat(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    ):
+        itens.append(
+            {
+                "id_solicitacao": item["id_solicitacao"],
+                "descricao_item": item["descricao_item"],
+                "valor_praticado": item["valor_praticado"],
+            }
+        )
+    return itens
+
+
 def _aplicar_lancamento(
     conexao: Connection,
     *,

@@ -225,6 +225,22 @@ def enfileirar_interpretar_pesquisa_saida(
     )
 
 
+def enfileirar_enviar_lista_pedidos_chat(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    id_mensagem: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    return repositorio.enfileirar_enviar_lista_pedidos_chat(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_mensagem=id_mensagem,
+    )
+
+
 def tentativas_maximas(
     conexao: Connection,
     *,

@@ -2,10 +2,12 @@
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Protocol
 
 from app.comum.log import obter_logger
 from app.comum.telefone import TelefoneInvalido, normalizar
+from app.modulos.atendimento import service as atendimento_service
 from app.modulos.conversa import service as conversa_service
 from app.modulos.hospedagem import repository as repositorio_padrao
 from app.modulos.hospedagem.schema import (
@@ -13,6 +15,8 @@ from app.modulos.hospedagem.schema import (
     ConsentimentoResposta,
     FichaTitularResposta,
     ItemFilaDoDia,
+    ItemPedidoFeitoPeloChat,
+    ListaPedidosFeitosPeloChat,
     ReservaResposta,
     SaidaResposta,
 )
@@ -359,6 +363,8 @@ def confirmar_saida(
     id_reserva: int,
     repositorio=repositorio_padrao,
     agendar_pesquisa_saida=conversa_service.agendar_pesquisa_saida,
+    listar_pedidos=atendimento_service.listar_pedidos_feitos_pelo_chat,
+    agendar_lista=conversa_service.agendar_lista_pedidos_chat,
 ) -> SaidaResposta:
     atualizada = repositorio.confirmar_saida(
         conexao, id_hotel=id_hotel, id_reserva=id_reserva
@@ -387,6 +393,24 @@ def confirmar_saida(
         id_reserva=id_reserva,
         nome_completo=nome,
     )
+    itens = listar_pedidos(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    desfecho_lista = "ausente"
+    if itens:
+        desfecho_lista = agendar_lista(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            nome_completo=nome,
+            itens=itens,
+        )
+    else:
+        logger.info(
+            "lista_pedidos_ausente id_reserva=%s id_hotel=%s",
+            id_reserva,
+            id_hotel,
+        )
     logger.info(
         "saida_confirmada id_reserva=%s id_hotel=%s",
         id_reserva,
@@ -397,6 +421,41 @@ def confirmar_saida(
         status=atualizada["status"],
         checkout_em=atualizada["checkout_em"],
         pesquisa=desfecho,
+        lista=desfecho_lista,
+    )
+
+
+def consultar_pedidos_feitos_pelo_chat(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    repositorio=repositorio_padrao,
+    listar_pedidos=atendimento_service.listar_pedidos_feitos_pelo_chat,
+) -> ListaPedidosFeitosPeloChat:
+    existente = repositorio.ler_reserva_do_hotel(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    if existente is None:
+        raise ReservaNaoEncontrada
+    itens = listar_pedidos(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    total = sum(
+        (item["valor_praticado"] for item in itens),
+        Decimal("0.00"),
+    )
+    return ListaPedidosFeitosPeloChat(
+        id_reserva=id_reserva,
+        itens=[
+            ItemPedidoFeitoPeloChat(
+                id_solicitacao=item["id_solicitacao"],
+                descricao_item=item["descricao_item"],
+                valor_praticado=item["valor_praticado"],
+            )
+            for item in itens
+        ],
+        total=total,
     )
 
 

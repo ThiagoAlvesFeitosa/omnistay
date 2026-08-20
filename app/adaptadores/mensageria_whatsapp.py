@@ -182,3 +182,14 @@ class MensageriaWhatsapp:
         id_reserva: int,
     ) -> ResultadoEnvio:
         raise NotImplementedError("template pesquisa_saida ainda nao cadastrado")
+
+    def enviar_lista_pedidos_chat(
+        self,
+        *,
+        telefone_destino: str,
+        primeiro_nome: str,
+        corpo: str,
+        id_mensagem: int,
+        id_reserva: int,
+    ) -> ResultadoEnvio:
+        raise NotImplementedError("template lista_pedidos_chat ainda nao cadastrado")
