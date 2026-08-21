@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 21 de 24 fatias concluídas.
+**Progresso:** 22 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -34,7 +34,8 @@
 | F4.2 Lista de pedidos feitos pelo chat | ✅ Concluída — o mesmo clique de saída agenda pesquisa **e** lista (mensagem distinta); recorte cobrável (`pendente`+`lancado`); GET ao vivo `pedidos-feitos-pelo-chat`; snapshot na mensagem; operação `ler_pedidos_feitos_pelo_chat`; revisão `0018_lista_pedidos_chat`. Sem React, sem extrato/conta |
 | F5.1 Cadastro de concorrentes | ✅ Concluída — módulo `mercado`, gestão cria/edita/desativa (não apaga); `GET /concorrentes/ativos` omite inativo; UNIQUE da fonte por hotel inclusive inativo; CHECK de URL; recepção e staff `403`; revisão `0019_cadastrar_concorrentes`. Sem visita à fonte, sem React, sem `coleta_mercado` |
 | F5.2 Coleta agendada de mercado | ✅ Concluída — `verificar_coletas_mercado` no `worker/agendador.py` (sem APScheduler, sem rota HTTP); tipo `coletar_mercado` com unicidade só do trabalho aberto; porta `FontePublica` + `FonteFalsa` / `FonteHttp` (stdlib, JSON-LD, User-Agent `OmniStay-Coletor/1.0`); diretiva ausente **não** autoriza visita; falha grava `sucesso=false`; `periodicidade_coleta_mercado=24` horas; revisão `0020_coleta_agendada`. Sem painel (F5.3), sem disparo manual, sem mensagem ao hóspede |
-| Demais 3 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F5.3** (painel de mercado). Não há F2.3 nem F3.9 no backlog |
+| F5.3 Painel de mercado | ✅ Concluída — `GET /mercado` (visão atual) e `GET /mercado/concorrentes/{id}` (histórico); operação `ler_mercado` só gestão; visão atual = último **sucesso** datado; `situacao` (`atual` · `desatualizado` · `cadencia_ausente` · `sem_coleta` · `so_falha`); limiar = periodicidade da casa; escrita da série `405`; sem migração, sem React, sem disparo de coleta |
+| Demais 2 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F6.1** (expurgo por retenção). Não há F2.3 nem F3.9 no backlog |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -158,6 +159,9 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Sem APScheduler | Varredura em `verificar_coletas_mercado`, flag `--verificar-mercado`, laço horário do worker. O Artigo XI segue; o Artefato 5 ainda nomeia a lib | F5.2 |
 | Falha ≠ preço zero | `coleta_mercado` só INSERT. `sucesso=false` com preço/nota nulos. Zero é sucesso. Trabalho sempre `concluido` — sem backoff da fila | F5.2 |
 | Periodicidade por hotel | `periodicidade_coleta_mercado` em horas, semente 24. Ausência loga `periodicidade_ausente` e omite o hotel. Isolamento pelo `id_hotel` do concorrente | F5.2 |
+| Visão atual = último sucesso | `GET /mercado` não usa `ultima_coleta` (qualquer desfecho) como preço. Falha posterior deixa o sucesso com a data antiga e marca `desatualizado` | F5.3 |
+| `ler_mercado` | Operação só gestão, distinta de `ler_concorrentes`. Recepção e staff `403`. Escrita da série inexistente (`405`) | F5.3 |
+| Limiar de desatualizado | O mesmo `agora >= U + P` da coleta devida. Sem chave nova. Periodicidade inválida → `cadencia_ausente`, não assume 24 | F5.3 |
 
 ## Onde ficam os arquivos
 
@@ -381,7 +385,8 @@ Ainda abertas:
 - [ ] Definir os **valores** dos parâmetros com o hotel (horas de reenvio, janela de corte,
       periodicidade da coleta)
 - [x] ~~Cadastrar a lista de concorrentes~~ F5.1: API de manutenção + fontes ativas. **Verificar os termos de uso de cada fonte** permanece humano
-- [x] ~~Coleta agendada de mercado~~ F5.2: varredura + `coleta_mercado` append-only. Painel de histórico e dado velho: **F5.3**
+- [x] ~~Coleta agendada de mercado~~ F5.2: varredura + `coleta_mercado` append-only
+- [x] ~~Painel de mercado~~ F5.3: `GET /mercado` + histórico; dado velho sinalizado; série somente leitura
 - [ ] Confirmar a lista oficial vigente de campos exigidos por lei para registro de hóspede
 - [ ] Testar colagem no PMS real
 - [ ] Confirmar junto à Meta a categoria do template de pulso do segundo dia

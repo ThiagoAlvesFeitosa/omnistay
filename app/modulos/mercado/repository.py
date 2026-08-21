@@ -164,3 +164,65 @@ def criado_em_do_trabalho(conexao: Connection, *, id_trabalho: int):
         text("SELECT criado_em FROM trabalho WHERE id_trabalho = :id"),
         {"id": id_trabalho},
     ).scalar_one()
+
+
+def ultimos_sucessos(conexao: Connection, *, id_hotel: int) -> dict[int, dict]:
+    linhas = conexao.execute(
+        text(
+            "SELECT DISTINCT ON (c.id_concorrente)"
+            " c.id_concorrente, m.id_coleta, m.preco, m.nota_media,"
+            " m.sucesso, m.coletado_em"
+            " FROM concorrente c"
+            " JOIN coleta_mercado m ON m.id_concorrente = c.id_concorrente"
+            " WHERE c.id_hotel = :id_hotel AND m.sucesso"
+            " ORDER BY c.id_concorrente, m.coletado_em DESC, m.id_coleta DESC"
+        ),
+        {"id_hotel": id_hotel},
+    ).mappings().all()
+    return {linha["id_concorrente"]: dict(linha) for linha in linhas}
+
+
+def ultimas_linhas(conexao: Connection, *, id_hotel: int) -> dict[int, dict]:
+    linhas = conexao.execute(
+        text(
+            "SELECT DISTINCT ON (c.id_concorrente)"
+            " c.id_concorrente, m.id_coleta, m.preco, m.nota_media,"
+            " m.sucesso, m.coletado_em"
+            " FROM concorrente c"
+            " JOIN coleta_mercado m ON m.id_concorrente = c.id_concorrente"
+            " WHERE c.id_hotel = :id_hotel"
+            " ORDER BY c.id_concorrente, m.coletado_em DESC, m.id_coleta DESC"
+        ),
+        {"id_hotel": id_hotel},
+    ).mappings().all()
+    return {linha["id_concorrente"]: dict(linha) for linha in linhas}
+
+
+def listar_serie(
+    conexao: Connection, *, id_hotel: int, id_concorrente: int
+) -> list[dict]:
+    linhas = conexao.execute(
+        text(
+            "SELECT m.id_coleta, m.sucesso, m.preco, m.nota_media, m.coletado_em"
+            " FROM coleta_mercado m"
+            " JOIN concorrente c ON c.id_concorrente = m.id_concorrente"
+            " WHERE c.id_hotel = :id_hotel AND c.id_concorrente = :id"
+            " ORDER BY m.coletado_em ASC, m.id_coleta ASC"
+        ),
+        {"id_hotel": id_hotel, "id": id_concorrente},
+    ).mappings().all()
+    return [dict(linha) for linha in linhas]
+
+
+def obter(
+    conexao: Connection, *, id_hotel: int, id_concorrente: int
+) -> dict | None:
+    linha = conexao.execute(
+        text(
+            "SELECT id_concorrente, id_hotel, nome, url_fonte, ativo"
+            " FROM concorrente"
+            " WHERE id_concorrente = :id AND id_hotel = :id_hotel"
+        ),
+        {"id": id_concorrente, "id_hotel": id_hotel},
+    ).mappings().one_or_none()
+    return dict(linha) if linha is not None else None

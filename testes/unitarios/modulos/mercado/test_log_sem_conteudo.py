@@ -134,3 +134,62 @@ def test_coleta_loga_identificadores_sem_url_preco_nem_nota(monkeypatch):
     _proibido(texto)
     assert str(PRECO_FIXTURE) not in texto
     assert "4.50" not in texto
+
+
+def test_painel_e_historico_logam_ids_sem_preco_nota_nem_url(monkeypatch):
+    from datetime import UTC, datetime, timedelta
+    from testes.suporte.coleta_mercado import PRECO_FIXTURE as PRECO
+
+    coletado = datetime(2026, 8, 21, 11, tzinfo=UTC)
+    sucesso = {
+        "id_coleta": 1,
+        "id_concorrente": 4,
+        "preco": PRECO,
+        "nota_media": None,
+        "sucesso": True,
+        "coletado_em": coletado,
+    }
+
+    class RepoPainel:
+        def listar_manutencao(self, conexao, *, id_hotel):
+            return [self.item]
+
+        def ultimos_sucessos(self, conexao, *, id_hotel):
+            return {4: sucesso}
+
+        def ultimas_linhas(self, conexao, *, id_hotel):
+            return {4: sucesso}
+
+        def obter(self, conexao, *, id_hotel, id_concorrente):
+            return self.item
+
+        def listar_serie(self, conexao, *, id_hotel, id_concorrente):
+            return [sucesso]
+
+    repo = RepoPainel()
+    repo.item = {
+        "id_concorrente": 4,
+        "id_hotel": 1,
+        "nome": NOME,
+        "url_fonte": URL_FONTE,
+        "ativo": True,
+    }
+    registros = _capturar(monkeypatch)
+    mercado.ler_painel(
+        object(),
+        id_hotel=1,
+        agora=coletado + timedelta(hours=1),
+        repositorio=repo,
+        ler_parametro=lambda conexao, id_hotel, chave: "24",
+    )
+    mercado.ler_historico(
+        object(), id_hotel=1, id_concorrente=4, repositorio=repo
+    )
+    texto = " ".join(registros)
+    assert "painel" in texto
+    assert "historico" in texto
+    assert "id_hotel=1" in texto
+    assert "id_concorrente=4" in texto
+    _proibido(texto)
+    assert str(PRECO) not in texto
+    assert "4.50" not in texto

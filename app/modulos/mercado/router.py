@@ -11,8 +11,10 @@ from app.modulos.mercado.schema import (
     ConcorrenteEntrada,
     ConcorrentePatch,
     ConcorrenteResposta,
+    HistoricoMercadoResposta,
     ListaFontesAtivasResposta,
     ListaManutencaoResposta,
+    PainelMercadoResposta,
 )
 
 roteador = APIRouter(tags=["mercado"])
@@ -105,3 +107,35 @@ def alterar_concorrente(
             detail="Ja existe concorrente com esta fonte.",
         ) from erro
     return alterado.para_resposta()
+
+
+@roteador.get("/mercado", response_model=PainelMercadoResposta)
+def consultar_painel(
+    conexao: Conexao,
+    sessao: Annotated[SessaoAtual, Depends(exigir_operacao("ler_mercado"))],
+) -> PainelMercadoResposta:
+    painel = mercado.ler_painel(conexao, id_hotel=sessao.id_hotel)
+    return painel.para_resposta()
+
+
+@roteador.get(
+    "/mercado/concorrentes/{id_concorrente}",
+    response_model=HistoricoMercadoResposta,
+)
+def consultar_historico(
+    id_concorrente: int,
+    conexao: Conexao,
+    sessao: Annotated[SessaoAtual, Depends(exigir_operacao("ler_mercado"))],
+) -> HistoricoMercadoResposta:
+    try:
+        historico = mercado.ler_historico(
+            conexao,
+            id_hotel=sessao.id_hotel,
+            id_concorrente=id_concorrente,
+        )
+    except mercado.ConcorrenteNaoEncontrado as erro:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Concorrente nao encontrado.",
+        ) from erro
+    return historico.para_resposta()

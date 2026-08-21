@@ -1,17 +1,28 @@
 """Cadastro de concorrentes e coleta agendada. Nao conhece HTTP nem SQL."""
 
 from dataclasses import dataclass
-from datetime import UTC, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from urllib.parse import urlparse
 
 from sqlalchemy.engine import Connection
 
+from app.comum import relogio as relogio_padrao
 from app.comum.log import obter_logger
 from app.fila import repository as fila_repository
 from app.fila import service as fila_service
 from app.modulos.mercado import repository as mercado_repository
-from app.modulos.mercado.schema import ConcorrenteResposta, FonteAtivaResposta
+from app.modulos.mercado.schema import (
+    ConcorrenteResposta,
+    FonteAtivaResposta,
+    HistoricoMercadoResposta,
+    ItemPainelResposta,
+    PainelMercadoResposta,
+    PontoColetaResposta,
+    UltimaFalhaResposta,
+    UltimoSucessoResposta,
+)
+from app.modulos.propriedade import repository as propriedade_repository
 from app.portas.fonte_publica import (
     DESFECHO_ENCONTRADO,
     DIRETIVA_AUSENTE,
@@ -198,6 +209,11 @@ def listar_fontes_ativas(
 
 
 CHAVE_PERIODICIDADE = "periodicidade_coleta_mercado"
+SITUACAO_ATUAL = "atual"
+SITUACAO_DESATUALIZADO = "desatualizado"
+SITUACAO_CADENCIA_AUSENTE = "cadencia_ausente"
+SITUACAO_SEM_COLETA = "sem_coleta"
+SITUACAO_SO_FALHA = "so_falha"
 
 
 def _inteiro_positivo(valor: str | None) -> int | None:
@@ -392,3 +408,222 @@ def processar_trabalho_coletar_mercado(
             codigo,
         )
     fila_repository.marcar_concluido(conexao, id_trabalho=id_trabalho)
+
+
+@dataclass(frozen=True)
+class UltimoSucesso:
+    preco: Decimal | None
+    nota_media: Decimal | None
+    coletado_em: datetime
+
+    def para_resposta(self) -> UltimoSucessoResposta:
+        return UltimoSucessoResposta(
+            preco=self.preco,
+            nota_media=self.nota_media,
+            coletado_em=self.coletado_em,
+        )
+
+
+@dataclass(frozen=True)
+class UltimaFalha:
+    coletado_em: datetime
+
+    def para_resposta(self) -> UltimaFalhaResposta:
+        return UltimaFalhaResposta(coletado_em=self.coletado_em)
+
+
+@dataclass(frozen=True)
+class ItemPainel:
+    id_concorrente: int
+    nome: str
+    ativo: bool
+    situacao: str
+    ultimo_sucesso: UltimoSucesso | None
+    ultima_falha: UltimaFalha | None
+
+    def para_resposta(self) -> ItemPainelResposta:
+        return ItemPainelResposta(
+            id_concorrente=self.id_concorrente,
+            nome=self.nome,
+            ativo=self.ativo,
+            situacao=self.situacao,
+            ultimo_sucesso=(
+                self.ultimo_sucesso.para_resposta()
+                if self.ultimo_sucesso is not None
+                else None
+            ),
+            ultima_falha=(
+                self.ultima_falha.para_resposta()
+                if self.ultima_falha is not None
+                else None
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class PainelMercado:
+    periodicidade_horas: int | None
+    concorrentes: list[ItemPainel]
+
+    def para_resposta(self) -> PainelMercadoResposta:
+        return PainelMercadoResposta(
+            periodicidade_horas=self.periodicidade_horas,
+            concorrentes=[item.para_resposta() for item in self.concorrentes],
+        )
+
+
+@dataclass(frozen=True)
+class PontoColeta:
+    id_coleta: int
+    sucesso: bool
+    preco: Decimal | None
+    nota_media: Decimal | None
+    coletado_em: datetime
+
+    def para_resposta(self) -> PontoColetaResposta:
+        return PontoColetaResposta(
+            id_coleta=self.id_coleta,
+            sucesso=self.sucesso,
+            preco=self.preco,
+            nota_media=self.nota_media,
+            coletado_em=self.coletado_em,
+        )
+
+
+@dataclass(frozen=True)
+class HistoricoConcorrente:
+    id_concorrente: int
+    nome: str
+    ativo: bool
+    coletas: list[PontoColeta]
+
+    def para_resposta(self) -> HistoricoMercadoResposta:
+        return HistoricoMercadoResposta(
+            id_concorrente=self.id_concorrente,
+            nome=self.nome,
+            ativo=self.ativo,
+            coletas=[ponto.para_resposta() for ponto in self.coletas],
+        )
+
+
+def _com_fuso(instante):
+    if instante is None:
+        return None
+    if getattr(instante, "tzinfo", None) is None:
+        return instante.replace(tzinfo=UTC)
+    return instante
+
+
+def _sucesso_de(linha: dict) -> UltimoSucesso:
+    return UltimoSucesso(
+        preco=linha["preco"],
+        nota_media=linha["nota_media"],
+        coletado_em=_com_fuso(linha["coletado_em"]),
+    )
+
+
+def _classificar_situacao(
+    *,
+    ultima_linha: dict | None,
+    ultimo_sucesso: dict | None,
+    ultima_falha: dict | None,
+    periodicidade: int | None,
+    agora,
+) -> str:
+    if ultima_linha is None:
+        return SITUACAO_SEM_COLETA
+    if ultimo_sucesso is None:
+        return SITUACAO_SO_FALHA
+    if periodicidade is None:
+        return SITUACAO_CADENCIA_AUSENTE
+    marcado = _com_fuso(ultimo_sucesso["coletado_em"])
+    if agora >= marcado + timedelta(hours=periodicidade) or ultima_falha is not None:
+        return SITUACAO_DESATUALIZADO
+    return SITUACAO_ATUAL
+
+
+def ler_painel(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    agora=None,
+    repositorio=mercado_repository,
+    ler_parametro=None,
+) -> PainelMercado:
+    instante = agora() if callable(agora) else agora
+    if instante is None:
+        instante = relogio_padrao.agora()
+    instante = _com_fuso(instante)
+    leitor = (
+        ler_parametro
+        if ler_parametro is not None
+        else propriedade_repository.ler_parametro
+    )
+    periodicidade = _inteiro_positivo(leitor(conexao, id_hotel, CHAVE_PERIODICIDADE))
+    fichas = repositorio.listar_manutencao(conexao, id_hotel=id_hotel)
+    sucessos = repositorio.ultimos_sucessos(conexao, id_hotel=id_hotel)
+    linhas = repositorio.ultimas_linhas(conexao, id_hotel=id_hotel)
+    itens: list[ItemPainel] = []
+    for ficha in fichas:
+        id_concorrente = ficha["id_concorrente"]
+        sucesso = sucessos.get(id_concorrente)
+        ultima = linhas.get(id_concorrente)
+        falha = ultima if ultima is not None and not ultima["sucesso"] else None
+        situacao = _classificar_situacao(
+            ultima_linha=ultima,
+            ultimo_sucesso=sucesso,
+            ultima_falha=falha,
+            periodicidade=periodicidade,
+            agora=instante,
+        )
+        itens.append(
+            ItemPainel(
+                id_concorrente=id_concorrente,
+                nome=ficha["nome"],
+                ativo=ficha["ativo"],
+                situacao=situacao,
+                ultimo_sucesso=_sucesso_de(sucesso) if sucesso is not None else None,
+                ultima_falha=(
+                    UltimaFalha(coletado_em=_com_fuso(falha["coletado_em"]))
+                    if falha is not None
+                    else None
+                ),
+            )
+        )
+    logger.info("painel id_hotel=%s", id_hotel)
+    return PainelMercado(periodicidade_horas=periodicidade, concorrentes=itens)
+
+
+def ler_historico(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_concorrente: int,
+    repositorio=mercado_repository,
+) -> HistoricoConcorrente:
+    ficha = repositorio.obter(
+        conexao, id_hotel=id_hotel, id_concorrente=id_concorrente
+    )
+    if ficha is None:
+        raise ConcorrenteNaoEncontrado
+    pontos = [
+        PontoColeta(
+            id_coleta=linha["id_coleta"],
+            sucesso=linha["sucesso"],
+            preco=linha["preco"],
+            nota_media=linha["nota_media"],
+            coletado_em=_com_fuso(linha["coletado_em"]),
+        )
+        for linha in repositorio.listar_serie(
+            conexao, id_hotel=id_hotel, id_concorrente=id_concorrente
+        )
+    ]
+    logger.info(
+        "historico id_hotel=%s id_concorrente=%s", id_hotel, id_concorrente
+    )
+    return HistoricoConcorrente(
+        id_concorrente=ficha["id_concorrente"],
+        nome=ficha["nome"],
+        ativo=ficha["ativo"],
+        coletas=pontos,
+    )
