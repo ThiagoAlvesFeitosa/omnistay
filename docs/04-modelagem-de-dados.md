@@ -660,9 +660,14 @@ CHECK: `origem <> 'checkout' OR nota IS NOT NULL` — pulso continua com nota nu
 | --- | --- | --- | --- | --- |
 | `id_concorrente` | `BIGSERIAL` | PK | OP | |
 | `id_hotel` | `BIGINT` | FK, NOT NULL | OP | Quem monitora |
-| `nome` | `VARCHAR(120)` | NOT NULL | OP | |
-| `url_fonte` | `VARCHAR(400)` | NOT NULL | OP | |
-| `ativo` | `BOOLEAN` | NOT NULL, default `true` | OP | |
+| `nome` | `VARCHAR(120)` | NOT NULL | OP | Duplicata permitida |
+| `url_fonte` | `VARCHAR(400)` | NOT NULL, CHECK `http(s)://` sem espaço | OP | Fonte pública; cadastrada, não visitada nesta fatia |
+| `ativo` | `BOOLEAN` | NOT NULL, default `true` | OP | Desativar não apaga; inativo fora da lista de fontes ativas |
+| `criado_em` | `TIMESTAMPTZ` | NOT NULL, default `now()` | OP | |
+
+Unicidade `uq_concorrente_hotel_fonte` em `(id_hotel, lower(btrim(url_fonte)))` — **completa**, não parcial: fonte desativada continua a ocupar o endereço; o caminho é reativar. Índice parcial `ix_concorrente_hotel_ativo` em `(id_hotel) WHERE ativo` cobre a consulta de fontes ativas.
+
+Esta fatia (F5.1) **não** escreve `coleta_mercado`.
 
 | Campo | Tipo | Restrições | Classe | Descrição |
 | --- | --- | --- | --- | --- |

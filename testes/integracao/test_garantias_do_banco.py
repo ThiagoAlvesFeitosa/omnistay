@@ -1146,3 +1146,90 @@ def test_segundo_trabalho_de_lista_pedidos_da_mesma_reserva_e_recusado(conexao):
         _inserir_trabalho_enviar_lista_pedidos_chat(conexao, id_hotel, id_reserva)
 
     assert "uq_trabalho_enviar_lista_pedidos_chat_reserva" in str(erro.value)
+
+
+def _inserir_concorrente(
+    conexao, id_hotel: int, *, nome="Hotel Vizinho", url="https://a.exemplo/x", ativo=True
+):
+    return conexao.execute(
+        text(
+            "INSERT INTO concorrente (id_hotel, nome, url_fonte, ativo) "
+            "VALUES (:id_hotel, :nome, :url, :ativo) RETURNING id_concorrente"
+        ),
+        {"id_hotel": id_hotel, "nome": nome, "url": url, "ativo": ativo},
+    ).scalar()
+
+
+@pytest.mark.postgres
+def test_concorrente_com_url_http_e_aceito(conexao):
+    id_hotel = criar_hotel(conexao)
+
+    id_concorrente = _inserir_concorrente(conexao, id_hotel)
+
+    assert id_concorrente
+
+
+@pytest.mark.postgres
+def test_concorrente_sem_esquema_e_recusado(conexao):
+    id_hotel = criar_hotel(conexao)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_concorrente(conexao, id_hotel, url="www.exemplo.com/x")
+
+    assert "ck_concorrente_url_fonte" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_concorrente_mailto_e_recusado(conexao):
+    id_hotel = criar_hotel(conexao)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_concorrente(conexao, id_hotel, url="mailto:x@y.com")
+
+    assert "ck_concorrente_url_fonte" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_concorrente_com_espaco_no_meio_da_url_e_recusado(conexao):
+    id_hotel = criar_hotel(conexao)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_concorrente(
+            conexao, id_hotel, url="https://a.exemplo/caminho com espaco"
+        )
+
+    assert "ck_concorrente_url_fonte" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_segunda_fonte_igual_no_hotel_e_recusada_mesmo_inativa(conexao):
+    id_hotel = criar_hotel(conexao)
+    _inserir_concorrente(conexao, id_hotel, url="https://a.exemplo/x", ativo=False)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_concorrente(conexao, id_hotel, nome="Outro", url="HTTPS://A.EXEMPLO/X")
+
+    assert "uq_concorrente_hotel_fonte" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_segunda_fonte_com_espacos_nas_pontas_e_recusada(conexao):
+    id_hotel = criar_hotel(conexao)
+    _inserir_concorrente(conexao, id_hotel, url="https://a.exemplo/x")
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_concorrente(conexao, id_hotel, nome="Outro", url="  https://a.exemplo/x  ")
+
+    assert "uq_concorrente_hotel_fonte" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_dois_hoteis_podem_ter_a_mesma_fonte(conexao):
+    hotel_a = criar_hotel(conexao)
+    hotel_b = criar_hotel(conexao)
+
+    um = _inserir_concorrente(conexao, hotel_a, url="https://a.exemplo/x")
+    outro = _inserir_concorrente(conexao, hotel_b, url="https://a.exemplo/x")
+
+    assert um
+    assert outro != um

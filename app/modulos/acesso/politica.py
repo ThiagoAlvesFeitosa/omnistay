@@ -25,6 +25,8 @@ OPERACOES: Final[dict[str, frozenset[str]]] = {
     "ler_consentimento": frozenset({"recepcao", "gestor"}),
     "registrar_consentimento": frozenset({"recepcao", "gestor"}),
     "ler_pedidos_feitos_pelo_chat": frozenset({"recepcao", "gestor"}),
+    "alterar_concorrentes": frozenset({"gestor"}),
+    "ler_concorrentes": frozenset({"gestor"}),
 }
 
 

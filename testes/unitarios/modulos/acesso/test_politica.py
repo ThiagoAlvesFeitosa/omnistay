@@ -25,6 +25,8 @@ OPERACOES_ESPERADAS = {
     "ler_consentimento": {"recepcao", "gestor"},
     "registrar_consentimento": {"recepcao", "gestor"},
     "ler_pedidos_feitos_pelo_chat": {"recepcao", "gestor"},
+    "alterar_concorrentes": {"gestor"},
+    "ler_concorrentes": {"gestor"},
 }
 
 
@@ -100,6 +102,13 @@ def test_ler_pedidos_feitos_pelo_chat_recepcao_e_gestor_staff_recusado():
     assert politica.permitido("recepcao", "ler_pedidos_feitos_pelo_chat") is True
     assert politica.permitido("gestor", "ler_pedidos_feitos_pelo_chat") is True
     assert politica.permitido("staff", "ler_pedidos_feitos_pelo_chat") is False
+
+
+def test_alterar_e_ler_concorrentes_so_gestor():
+    for operacao in ("alterar_concorrentes", "ler_concorrentes"):
+        assert politica.permitido("gestor", operacao) is True
+        assert politica.permitido("recepcao", operacao) is False
+        assert politica.permitido("staff", operacao) is False
 
 
 def test_nenhuma_operacao_da_matriz_contem_parametro_no_nome():

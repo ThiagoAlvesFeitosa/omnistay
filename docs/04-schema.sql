@@ -535,8 +535,16 @@ CREATE TABLE concorrente (
     nome           VARCHAR(120) NOT NULL,
     url_fonte      VARCHAR(400) NOT NULL,
     ativo          BOOLEAN      NOT NULL DEFAULT TRUE,
-    criado_em      TIMESTAMPTZ  NOT NULL DEFAULT now()
+    criado_em      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT ck_concorrente_url_fonte
+        CHECK (btrim(url_fonte) ~* '^https?://[^[:space:]]+$')
 );
+
+CREATE UNIQUE INDEX uq_concorrente_hotel_fonte
+    ON concorrente (id_hotel, lower(btrim(url_fonte)));
+
+CREATE INDEX ix_concorrente_hotel_ativo
+    ON concorrente (id_hotel) WHERE ativo;
 
 
 CREATE TABLE coleta_mercado (

@@ -1,6 +1,6 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 20/08/2026
+**Atualizado em:** 21/08/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
 
 ---
@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 19 de 24 fatias concluídas.
+**Progresso:** 20 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -32,7 +32,8 @@
 | F3.8 Pulso do segundo dia | ✅ Concluída — varredura em `worker/agendador.py` (sem APScheduler), módulo `feedback` escreve `avaliacao`, um recado por mensagem, neutro = positivo, só reclamação não resolvida suprime, `horas_minimas_para_pulso=24`; revisão `0016_pulso_segundo_dia` |
 | F4.1 Confirmar saída e pesquisa | ✅ Concluída — clique `POST /reservas/{id}/saida` reusa `confirmar_fase_da_reserva`, pesquisa curta sem classificar, consentimento append-only, visão mantém encerrada só com leitura humana, `horas_atribuicao_pesquisa_saida=24`; revisão `0017_confirmar_saida` |
 | F4.2 Lista de pedidos feitos pelo chat | ✅ Concluída — o mesmo clique de saída agenda pesquisa **e** lista (mensagem distinta); recorte cobrável (`pendente`+`lancado`); GET ao vivo `pedidos-feitos-pelo-chat`; snapshot na mensagem; operação `ler_pedidos_feitos_pelo_chat`; revisão `0018_lista_pedidos_chat`. Sem React, sem extrato/conta |
-| Demais 5 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F5.1** (cadastro de concorrentes). Não há F2.3 nem F3.9 no backlog |
+| F5.1 Cadastro de concorrentes | ✅ Concluída — módulo `mercado`, gestão cria/edita/desativa (não apaga); `GET /concorrentes/ativos` omite inativo; UNIQUE da fonte por hotel inclusive inativo; CHECK de URL; recepção e staff `403`; revisão `0019_cadastrar_concorrentes`. Sem visita à fonte, sem React, sem `coleta_mercado` |
+| Demais 4 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F5.2** (coleta agendada). Não há F2.3 nem F3.9 no backlog |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -148,6 +149,9 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Snapshot vs consulta | O corpo da mensagem é gravado no enfileiramento. `GET /reservas/{id}/pedidos-feitos-pelo-chat` é consulta ao vivo (recepção e gestão; staff `403`; outro hotel `404` uniforme) | F4.2 |
 | Valor histórico | A lista lê `consumo.valor_praticado`, nunca `item_vendavel.preco_atual`. Reajuste depois do pedido não altera o recado nem o GET | F4.2 |
 | Nomenclatura | Rótulo **pedidos feitos pelo chat**. Sem “extrato”, sem “conta”, sem “está correto?”, sem convite a pagar. Sem tela React nesta fatia | F4.2 |
+| Gestão cadastra concorrentes | Escrever a lista **não** contradiz “somente leitura” do painel de preços (F5.3). A FR-019 da F0.3 recusa gestão em reserva/hóspede/solicitação/consumo/avaliação — não em concorrente. Recepção e staff não leem nem alteram | F5.1 |
+| Fonte única por hotel | `uq_concorrente_hotel_fonte` em `(id_hotel, lower(btrim(url_fonte)))` é completa, não parcial: inativo continua a ocupar o endereço. Desativar não apaga. `GET /concorrentes/ativos` é o contrato da F5.2 | F5.1 |
+| Sem visita nesta fatia | Cadastro não abre a URL, não grava `coleta_mercado` e não examina termos de uso. Quem cadastra escolhe fonte pública | F5.1 |
 
 ## Onde ficam os arquivos
 
@@ -370,7 +374,7 @@ Ainda abertas:
       01/10/2026** — as margens do cenário B do Canvas dependem disso
 - [ ] Definir os **valores** dos parâmetros com o hotel (horas de reenvio, janela de corte,
       periodicidade da coleta)
-- [ ] Cadastrar a lista de concorrentes e **verificar os termos de uso de cada fonte**
+- [x] ~~Cadastrar a lista de concorrentes~~ F5.1: API de manutenção + fontes ativas. **Verificar os termos de uso de cada fonte** permanece humano / F5.2
 - [ ] Confirmar a lista oficial vigente de campos exigidos por lei para registro de hóspede
 - [ ] Testar colagem no PMS real
 - [ ] Confirmar junto à Meta a categoria do template de pulso do segundo dia
