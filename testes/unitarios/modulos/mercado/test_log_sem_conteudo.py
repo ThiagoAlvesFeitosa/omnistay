@@ -86,3 +86,51 @@ def test_editar_desativar_reativar_sem_nome_nem_url(monkeypatch):
     assert "concorrente_reativar" in texto
     assert "id_concorrente=4" in texto
     _proibido(texto)
+
+
+def test_coleta_loga_identificadores_sem_url_preco_nem_nota(monkeypatch):
+    from datetime import UTC, datetime
+    from app.adaptadores.fonte_falsa import FonteFalsa
+    from testes.suporte.coleta_mercado import PRECO_FIXTURE
+
+    class RepoColeta:
+        def obter_ativo(self, conexao, *, id_hotel, id_concorrente):
+            return {
+                "id_concorrente": 4,
+                "id_hotel": 1,
+                "url_fonte": URL_FONTE,
+            }
+
+        def ultima_coleta(self, conexao, *, id_concorrente):
+            return None
+
+        def inserir_coleta(self, conexao, **kwargs):
+            return kwargs
+
+        def criado_em_do_trabalho(self, conexao, *, id_trabalho):
+            return datetime(2026, 8, 21, tzinfo=UTC)
+
+    registros = _capturar(monkeypatch)
+    monkeypatch.setattr(
+        mercado.fila_repository,
+        "marcar_concluido",
+        lambda conexao, id_trabalho: None,
+    )
+    mercado.processar_trabalho_coletar_mercado(
+        object(),
+        trabalho={
+            "id_trabalho": 1,
+            "id_hotel": 1,
+            "payload": {"id_concorrente": 4},
+        },
+        fonte=FonteFalsa(),
+        agora=datetime(2026, 8, 21, 12, tzinfo=UTC),
+        repositorio=RepoColeta(),
+    )
+    texto = " ".join(registros)
+    assert "id_concorrente=4" in texto
+    assert "id_hotel=1" in texto
+    assert "coleta_sucesso" in texto
+    _proibido(texto)
+    assert str(PRECO_FIXTURE) not in texto
+    assert "4.50" not in texto

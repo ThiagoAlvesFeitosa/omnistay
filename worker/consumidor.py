@@ -3,6 +3,7 @@
 from sqlalchemy.engine import Connection, Engine
 
 from app.adaptadores.catalogo_banco import CatalogoBanco
+from app.adaptadores.fonte_falsa import FonteFalsa
 from app.adaptadores.llm_falso import LLMFalso
 from app.adaptadores.mensageria_falsa import MensageriaFalsa
 from app.comum.log import obter_logger
@@ -10,7 +11,9 @@ from app.fila import repository as fila_repository
 from app.modulos.atendimento import service as atendimento_service
 from app.modulos.conversa import service as conversa_service
 from app.modulos.hospedagem import service as hospedagem_service
+from app.modulos.mercado import service as mercado_service
 from app.modulos.propriedade import service as propriedade_service
+from app.portas.fonte_publica import FontePublica
 from app.portas.llm import LLMProvider
 from app.portas.mensageria import MensageriaGateway
 
@@ -23,11 +26,13 @@ def processar_uma_passagem(
     gateway: MensageriaGateway,
     llm: LLMProvider | None = None,
     catalogo=None,
+    fonte: FontePublica | None = None,
     limite: int = 100,
 ) -> int:
     """Processa ate `limite` trabalhos elegiveis. Devolve quantos foram claims."""
     porta_llm = llm or LLMFalso()
     porta_catalogo = catalogo
+    porta_fonte = fonte or FonteFalsa()
     processados = 0
     while processados < limite:
         trabalho = fila_repository.reclamar_proximo(conexao)
@@ -119,6 +124,10 @@ def processar_uma_passagem(
             conversa_service.processar_trabalho_enviar_lista_pedidos_chat(
                 conexao, trabalho=trabalho, gateway=gateway
             )
+        elif trabalho["tipo"] == "coletar_mercado":
+            mercado_service.processar_trabalho_coletar_mercado(
+                conexao, trabalho=trabalho, fonte=porta_fonte
+            )
         else:
             fila_repository.marcar_falha(
                 conexao,
@@ -136,9 +145,10 @@ def processar_uma_passagem_na_engine(
     gateway: MensageriaGateway | None = None,
     llm: LLMProvider | None = None,
     catalogo=None,
+    fonte: FontePublica | None = None,
 ) -> int:
     porta = gateway or MensageriaFalsa()
     with engine.begin() as conexao:
         return processar_uma_passagem(
-            conexao, gateway=porta, llm=llm, catalogo=catalogo
+            conexao, gateway=porta, llm=llm, catalogo=catalogo, fonte=fonte
         )

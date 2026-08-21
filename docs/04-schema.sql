@@ -336,7 +336,7 @@ CREATE TABLE trabalho (
                  'abrir_chamado_reclamacao', 'enviar_confirmacao_resolucao',
                  'enviar_pulso', 'registrar_resposta_pulso',
                  'enviar_pesquisa_saida', 'interpretar_pesquisa_saida',
-                 'enviar_lista_pedidos_chat')
+                 'enviar_lista_pedidos_chat', 'coletar_mercado')
     ),
     CONSTRAINT ck_trabalho_status CHECK (
         status IN ('pendente', 'processando', 'concluido', 'falha')
@@ -402,6 +402,11 @@ CREATE UNIQUE INDEX uq_trabalho_interpretar_pesquisa_saida_mensagem
 CREATE UNIQUE INDEX uq_trabalho_enviar_lista_pedidos_chat_reserva
     ON trabalho ( ((payload->>'id_reserva')::bigint) )
     WHERE tipo = 'enviar_lista_pedidos_chat';
+
+CREATE UNIQUE INDEX uq_trabalho_coletar_mercado_concorrente_aberto
+    ON trabalho ( ((payload->>'id_concorrente')::bigint) )
+    WHERE tipo = 'coletar_mercado'
+      AND status IN ('pendente', 'processando');
 
 CREATE INDEX ix_trabalho_claim
     ON trabalho (status, proxima_tentativa_em)

@@ -241,6 +241,20 @@ def enfileirar_enviar_lista_pedidos_chat(
     )
 
 
+def enfileirar_coletar_mercado(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_concorrente: int,
+    repositorio=repositorio_padrao,
+) -> int | None:
+    return repositorio.enfileirar_coletar_mercado(
+        conexao,
+        id_hotel=id_hotel,
+        id_concorrente=id_concorrente,
+    )
+
+
 def tentativas_maximas(
     conexao: Connection,
     *,

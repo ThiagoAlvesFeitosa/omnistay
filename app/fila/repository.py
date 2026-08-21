@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
+from sqlalchemy.exc import IntegrityError
 
 TIPO_ENVIAR_COLETA = "enviar_coleta"
 TIPO_INTERPRETAR_FICHA = "interpretar_ficha"
@@ -20,6 +21,7 @@ TIPO_REGISTRAR_RESPOSTA_PULSO = "registrar_resposta_pulso"
 TIPO_ENVIAR_PESQUISA_SAIDA = "enviar_pesquisa_saida"
 TIPO_INTERPRETAR_PESQUISA_SAIDA = "interpretar_pesquisa_saida"
 TIPO_ENVIAR_LISTA_PEDIDOS_CHAT = "enviar_lista_pedidos_chat"
+TIPO_COLETAR_MERCADO = "coletar_mercado"
 TIPOS_CONSUMIVEIS = (
     TIPO_ENVIAR_COLETA,
     TIPO_INTERPRETAR_FICHA,
@@ -35,6 +37,7 @@ TIPOS_CONSUMIVEIS = (
     TIPO_ENVIAR_PESQUISA_SAIDA,
     TIPO_INTERPRETAR_PESQUISA_SAIDA,
     TIPO_ENVIAR_LISTA_PEDIDOS_CHAT,
+    TIPO_COLETAR_MERCADO,
 )
 BLOQUEIO_PROCESSANDO = timedelta(minutes=5)
 
@@ -368,6 +371,31 @@ def enfileirar_enviar_lista_pedidos_chat(
     ).scalar_one()
 
 
+def enfileirar_coletar_mercado(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_concorrente: int,
+) -> int | None:
+    payload = json.dumps({"id_concorrente": id_concorrente})
+    try:
+        with conexao.begin_nested():
+            return conexao.execute(
+                text(
+                    "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+                    "VALUES (:id_hotel, :tipo, CAST(:payload AS jsonb), 'pendente') "
+                    "RETURNING id_trabalho"
+                ),
+                {
+                    "id_hotel": id_hotel,
+                    "tipo": TIPO_COLETAR_MERCADO,
+                    "payload": payload,
+                },
+            ).scalar_one()
+    except IntegrityError:
+        return None
+
+
 def reclaim_expirados(
     conexao: Connection,
     *,
@@ -408,7 +436,7 @@ def reclamar_proximo(
             " 'abrir_chamado_reclamacao', 'enviar_confirmacao_resolucao',"
             " 'enviar_pulso', 'registrar_resposta_pulso',"
             " 'enviar_pesquisa_saida', 'interpretar_pesquisa_saida',"
-            " 'enviar_lista_pedidos_chat')"
+            " 'enviar_lista_pedidos_chat', 'coletar_mercado')"
             " AND (proxima_tentativa_em IS NULL OR proxima_tentativa_em <= :agora)"
             " ORDER BY id_trabalho ASC"
             " FOR UPDATE SKIP LOCKED"

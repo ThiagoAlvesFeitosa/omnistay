@@ -273,3 +273,25 @@ def verificar_pulsos_pendentes(
         )
         afetados += 1
     return afetados
+
+
+def verificar_coletas_mercado(
+    conexao: Connection,
+    *,
+    agora=None,
+    repositorio_propriedade=propriedade_repository,
+    repositorio_mercado=None,
+    enfileirar=None,
+) -> int:
+    from app.modulos.mercado import service as mercado_service
+
+    instante = agora or relogio.agora()
+    kwargs = {
+        "agora": instante,
+        "repositorio_propriedade": repositorio_propriedade,
+    }
+    if repositorio_mercado is not None:
+        kwargs["repositorio"] = repositorio_mercado
+    if enfileirar is not None:
+        kwargs["enfileirar"] = enfileirar
+    return mercado_service.agendar_coletas_devidas(conexao, **kwargs)

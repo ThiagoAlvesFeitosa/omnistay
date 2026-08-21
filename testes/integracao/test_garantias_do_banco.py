@@ -1148,6 +1148,71 @@ def test_segundo_trabalho_de_lista_pedidos_da_mesma_reserva_e_recusado(conexao):
     assert "uq_trabalho_enviar_lista_pedidos_chat_reserva" in str(erro.value)
 
 
+def _inserir_trabalho_coletar_mercado(
+    conexao, id_hotel: int, id_concorrente: int, *, status="pendente"
+) -> None:
+    conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, 'coletar_mercado',"
+            " CAST(:payload AS jsonb), :status)"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "payload": '{"id_concorrente": %s}' % id_concorrente,
+            "status": status,
+        },
+    )
+
+
+@pytest.mark.postgres
+def test_tipo_coletar_mercado_e_aceito_pelo_check(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_concorrente = _inserir_concorrente(conexao, id_hotel)
+
+    _inserir_trabalho_coletar_mercado(conexao, id_hotel, id_concorrente)
+
+    tipo = conexao.execute(
+        text("SELECT tipo FROM trabalho WHERE tipo = 'coletar_mercado'")
+    ).scalar_one()
+    assert tipo == "coletar_mercado"
+
+
+@pytest.mark.postgres
+def test_segundo_trabalho_aberto_de_coleta_do_mesmo_concorrente_e_recusado(
+    conexao,
+):
+    id_hotel = criar_hotel(conexao)
+    id_concorrente = _inserir_concorrente(conexao, id_hotel)
+    _inserir_trabalho_coletar_mercado(conexao, id_hotel, id_concorrente)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_trabalho_coletar_mercado(conexao, id_hotel, id_concorrente)
+
+    assert "uq_trabalho_coletar_mercado_concorrente_aberto" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_segundo_trabalho_concluido_de_coleta_do_mesmo_concorrente_passa(
+    conexao,
+):
+    id_hotel = criar_hotel(conexao)
+    id_concorrente = _inserir_concorrente(conexao, id_hotel)
+    _inserir_trabalho_coletar_mercado(
+        conexao, id_hotel, id_concorrente, status="concluido"
+    )
+    _inserir_trabalho_coletar_mercado(
+        conexao, id_hotel, id_concorrente, status="concluido"
+    )
+
+    qtd = conexao.execute(
+        text(
+            "SELECT COUNT(*) FROM trabalho WHERE tipo = 'coletar_mercado'"
+        )
+    ).scalar_one()
+    assert qtd == 2
+
+
 def _inserir_concorrente(
     conexao, id_hotel: int, *, nome="Hotel Vizinho", url="https://a.exemplo/x", ativo=True
 ):

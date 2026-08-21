@@ -665,9 +665,14 @@ CHECK: `origem <> 'checkout' OR nota IS NOT NULL` — pulso continua com nota nu
 | `ativo` | `BOOLEAN` | NOT NULL, default `true` | OP | Desativar não apaga; inativo fora da lista de fontes ativas |
 | `criado_em` | `TIMESTAMPTZ` | NOT NULL, default `now()` | OP | |
 
-Unicidade `uq_concorrente_hotel_fonte` em `(id_hotel, lower(btrim(url_fonte)))` — **completa**, não parcial: fonte desativada continua a ocupar o endereço; o caminho é reativar. Índice parcial `ix_concorrente_hotel_ativo` em `(id_hotel) WHERE ativo` cobre a consulta de fontes ativas.
+Esta fatia (F5.2) **escreve** `coleta_mercado`: cada ciclo insere uma linha
+nova, jamais atualiza a anterior. A periodicidade vem de
+`periodicidade_coleta_mercado` (horas, semente 24). Um trabalho
+`coletar_mercado` aberto (pendente/processando) por concorrente é único;
+históricos `concluido` se repetem a cada ciclo. O hotel chega pelo
+`concorrente`, não por coluna própria. Painel de consulta permanece F5.3.
 
-Esta fatia (F5.1) **não** escreve `coleta_mercado`.
+Unicidade `uq_concorrente_hotel_fonte` em `(id_hotel, lower(btrim(url_fonte)))` — **completa**, não parcial: fonte desativada continua a ocupar o endereço; o caminho é reativar. Índice parcial `ix_concorrente_hotel_ativo` em `(id_hotel) WHERE ativo` cobre a consulta de fontes ativas.
 
 | Campo | Tipo | Restrições | Classe | Descrição |
 | --- | --- | --- | --- | --- |
