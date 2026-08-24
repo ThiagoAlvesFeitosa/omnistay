@@ -826,11 +826,12 @@ um acompanhante, ou pelo celular corporativo de quem organizou a viagem.
 | 1 | `numero_quarto` como texto livre | Aceito. Criar entidade `quarto` exigiria sincronizar inventário com o PMS, o que a premissa arquitetural proíbe |
 | 2 | `catalogo_item.conteudo` como `TEXT` | Aceito no MVP. Se a resposta automática evoluir para busca semântica, esta tabela ganha coluna de embedding — decisão do Artefato 5 |
 | 3 | Ausência de auditoria genérica | Não há tabela de log de alteração. Para um TCC é escopo excessivo; em produção seria exigível |
-| 4 | Expurgo por retenção não está no DDL | Os prazos estão declarados nos comentários, mas a rotina de expurgo é tarefa agendada, não estrutura. Fica para o Artefato 5 |
+| 4 | Expurgo por retenção (cumprido na F6.1) | A rotina não é trigger nem coluna `anonimizado_em`. É passagem em `worker/agendador.py` (`verificar_retencao`), com comprovante na tabela `execucao_retencao` (uma por hotel por dia civil UTC). Chaves `meses_retencao_conteudo_livre` e `anos_retencao_ficha` em `parametro_hotel`. Revisão `0021_expurgo_retencao` |
 | 5 | `mensagem.id_externo` sem `UNIQUE` | Deliberado: a idempotência é controlada em `evento_webhook`, e duplicar a restrição aqui rejeitaria reprocessamentos legítimos |
 
-O item 4 é o que mais merece atenção: **declarar um prazo de retenção e não implementar o
-expurgo é pior do que não declarar**, porque cria uma obrigação documentada e não cumprida.
+O item 4 era o que mais merecia atenção: **declarar um prazo de retenção e não implementar o
+expurgo é pior do que não declarar**. A F6.1 cumpriu a passagem (não por trigger): conteúdo
+livre anonimizado aos 12 meses, ficha apagada aos 5 anos, comprovante consultável.
 
 ---
 
@@ -852,7 +853,8 @@ Resolvidas por este artefato:
 Ainda abertas:
 
 - [ ] Executar o `04-schema.sql` em um PostgreSQL real antes de iniciar a implementação
-- [ ] Implementar a rotina de expurgo por retenção — obrigação declarada em §6.1
+- [x] ~~Implementar a rotina de expurgo por retenção~~ F6.1: `verificar_retencao`, tabela
+      `execucao_retencao`, chaves `meses_retencao_conteudo_livre` e `anos_retencao_ficha`
 - [ ] Confirmar a lista oficial vigente de campos exigidos por lei para registro de hóspede
 - [ ] Testar colagem no PMS real
 - [ ] Mecanismo de acesso do staff ao Alert Center pelo celular

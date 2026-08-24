@@ -588,3 +588,61 @@ def ler_checkout_da_reserva(
         {"id": id_reserva},
     ).mappings().first()
     return dict(linha) if linha else None
+
+
+def anonimizar_mensagens_vencidas(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    agora,
+    meses: int,
+    marca: str,
+) -> int:
+    resultado = conexao.execute(
+        text(
+            "UPDATE mensagem m SET conteudo = :marca, classificacao_bruta = NULL"
+            " FROM reserva r"
+            " WHERE m.id_reserva = r.id_reserva"
+            " AND r.id_hotel = :id_hotel"
+            " AND r.checkout_em IS NOT NULL"
+            " AND r.checkout_em + make_interval(months => :meses) <= :agora"
+            " AND m.conteudo IS DISTINCT FROM :marca"
+        ),
+        {
+            "marca": marca,
+            "id_hotel": id_hotel,
+            "meses": meses,
+            "agora": agora,
+        },
+    )
+    return resultado.rowcount or 0
+
+
+def anonimizar_payloads_vencidos(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    agora,
+    meses: int,
+    marca_json: str,
+) -> int:
+    resultado = conexao.execute(
+        text(
+            "UPDATE evento_webhook e SET payload = CAST(:marca AS jsonb)"
+            " FROM mensagem m"
+            " JOIN reserva r ON r.id_reserva = m.id_reserva"
+            " WHERE e.id_externo = m.id_externo"
+            " AND m.id_externo IS NOT NULL"
+            " AND r.id_hotel = :id_hotel"
+            " AND r.checkout_em IS NOT NULL"
+            " AND r.checkout_em + make_interval(months => :meses) <= :agora"
+            " AND e.payload IS DISTINCT FROM CAST(:marca AS jsonb)"
+        ),
+        {
+            "marca": marca_json,
+            "id_hotel": id_hotel,
+            "meses": meses,
+            "agora": agora,
+        },
+    )
+    return resultado.rowcount or 0

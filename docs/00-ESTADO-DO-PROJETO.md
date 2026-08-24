@@ -1,6 +1,6 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 21/08/2026
+**Atualizado em:** 24/08/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
 
 ---
@@ -9,7 +9,7 @@
 
 **Documentação concluída** — seis artefatos. **Implementação em andamento.**
 
-**Progresso:** 22 de 24 fatias concluídas.
+**Progresso:** 23 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -35,7 +35,8 @@
 | F5.1 Cadastro de concorrentes | ✅ Concluída — módulo `mercado`, gestão cria/edita/desativa (não apaga); `GET /concorrentes/ativos` omite inativo; UNIQUE da fonte por hotel inclusive inativo; CHECK de URL; recepção e staff `403`; revisão `0019_cadastrar_concorrentes`. Sem visita à fonte, sem React, sem `coleta_mercado` |
 | F5.2 Coleta agendada de mercado | ✅ Concluída — `verificar_coletas_mercado` no `worker/agendador.py` (sem APScheduler, sem rota HTTP); tipo `coletar_mercado` com unicidade só do trabalho aberto; porta `FontePublica` + `FonteFalsa` / `FonteHttp` (stdlib, JSON-LD, User-Agent `OmniStay-Coletor/1.0`); diretiva ausente **não** autoriza visita; falha grava `sucesso=false`; `periodicidade_coleta_mercado=24` horas; revisão `0020_coleta_agendada`. Sem painel (F5.3), sem disparo manual, sem mensagem ao hóspede |
 | F5.3 Painel de mercado | ✅ Concluída — `GET /mercado` (visão atual) e `GET /mercado/concorrentes/{id}` (histórico); operação `ler_mercado` só gestão; visão atual = último **sucesso** datado; `situacao` (`atual` · `desatualizado` · `cadencia_ausente` · `sem_coleta` · `so_falha`); limiar = periodicidade da casa; escrita da série `405`; sem migração, sem React, sem disparo de coleta |
-| Demais 2 fatias | Pendentes, na ordem de `docs/backlog.md` — próxima: **F6.1** (expurgo por retenção). Não há F2.3 nem F3.9 no backlog |
+| F6.1 Expurgo por retenção | ✅ Concluída — `verificar_retencao` no `worker/agendador.py` (sem APScheduler, sem tipo na fila, sem botão “expurgar agora”); conteúdo livre vira marca 12 meses após `checkout_em`; ficha apagada 5 anos após a última saída vinculada; comprovante `execucao_retencao` (1/hotel/dia UTC); `GET /retencao` com `ler_retencao` só gestão; revisão `0021_expurgo_retencao`. Payload órfão fora; sem React; sem pedido avulso de esquecimento |
+| Demais 1 fatia | Pendente, na ordem de `docs/backlog.md` — próxima: **F6.2** (simulador da apresentação). Não há F2.3 nem F3.9 no backlog |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -162,6 +163,13 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Visão atual = último sucesso | `GET /mercado` não usa `ultima_coleta` (qualquer desfecho) como preço. Falha posterior deixa o sucesso com a data antiga e marca `desatualizado` | F5.3 |
 | `ler_mercado` | Operação só gestão, distinta de `ler_concorrentes`. Recepção e staff `403`. Escrita da série inexistente (`405`) | F5.3 |
 | Limiar de desatualizado | O mesmo `agora >= U + P` da coleta devida. Sem chave nova. Periodicidade inválida → `cadencia_ausente`, não assume 24 | F5.3 |
+| Relógio da retenção | Só `checkout_em` (clique de saída). Data prevista e PMS intocados. Sem `checkout_em`, o prazo não anda | F6.1 |
+| Anonimizar ≠ apagar | Mensagem, comentário, descrição e payload viram marca; a linha fica (volume). `classificacao_bruta` vira `NULL`. Comentário **e** descrição vazios não ganham marca | F6.1 |
+| Ficha aos 5 anos | DELETE de consentimento, vínculo e hóspede; reserva operacional permanece; telefone da reserva vira marca se ficou sem vínculo. Elegível só se **todas** as reservas vinculadas (qualquer hotel) já venceram | F6.1 |
+| Sem APScheduler (retenção) | `verificar_retencao` no laço horário; efetividade 1×/hotel/dia UTC via UNIQUE. `--verificar-retencao`; `--uma-passagem` não dispara. Sem tipo na fila `trabalho` | F6.1 |
+| Comprovante ≠ auditoria | Tabela `execucao_retencao` (quantidades e flags, sem texto). `GET /retencao` com `ler_retencao` só gestão. Sem botão de disparo (`405` / rota inexistente) | F6.1 |
+| Prazos sem default | `meses_retencao_conteudo_livre=12` e `anos_retencao_ficha=5` semeados. Ausência ou inválido: flag no comprovante e log `prazo_conteudo_ausente` / `prazo_ficha_ausente` — não assume 12 nem 5 | F6.1 |
+| Divergência do Artefato 5 §9.1 | `solicitacao.descricao` e `classificacao_bruta` entram no prazo de 12 meses (conteúdo livre). Payload de webhook órfão (sem mensagem) fica **fora** desta fatia | F6.1 |
 
 ## Onde ficam os arquivos
 
@@ -333,10 +341,11 @@ Resolvidas pelo Artefato 5:
 
 - [x] ~~Idempotência dos webhooks~~ Restrição `UNIQUE`, com o fluxo descrito
 - [x] ~~Ordem de chegada das mensagens~~ Não garantida no MVP, com justificativa
-- [x] ~~Mecanismo de agendamento~~ Artefato 5 nomeou APScheduler; F1.4 e F5.2
+- [x] ~~Mecanismo de agendamento~~ Artefato 5 nomeou APScheduler; F1.4, F5.2 e F6.1
       entregam o comportamento em `worker/agendador.py` sem a biblioteca (Artigo XI).
-      Pulso, mercado e cadastros já varrem nesse laço. A lib permanece rejeitada
-- [x] ~~Rotina de expurgo por retenção~~ Tarefa agendada, com anonimização e auditoria
+      Pulso, mercado, cadastros e retenção varrem nesse laço. A lib permanece rejeitada
+- [x] ~~Rotina de expurgo por retenção~~ F6.1: anonimização + exclusão da ficha + comprovante
+      `execucao_retencao` consultável pela gestão. Não é auditoria genérica de UPDATE
 - [x] ~~Acesso do staff ao Alert Center~~ Sessão longa por dispositivo
 
 Resolvidas pelo Artefato 6:
@@ -387,6 +396,7 @@ Ainda abertas:
 - [x] ~~Cadastrar a lista de concorrentes~~ F5.1: API de manutenção + fontes ativas. **Verificar os termos de uso de cada fonte** permanece humano
 - [x] ~~Coleta agendada de mercado~~ F5.2: varredura + `coleta_mercado` append-only
 - [x] ~~Painel de mercado~~ F5.3: `GET /mercado` + histórico; dado velho sinalizado; série somente leitura
+- [x] ~~Expurgo por retenção~~ F6.1: varredura diária efetiva, marcas, ficha aos 5 anos, `GET /retencao`
 - [ ] Confirmar a lista oficial vigente de campos exigidos por lei para registro de hóspede
 - [ ] Testar colagem no PMS real
 - [ ] Confirmar junto à Meta a categoria do template de pulso do segundo dia

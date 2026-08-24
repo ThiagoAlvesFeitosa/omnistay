@@ -88,3 +88,19 @@ class ItemVendavelResposta(BaseModel):
 
 class ListaItensVendaveisResposta(BaseModel):
     itens: list[ItemVendavelResposta]
+
+
+class ExecucaoRetencaoResposta(BaseModel):
+    id_execucao: int
+    executado_em: datetime
+    mensagens_anonimizadas: int
+    comentarios_anonimizados: int
+    payloads_anonimizados: int
+    descricoes_anonimizadas: int
+    fichas_apagadas: int
+    prazo_conteudo_ausente: bool
+    prazo_ficha_ausente: bool
+
+
+class ListaRetencaoResposta(BaseModel):
+    execucoes: list[ExecucaoRetencaoResposta]

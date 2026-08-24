@@ -87,3 +87,33 @@ def completar_comentario_checkout(
         ),
         {"comentario": comentario, "id": id_avaliacao},
     )
+
+
+def anonimizar_comentarios_vencidos(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    agora,
+    meses: int,
+    marca: str,
+) -> int:
+    resultado = conexao.execute(
+        text(
+            "UPDATE avaliacao a SET comentario = :marca"
+            " FROM reserva r"
+            " WHERE a.id_reserva = r.id_reserva"
+            " AND r.id_hotel = :id_hotel"
+            " AND r.checkout_em IS NOT NULL"
+            " AND r.checkout_em + make_interval(months => :meses) <= :agora"
+            " AND a.comentario IS NOT NULL"
+            " AND btrim(a.comentario) <> ''"
+            " AND a.comentario IS DISTINCT FROM :marca"
+        ),
+        {
+            "marca": marca,
+            "id_hotel": id_hotel,
+            "meses": meses,
+            "agora": agora,
+        },
+    )
+    return resultado.rowcount or 0

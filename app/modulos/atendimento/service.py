@@ -468,3 +468,22 @@ def dispensar(
         repositorio=repositorio,
         relogio=relogio,
     )
+
+
+def anonimizar_descricoes_vencidas(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    agora,
+    meses: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    from app.comum.retencao import MARCA_TEXTO
+
+    return repositorio.anonimizar_descricoes_vencidas(
+        conexao,
+        id_hotel=id_hotel,
+        agora=agora,
+        meses=meses,
+        marca=MARCA_TEXTO,
+    )

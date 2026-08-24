@@ -339,3 +339,32 @@ def ler_consumo_do_hotel(
         {"id": id_solicitacao, "id_hotel": id_hotel},
     ).mappings().first()
     return dict(linha) if linha else None
+
+
+def anonimizar_descricoes_vencidas(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    agora,
+    meses: int,
+    marca: str,
+) -> int:
+    resultado = conexao.execute(
+        text(
+            "UPDATE solicitacao s SET descricao = :marca"
+            " FROM reserva r"
+            " WHERE s.id_reserva = r.id_reserva"
+            " AND r.id_hotel = :id_hotel"
+            " AND r.checkout_em IS NOT NULL"
+            " AND r.checkout_em + make_interval(months => :meses) <= :agora"
+            " AND btrim(s.descricao) <> ''"
+            " AND s.descricao IS DISTINCT FROM :marca"
+        ),
+        {
+            "marca": marca,
+            "id_hotel": id_hotel,
+            "meses": meses,
+            "agora": agora,
+        },
+    )
+    return resultado.rowcount or 0

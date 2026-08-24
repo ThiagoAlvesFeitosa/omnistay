@@ -1,5 +1,6 @@
 """Regras de conversa: agendar coleta, receber webhook e extrair ficha."""
 
+import json
 from contextlib import nullcontext
 
 from sqlalchemy.engine import Connection
@@ -2659,3 +2660,41 @@ def processar_trabalho_interpretar_pesquisa_saida(
         _concluir("parcial")
         return
     _concluir("formato_invalido")
+
+
+def anonimizar_mensagens_vencidas(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    agora,
+    meses: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    from app.comum.retencao import MARCA_TEXTO
+
+    return repositorio.anonimizar_mensagens_vencidas(
+        conexao,
+        id_hotel=id_hotel,
+        agora=agora,
+        meses=meses,
+        marca=MARCA_TEXTO,
+    )
+
+
+def anonimizar_payloads_vencidos(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    agora,
+    meses: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    from app.comum.retencao import MARCA_PAYLOAD
+
+    return repositorio.anonimizar_payloads_vencidos(
+        conexao,
+        id_hotel=id_hotel,
+        agora=agora,
+        meses=meses,
+        marca_json=json.dumps(MARCA_PAYLOAD),
+    )

@@ -585,3 +585,22 @@ def registrar_consentimento_painel(
         origem=gravado["origem"],
         em=gravado["momento"],
     )
+
+
+def apagar_fichas_vencidas(
+    conexao,
+    *,
+    id_hotel: int,
+    agora,
+    anos: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    from app.comum.retencao import MARCA_TELEFONE
+
+    return repositorio.apagar_fichas_vencidas(
+        conexao,
+        id_hotel=id_hotel,
+        agora=agora,
+        anos=anos,
+        marca_telefone=MARCA_TELEFONE,
+    )

@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.engine import Connection
 
 
@@ -420,3 +420,81 @@ def id_titular_da_reserva(
         ),
         {"id": id_reserva, "id_hotel": id_hotel},
     ).scalar_one_or_none()
+
+
+def apagar_fichas_vencidas(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    agora,
+    anos: int,
+    marca_telefone: str,
+) -> int:
+    ids = list(
+        conexao.execute(
+            text(
+                "SELECT DISTINCT rh_hotel.id_hospede"
+                " FROM reserva_hospede rh_hotel"
+                " JOIN reserva r_hotel"
+                "   ON r_hotel.id_reserva = rh_hotel.id_reserva"
+                " WHERE r_hotel.id_hotel = :id_hotel"
+                " AND NOT EXISTS ("
+                "   SELECT 1 FROM reserva_hospede rh2"
+                "   JOIN reserva r2 ON r2.id_reserva = rh2.id_reserva"
+                "   WHERE rh2.id_hospede = rh_hotel.id_hospede"
+                "     AND r2.checkout_em IS NULL"
+                " )"
+                " AND ("
+                "   SELECT MAX(r3.checkout_em)"
+                "   FROM reserva_hospede rh3"
+                "   JOIN reserva r3 ON r3.id_reserva = rh3.id_reserva"
+                "   WHERE rh3.id_hospede = rh_hotel.id_hospede"
+                " ) + make_interval(years => :anos) <= :agora"
+            ),
+            {"id_hotel": id_hotel, "anos": anos, "agora": agora},
+        ).scalars().all()
+    )
+    if not ids:
+        return 0
+
+    reservas = list(
+        conexao.execute(
+            text(
+                "SELECT DISTINCT id_reserva FROM reserva_hospede"
+                " WHERE id_hospede IN :ids"
+            ).bindparams(bindparam("ids", expanding=True)),
+            {"ids": ids},
+        ).scalars().all()
+    )
+    conexao.execute(
+        text(
+            "DELETE FROM consentimento WHERE id_hospede IN :ids"
+        ).bindparams(bindparam("ids", expanding=True)),
+        {"ids": ids},
+    )
+    conexao.execute(
+        text(
+            "DELETE FROM reserva_hospede WHERE id_hospede IN :ids"
+        ).bindparams(bindparam("ids", expanding=True)),
+        {"ids": ids},
+    )
+    apagados = conexao.execute(
+        text("DELETE FROM hospede WHERE id_hospede IN :ids").bindparams(
+            bindparam("ids", expanding=True)
+        ),
+        {"ids": ids},
+    ).rowcount or 0
+    if reservas:
+        conexao.execute(
+            text(
+                "UPDATE reserva SET telefone_contato = :marca"
+                " WHERE id_reserva IN :reservas"
+                " AND NOT EXISTS ("
+                "   SELECT 1 FROM reserva_hospede rh"
+                "   WHERE rh.id_reserva = reserva.id_reserva"
+                " )"
+                " AND telefone_contato IS DISTINCT FROM :marca"
+            ).bindparams(bindparam("reservas", expanding=True)),
+            {"marca": marca_telefone, "reservas": reservas},
+        )
+    return apagados

@@ -1,4 +1,4 @@
-"""Ponto de entrada: python -m worker [--uma-passagem|--verificar-cadastros|--verificar-boas-vindas|--verificar-pulsos|--verificar-mercado]."""
+"""Ponto de entrada: python -m worker [--uma-passagem|--verificar-cadastros|--verificar-boas-vindas|--verificar-pulsos|--verificar-mercado|--verificar-retencao]."""
 
 import argparse
 import time
@@ -15,6 +15,7 @@ from worker.agendador import (
     verificar_cadastros_pendentes,
     verificar_coletas_mercado,
     verificar_pulsos_pendentes,
+    verificar_retencao,
 )
 from worker.consumidor import processar_uma_passagem_na_engine
 
@@ -51,6 +52,13 @@ def _rodar_verificacao_mercado(engine) -> int:
     return n
 
 
+def _rodar_verificacao_retencao(engine) -> int:
+    with engine.begin() as conexao:
+        n = verificar_retencao(conexao)
+    logger.info("verificacao_retencao_concluida afetados=%s", n)
+    return n
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Worker OmniStay")
     parser.add_argument(
@@ -79,6 +87,11 @@ def main(argv: list[str] | None = None) -> None:
         help="Verifica coletas de mercado devidas uma vez e encerra",
     )
     parser.add_argument(
+        "--verificar-retencao",
+        action="store_true",
+        help="Aplica a politica de retencao uma vez e encerra",
+    )
+    parser.add_argument(
         "--intervalo-segundos",
         type=float,
         default=2.0,
@@ -104,6 +117,9 @@ def main(argv: list[str] | None = None) -> None:
     if args.verificar_mercado:
         _rodar_verificacao_mercado(engine)
         return
+    if args.verificar_retencao:
+        _rodar_verificacao_retencao(engine)
+        return
     logger.info("worker_iniciado")
     ultima_verificacao = None
     while True:
@@ -117,6 +133,7 @@ def main(argv: list[str] | None = None) -> None:
             _rodar_verificacao_boas_vindas(engine)
             _rodar_verificacao_pulsos(engine)
             _rodar_verificacao_mercado(engine)
+            _rodar_verificacao_retencao(engine)
             ultima_verificacao = agora
         time.sleep(args.intervalo_segundos)
 

@@ -28,6 +28,7 @@ OPERACOES_ESPERADAS = {
     "alterar_concorrentes": {"gestor"},
     "ler_concorrentes": {"gestor"},
     "ler_mercado": {"gestor"},
+    "ler_retencao": {"gestor"},
 }
 
 
@@ -116,6 +117,12 @@ def test_ler_mercado_so_gestor():
     assert politica.permitido("gestor", "ler_mercado") is True
     assert politica.permitido("recepcao", "ler_mercado") is False
     assert politica.permitido("staff", "ler_mercado") is False
+
+
+def test_ler_retencao_so_gestor():
+    assert politica.permitido("gestor", "ler_retencao") is True
+    assert politica.permitido("recepcao", "ler_retencao") is False
+    assert politica.permitido("staff", "ler_retencao") is False
 
 
 def test_nenhuma_operacao_da_matriz_contem_parametro_no_nome():

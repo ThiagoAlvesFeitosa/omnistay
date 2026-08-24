@@ -7,6 +7,7 @@ def test_uma_passagem_nao_chama_agendador(monkeypatch):
     verificacoes = []
     pulsos = []
     mercado = []
+    retencao = []
     monkeypatch.setattr(
         worker_main,
         "processar_uma_passagem_na_engine",
@@ -29,6 +30,11 @@ def test_uma_passagem_nao_chama_agendador(monkeypatch):
     )
     monkeypatch.setattr(
         worker_main,
+        "_rodar_verificacao_retencao",
+        lambda engine: retencao.append("r") or 0,
+    )
+    monkeypatch.setattr(
+        worker_main,
         "create_engine",
         lambda url: object(),
     )
@@ -41,6 +47,7 @@ def test_uma_passagem_nao_chama_agendador(monkeypatch):
     assert verificacoes == []
     assert pulsos == []
     assert mercado == []
+    assert retencao == []
 
 
 def test_verificar_cadastros_chama_agendador(monkeypatch):
@@ -130,6 +137,9 @@ def test_loop_continuo_varre_mercado(monkeypatch):
         "_rodar_verificacao_mercado",
         lambda engine: mercado.append("m") or 0,
     )
+    monkeypatch.setattr(
+        worker_main, "_rodar_verificacao_retencao", lambda engine: 0
+    )
     monkeypatch.setattr(worker_main, "create_engine", lambda url: object())
     monkeypatch.setattr(
         worker_main,
@@ -146,3 +156,60 @@ def test_loop_continuo_varre_mercado(monkeypatch):
     except KeyboardInterrupt:
         pass
     assert mercado == ["m"]
+
+
+def test_verificar_retencao_chama_varredura_e_encerra(monkeypatch):
+    chamadas = []
+    monkeypatch.setattr(
+        worker_main,
+        "_rodar_verificacao_retencao",
+        lambda engine: chamadas.append("r") or 0,
+    )
+    monkeypatch.setattr(worker_main, "create_engine", lambda url: object())
+    monkeypatch.setattr(
+        worker_main,
+        "obter_configuracao",
+        lambda: type("C", (), {"database_url": "postgresql://x"})(),
+    )
+    worker_main.main(["--verificar-retencao"])
+    assert chamadas == ["r"]
+
+
+def test_loop_continuo_varre_retencao(monkeypatch):
+    retencao = []
+    monkeypatch.setattr(
+        worker_main,
+        "processar_uma_passagem_na_engine",
+        lambda *args, **kwargs: 0,
+    )
+    monkeypatch.setattr(worker_main, "_rodar_verificacao", lambda engine: 0)
+    monkeypatch.setattr(
+        worker_main, "_rodar_verificacao_boas_vindas", lambda engine: 0
+    )
+    monkeypatch.setattr(
+        worker_main, "_rodar_verificacao_pulsos", lambda engine: 0
+    )
+    monkeypatch.setattr(
+        worker_main, "_rodar_verificacao_mercado", lambda engine: 0
+    )
+    monkeypatch.setattr(
+        worker_main,
+        "_rodar_verificacao_retencao",
+        lambda engine: retencao.append("r") or 0,
+    )
+    monkeypatch.setattr(worker_main, "create_engine", lambda url: object())
+    monkeypatch.setattr(
+        worker_main,
+        "obter_configuracao",
+        lambda: type("C", (), {"database_url": "postgresql://x"})(),
+    )
+
+    def _sleep(_segundos):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(worker_main.time, "sleep", _sleep)
+    try:
+        worker_main.main([])
+    except KeyboardInterrupt:
+        pass
+    assert retencao == ["r"]

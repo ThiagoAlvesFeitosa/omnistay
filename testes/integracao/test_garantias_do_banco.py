@@ -1298,3 +1298,78 @@ def test_dois_hoteis_podem_ter_a_mesma_fonte(conexao):
 
     assert um
     assert outro != um
+
+
+def _inserir_execucao_retencao(
+    conexao, id_hotel: int, *, executado_em, mensagens=0
+):
+    return conexao.execute(
+        text(
+            "INSERT INTO execucao_retencao (id_hotel, executado_em,"
+            " mensagens_anonimizadas) "
+            "VALUES (:h, :quando, :n) RETURNING id_execucao"
+        ),
+        {"h": id_hotel, "quando": executado_em, "n": mensagens},
+    ).scalar()
+
+
+@pytest.mark.postgres
+def test_segunda_execucao_retencao_do_mesmo_hotel_no_mesmo_dia_utc_e_recusada(
+    conexao,
+):
+    from datetime import UTC, datetime
+
+    id_hotel = criar_hotel(conexao)
+    quando = datetime(2026, 8, 24, 3, 0, tzinfo=UTC)
+    _inserir_execucao_retencao(conexao, id_hotel, executado_em=quando)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_execucao_retencao(
+            conexao,
+            id_hotel,
+            executado_em=datetime(2026, 8, 24, 22, 0, tzinfo=UTC),
+        )
+
+    assert "uq_execucao_retencao_hotel_dia" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_dois_hoteis_podem_ter_execucao_retencao_no_mesmo_dia(conexao):
+    from datetime import UTC, datetime
+
+    hotel_a = criar_hotel(conexao)
+    hotel_b = criar_hotel(conexao)
+    quando = datetime(2026, 8, 24, 12, 0, tzinfo=UTC)
+    um = _inserir_execucao_retencao(conexao, hotel_a, executado_em=quando)
+    outro = _inserir_execucao_retencao(conexao, hotel_b, executado_em=quando)
+    assert um
+    assert outro != um
+
+
+@pytest.mark.postgres
+def test_segunda_execucao_retencao_no_dia_utc_seguinte_e_aceita(conexao):
+    from datetime import UTC, datetime, timedelta
+
+    id_hotel = criar_hotel(conexao)
+    primeiro = datetime(2026, 8, 24, 23, 0, tzinfo=UTC)
+    _inserir_execucao_retencao(conexao, id_hotel, executado_em=primeiro)
+    segundo = _inserir_execucao_retencao(
+        conexao, id_hotel, executado_em=primeiro + timedelta(hours=2)
+    )
+    assert segundo
+
+
+@pytest.mark.postgres
+def test_quantidade_negativa_de_retencao_e_recusada(conexao):
+    from datetime import UTC, datetime
+
+    id_hotel = criar_hotel(conexao)
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_execucao_retencao(
+            conexao,
+            id_hotel,
+            executado_em=datetime(2026, 8, 24, 12, 0, tzinfo=UTC),
+            mensagens=-1,
+        )
+
+    assert "ck_execucao_mensagens_nao_negativas" in str(erro.value)

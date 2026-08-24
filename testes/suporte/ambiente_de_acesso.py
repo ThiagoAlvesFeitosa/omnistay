@@ -95,6 +95,8 @@ def _semear_parametros_coleta(
         ("horas_minimas_para_pulso", "24"),
         ("horas_atribuicao_pesquisa_saida", "24"),
         ("periodicidade_coleta_mercado", "24"),
+        ("meses_retencao_conteudo_livre", "12"),
+        ("anos_retencao_ficha", "5"),
     ):
         conexao.execute(
             text(

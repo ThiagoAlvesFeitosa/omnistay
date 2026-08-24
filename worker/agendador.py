@@ -6,6 +6,7 @@ from sqlalchemy.engine import Connection
 
 from app.comum import relogio
 from app.comum.log import obter_logger
+from app.comum.retencao import CHAVE_ANOS, CHAVE_MESES
 from app.modulos.conversa import service as conversa_service
 from app.modulos.hospedagem import service as hospedagem_service
 from app.modulos.propriedade import repository as propriedade_repository
@@ -295,3 +296,111 @@ def verificar_coletas_mercado(
     if enfileirar is not None:
         kwargs["enfileirar"] = enfileirar
     return mercado_service.agendar_coletas_devidas(conexao, **kwargs)
+
+
+def verificar_retencao(
+    conexao: Connection,
+    *,
+    agora=None,
+    repositorio_propriedade=propriedade_repository,
+    anonimizar_mensagens=None,
+    anonimizar_payloads=None,
+    anonimizar_descricoes=None,
+    anonimizar_comentarios=None,
+    apagar_fichas=None,
+) -> int:
+    """Aplica a politica de retencao e grava o comprovante do dia. Devolve hotéis comprovados."""
+    from app.modulos.atendimento import service as atendimento_service
+    from app.modulos.feedback import service as feedback_service
+
+    if agora is None:
+        instante = relogio.agora()
+    elif callable(agora):
+        instante = agora()
+    else:
+        instante = agora
+    if instante.tzinfo is None:
+        instante = instante.replace(tzinfo=UTC)
+
+    if anonimizar_mensagens is None:
+        anonimizar_mensagens = conversa_service.anonimizar_mensagens_vencidas
+    if anonimizar_payloads is None:
+        anonimizar_payloads = conversa_service.anonimizar_payloads_vencidos
+    if anonimizar_descricoes is None:
+        anonimizar_descricoes = atendimento_service.anonimizar_descricoes_vencidas
+    if anonimizar_comentarios is None:
+        anonimizar_comentarios = feedback_service.anonimizar_comentarios_vencidos
+    if apagar_fichas is None:
+        apagar_fichas = hospedagem_service.apagar_fichas_vencidas
+
+    comprovados = 0
+    for id_hotel in repositorio_propriedade.listar_ids_hotel(conexao):
+        if repositorio_propriedade.ja_executou_retencao_no_dia(
+            conexao, id_hotel=id_hotel, agora=instante
+        ):
+            logger.info("retencao_ja_executada_hoje id_hotel=%s", id_hotel)
+            continue
+
+        meses = _inteiro_positivo(
+            repositorio_propriedade.ler_parametro(
+                conexao, id_hotel, CHAVE_MESES
+            )
+        )
+        anos = _inteiro_positivo(
+            repositorio_propriedade.ler_parametro(
+                conexao, id_hotel, CHAVE_ANOS
+            )
+        )
+        prazo_conteudo_ausente = meses is None
+        prazo_ficha_ausente = anos is None
+        if prazo_conteudo_ausente:
+            logger.info("prazo_conteudo_ausente id_hotel=%s", id_hotel)
+        if prazo_ficha_ausente:
+            logger.info("prazo_ficha_ausente id_hotel=%s", id_hotel)
+
+        mensagens = comentarios = payloads = descricoes = fichas = 0
+        if meses is not None:
+            mensagens = anonimizar_mensagens(
+                conexao, id_hotel=id_hotel, agora=instante, meses=meses
+            )
+            payloads = anonimizar_payloads(
+                conexao, id_hotel=id_hotel, agora=instante, meses=meses
+            )
+            descricoes = anonimizar_descricoes(
+                conexao, id_hotel=id_hotel, agora=instante, meses=meses
+            )
+            comentarios = anonimizar_comentarios(
+                conexao, id_hotel=id_hotel, agora=instante, meses=meses
+            )
+        if anos is not None:
+            fichas = apagar_fichas(
+                conexao, id_hotel=id_hotel, agora=instante, anos=anos
+            )
+
+        id_execucao = repositorio_propriedade.registrar_execucao_retencao(
+            conexao,
+            id_hotel=id_hotel,
+            executado_em=instante,
+            mensagens_anonimizadas=mensagens,
+            comentarios_anonimizados=comentarios,
+            payloads_anonimizados=payloads,
+            descricoes_anonimizadas=descricoes,
+            fichas_apagadas=fichas,
+            prazo_conteudo_ausente=prazo_conteudo_ausente,
+            prazo_ficha_ausente=prazo_ficha_ausente,
+        )
+        if id_execucao is None:
+            logger.info("retencao_ja_executada_hoje id_hotel=%s", id_hotel)
+            continue
+        logger.info(
+            "retencao_aplicada id_hotel=%s mensagens=%s comentarios=%s"
+            " payloads=%s descricoes=%s fichas=%s",
+            id_hotel,
+            mensagens,
+            comentarios,
+            payloads,
+            descricoes,
+            fichas,
+        )
+        comprovados += 1
+    return comprovados

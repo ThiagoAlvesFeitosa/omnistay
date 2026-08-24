@@ -2,6 +2,7 @@
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.engine import Connection
+from sqlalchemy.exc import IntegrityError
 
 
 def existe_propriedade(conexao: Connection) -> bool:
@@ -263,3 +264,92 @@ def existe_nome_ativo(
             {"id_hotel": id_hotel, "nome": nome, "exceto_id": exceto_id},
         ).scalar()
     )
+
+
+def listar_ids_hotel(conexao: Connection) -> list[int]:
+    linhas = conexao.execute(
+        text("SELECT id_hotel FROM hotel ORDER BY id_hotel ASC")
+    ).scalars().all()
+    return [int(id_hotel) for id_hotel in linhas]
+
+
+def ja_executou_retencao_no_dia(
+    conexao: Connection, *, id_hotel: int, agora
+) -> bool:
+    return bool(
+        conexao.execute(
+            text(
+                "SELECT 1 FROM execucao_retencao"
+                " WHERE id_hotel = :id_hotel"
+                " AND (executado_em AT TIME ZONE 'UTC')::date"
+                "     = (:agora AT TIME ZONE 'UTC')::date"
+            ),
+            {"id_hotel": id_hotel, "agora": agora},
+        ).scalar()
+    )
+
+
+def registrar_execucao_retencao(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    executado_em,
+    mensagens_anonimizadas: int = 0,
+    comentarios_anonimizados: int = 0,
+    payloads_anonimizados: int = 0,
+    descricoes_anonimizadas: int = 0,
+    fichas_apagadas: int = 0,
+    prazo_conteudo_ausente: bool = False,
+    prazo_ficha_ausente: bool = False,
+) -> int | None:
+    sql = text(
+        "INSERT INTO execucao_retencao ("
+        " id_hotel, executado_em, mensagens_anonimizadas,"
+        " comentarios_anonimizados, payloads_anonimizados,"
+        " descricoes_anonimizadas, fichas_apagadas,"
+        " prazo_conteudo_ausente, prazo_ficha_ausente)"
+        " VALUES ("
+        " :id_hotel, :executado_em, :mensagens,"
+        " :comentarios, :payloads, :descricoes, :fichas,"
+        " :prazo_conteudo, :prazo_ficha)"
+        " RETURNING id_execucao"
+    )
+    params = {
+        "id_hotel": id_hotel,
+        "executado_em": executado_em,
+        "mensagens": mensagens_anonimizadas,
+        "comentarios": comentarios_anonimizados,
+        "payloads": payloads_anonimizados,
+        "descricoes": descricoes_anonimizadas,
+        "fichas": fichas_apagadas,
+        "prazo_conteudo": prazo_conteudo_ausente,
+        "prazo_ficha": prazo_ficha_ausente,
+    }
+    try:
+        begin = getattr(conexao, "begin_nested", None)
+        if begin is not None:
+            with conexao.begin_nested():
+                return int(conexao.execute(sql, params).scalar_one())
+        return int(conexao.execute(sql, params).scalar_one())
+    except IntegrityError as erro:
+        if "uq_execucao_retencao_hotel_dia" not in str(erro):
+            raise
+        return None
+
+
+def listar_execucoes_retencao(
+    conexao: Connection, *, id_hotel: int
+) -> list[dict]:
+    linhas = conexao.execute(
+        text(
+            "SELECT id_execucao, executado_em,"
+            " mensagens_anonimizadas, comentarios_anonimizados,"
+            " payloads_anonimizados, descricoes_anonimizadas,"
+            " fichas_apagadas, prazo_conteudo_ausente, prazo_ficha_ausente"
+            " FROM execucao_retencao"
+            " WHERE id_hotel = :id_hotel"
+            " ORDER BY executado_em DESC"
+        ),
+        {"id_hotel": id_hotel},
+    ).mappings().all()
+    return [dict(linha) for linha in linhas]

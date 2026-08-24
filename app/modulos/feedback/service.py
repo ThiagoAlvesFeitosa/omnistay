@@ -131,3 +131,22 @@ def gravar_avaliacao_checkout(
         nota,
     )
     return id_avaliacao
+
+
+def anonimizar_comentarios_vencidos(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    agora,
+    meses: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    from app.comum.retencao import MARCA_TEXTO
+
+    return repositorio.anonimizar_comentarios_vencidos(
+        conexao,
+        id_hotel=id_hotel,
+        agora=agora,
+        meses=meses,
+        marca=MARCA_TEXTO,
+    )

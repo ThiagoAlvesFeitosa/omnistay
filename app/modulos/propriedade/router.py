@@ -20,6 +20,7 @@ from app.modulos.propriedade.schema import (
     ItemVendavelResposta,
     ListaItensVendaveisResposta,
     ListaManutencaoResposta,
+    ListaRetencaoResposta,
 )
 
 roteador = APIRouter(tags=["propriedade"])
@@ -231,3 +232,14 @@ def alterar_item_vendavel(
             detail="Ja existe item vendavel ativo com este nome.",
         ) from erro
     return alterado.para_resposta()
+
+
+@roteador.get("/retencao", response_model=ListaRetencaoResposta)
+def listar_retencao(
+    conexao: Conexao,
+    sessao: Annotated[SessaoAtual, Depends(exigir_operacao("ler_retencao"))],
+) -> ListaRetencaoResposta:
+    execucoes = catalogo.listar_execucoes_retencao(
+        conexao, id_hotel=sessao.id_hotel
+    )
+    return ListaRetencaoResposta(execucoes=execucoes)

@@ -8,7 +8,11 @@ from sqlalchemy.engine import Connection
 from app.comum.log import obter_logger
 from app.modulos.acesso import service as acesso_service
 from app.modulos.propriedade import repository as propriedade_repository
-from app.modulos.propriedade.schema import ItemCatalogoResposta, ItemVendavelResposta
+from app.modulos.propriedade.schema import (
+    ExecucaoRetencaoResposta,
+    ItemCatalogoResposta,
+    ItemVendavelResposta,
+)
 
 logger = obter_logger(__name__)
 
@@ -53,6 +57,11 @@ PARAMETROS_PESQUISA_SAIDA_PADRAO = {
 
 PARAMETROS_MERCADO_PADRAO = {
     "periodicidade_coleta_mercado": "24",
+}
+
+PARAMETROS_RETENCAO_PADRAO = {
+    "meses_retencao_conteudo_livre": "12",
+    "anos_retencao_ficha": "5",
 }
 
 CHAVES_SLOTS_BOAS_VINDAS = {
@@ -125,6 +134,8 @@ def criar_instalacao_inicial(
     for chave, valor in PARAMETROS_PESQUISA_SAIDA_PADRAO.items():
         repositorio.inserir_parametro(conexao, id_hotel, chave, valor)
     for chave, valor in PARAMETROS_MERCADO_PADRAO.items():
+        repositorio.inserir_parametro(conexao, id_hotel, chave, valor)
+    for chave, valor in PARAMETROS_RETENCAO_PADRAO.items():
         repositorio.inserir_parametro(conexao, id_hotel, chave, valor)
 
     return InstalacaoCriada(id_hotel=id_hotel, email_gestor=email_gestor)
@@ -519,3 +530,71 @@ def ler_preco_item_ativo(
     if isinstance(bruto, Decimal):
         return bruto
     return Decimal(str(bruto))
+
+
+def ja_executou_retencao_no_dia(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    agora,
+    repositorio=propriedade_repository,
+) -> bool:
+    return repositorio.ja_executou_retencao_no_dia(
+        conexao, id_hotel=id_hotel, agora=agora
+    )
+
+
+def registrar_execucao_retencao(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    executado_em,
+    mensagens_anonimizadas: int = 0,
+    comentarios_anonimizados: int = 0,
+    payloads_anonimizados: int = 0,
+    descricoes_anonimizadas: int = 0,
+    fichas_apagadas: int = 0,
+    prazo_conteudo_ausente: bool = False,
+    prazo_ficha_ausente: bool = False,
+    repositorio=propriedade_repository,
+) -> int | None:
+    return repositorio.registrar_execucao_retencao(
+        conexao,
+        id_hotel=id_hotel,
+        executado_em=executado_em,
+        mensagens_anonimizadas=mensagens_anonimizadas,
+        comentarios_anonimizados=comentarios_anonimizados,
+        payloads_anonimizados=payloads_anonimizados,
+        descricoes_anonimizadas=descricoes_anonimizadas,
+        fichas_apagadas=fichas_apagadas,
+        prazo_conteudo_ausente=prazo_conteudo_ausente,
+        prazo_ficha_ausente=prazo_ficha_ausente,
+    )
+
+
+def listar_execucoes_retencao(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    repositorio=propriedade_repository,
+) -> list[ExecucaoRetencaoResposta]:
+    linhas = repositorio.listar_execucoes_retencao(conexao, id_hotel=id_hotel)
+    logger.info(
+        "comprovante id_hotel=%s acao=comprovante quantidade=%s",
+        id_hotel,
+        len(linhas),
+    )
+    return [
+        ExecucaoRetencaoResposta(
+            id_execucao=int(linha["id_execucao"]),
+            executado_em=linha["executado_em"],
+            mensagens_anonimizadas=int(linha["mensagens_anonimizadas"]),
+            comentarios_anonimizados=int(linha["comentarios_anonimizados"]),
+            payloads_anonimizados=int(linha["payloads_anonimizados"]),
+            descricoes_anonimizadas=int(linha["descricoes_anonimizadas"]),
+            fichas_apagadas=int(linha["fichas_apagadas"]),
+            prazo_conteudo_ausente=bool(linha["prazo_conteudo_ausente"]),
+            prazo_ficha_ausente=bool(linha["prazo_ficha_ausente"]),
+        )
+        for linha in linhas
+    ]
