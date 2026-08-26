@@ -1,15 +1,15 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 24/08/2026
+**Atualizado em:** 26/08/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
 
 ---
 
 ## Onde paramos
 
-**Documentação concluída** — seis artefatos. **Implementação em andamento.**
+**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog concluída.**
 
-**Progresso:** 23 de 24 fatias concluídas.
+**Progresso:** 24 de 24 fatias concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -36,7 +36,8 @@
 | F5.2 Coleta agendada de mercado | ✅ Concluída — `verificar_coletas_mercado` no `worker/agendador.py` (sem APScheduler, sem rota HTTP); tipo `coletar_mercado` com unicidade só do trabalho aberto; porta `FontePublica` + `FonteFalsa` / `FonteHttp` (stdlib, JSON-LD, User-Agent `OmniStay-Coletor/1.0`); diretiva ausente **não** autoriza visita; falha grava `sucesso=false`; `periodicidade_coleta_mercado=24` horas; revisão `0020_coleta_agendada`. Sem painel (F5.3), sem disparo manual, sem mensagem ao hóspede |
 | F5.3 Painel de mercado | ✅ Concluída — `GET /mercado` (visão atual) e `GET /mercado/concorrentes/{id}` (histórico); operação `ler_mercado` só gestão; visão atual = último **sucesso** datado; `situacao` (`atual` · `desatualizado` · `cadencia_ausente` · `sem_coleta` · `so_falha`); limiar = periodicidade da casa; escrita da série `405`; sem migração, sem React, sem disparo de coleta |
 | F6.1 Expurgo por retenção | ✅ Concluída — `verificar_retencao` no `worker/agendador.py` (sem APScheduler, sem tipo na fila, sem botão “expurgar agora”); conteúdo livre vira marca 12 meses após `checkout_em`; ficha apagada 5 anos após a última saída vinculada; comprovante `execucao_retencao` (1/hotel/dia UTC); `GET /retencao` com `ler_retencao` só gestão; revisão `0021_expurgo_retencao`. Payload órfão fora; sem React; sem pedido avulso de esquecimento |
-| Demais 1 fatia | Pendente, na ordem de `docs/backlog.md` — próxima: **F6.2** (simulador da apresentação). Não há F2.3 nem F3.9 no backlog |
+| F6.2 Simulador de conversa | ✅ Concluída — `MENSAGERIA_MODO` (`demonstracao` \| `real`) na config de plataforma; fábrica escolhe `MensageriaSimulada` ou WhatsApp; worker de processo **não** instancia `MensageriaFalsa`; `GET/POST /simulador/conversas` com `usar_simulador`; tela React em `frontend/` servida em `/demo/` se houver `dist`. Sem túnel, sem painel operacional React, sem migração |
+| Demais fatias | Nenhuma pendente no backlog. **Próxima entrega:** implantação em nuvem (ADR-008). Não há F2.3 nem F3.9 |
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -50,8 +51,7 @@ commit.
 > O estado mora nos arquivos — spec, plano, tarefas, código e este documento —, nunca no
 > histórico da conversa.
 
-**Para a próxima entrega**, além da implementação: a implantação em nuvem, que o ADR-008
-deixou deliberadamente adiada para ser decidida contra um sistema funcionando.
+**Para a próxima entrega:** implantação em nuvem, que o ADR-008 deixou deliberadamente adiada para ser decidida contra um sistema funcionando.
 
 ## Decisões tomadas durante a implementação
 
@@ -170,6 +170,10 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Comprovante ≠ auditoria | Tabela `execucao_retencao` (quantidades e flags, sem texto). `GET /retencao` com `ler_retencao` só gestão. Sem botão de disparo (`405` / rota inexistente) | F6.1 |
 | Prazos sem default | `meses_retencao_conteudo_livre=12` e `anos_retencao_ficha=5` semeados. Ausência ou inválido: flag no comprovante e log `prazo_conteudo_ausente` / `prazo_ficha_ausente` — não assume 12 nem 5 | F6.1 |
 | Divergência do Artefato 5 §9.1 | `solicitacao.descricao` e `classificacao_bruta` entram no prazo de 12 meses (conteúdo livre). Payload de webhook órfão (sem mensagem) fica **fora** desta fatia | F6.1 |
+| `MENSAGERIA_MODO` | Configuração de **plataforma**, não `parametro_hotel`. Vazio ou lixo: a fábrica falha alto; o Settings aceita `""` para a suíte que não constrói a porta | F6.2 |
+| Fábrica no worker | `construir_mensageria(config)` escolhe `MensageriaSimulada` ou `MensageriaWhatsapp`. `MensageriaFalsa` permanece só na suíte | F6.2 |
+| Tela `/simulador` | Cookie + `usar_simulador` (recepção e gestão). Modo `real` → `409` `modo_real`, não `403`. Outro hotel → `404`. Sem HMAC | F6.2 |
+| Frontend da banca | `frontend/` Vite+React, uma tela; estáticos em `/demo/` se existir `frontend/dist`. Sem kit UI, sem React Router, sem painel operacional | F6.2 |
 
 ## Onde ficam os arquivos
 
@@ -397,6 +401,7 @@ Ainda abertas:
 - [x] ~~Coleta agendada de mercado~~ F5.2: varredura + `coleta_mercado` append-only
 - [x] ~~Painel de mercado~~ F5.3: `GET /mercado` + histórico; dado velho sinalizado; série somente leitura
 - [x] ~~Expurgo por retenção~~ F6.1: varredura diária efetiva, marcas, ficha aos 5 anos, `GET /retencao`
+- [x] ~~Simulador de conversa~~ F6.2: fábrica + tela `/demo/` + GET/POST autenticados; worker sem `MensageriaFalsa`
 - [ ] Confirmar a lista oficial vigente de campos exigidos por lei para registro de hóspede
 - [ ] Testar colagem no PMS real
 - [ ] Confirmar junto à Meta a categoria do template de pulso do segundo dia

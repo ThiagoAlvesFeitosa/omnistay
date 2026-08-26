@@ -6,7 +6,7 @@ from datetime import timedelta
 
 from sqlalchemy import create_engine
 
-from app.adaptadores.mensageria_falsa import MensageriaFalsa
+from app.adaptadores.fabrica_mensageria import construir_mensageria
 from app.config import obter_configuracao
 from app.comum import relogio
 from app.comum.log import configurar_log, obter_logger
@@ -99,8 +99,9 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
     configurar_log()
-    engine = create_engine(obter_configuracao().database_url)
-    gateway = MensageriaFalsa()
+    configuracao = obter_configuracao()
+    engine = create_engine(configuracao.database_url)
+    gateway = construir_mensageria(configuracao)
     if args.uma_passagem:
         n = processar_uma_passagem_na_engine(engine, gateway=gateway)
         logger.info("passagem_concluida processados=%s", n)

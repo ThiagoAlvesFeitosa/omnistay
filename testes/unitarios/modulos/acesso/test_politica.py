@@ -29,6 +29,7 @@ OPERACOES_ESPERADAS = {
     "ler_concorrentes": {"gestor"},
     "ler_mercado": {"gestor"},
     "ler_retencao": {"gestor"},
+    "usar_simulador": {"recepcao", "gestor"},
 }
 
 
@@ -123,6 +124,12 @@ def test_ler_retencao_so_gestor():
     assert politica.permitido("gestor", "ler_retencao") is True
     assert politica.permitido("recepcao", "ler_retencao") is False
     assert politica.permitido("staff", "ler_retencao") is False
+
+
+def test_usar_simulador_recepcao_e_gestor_staff_recusado():
+    assert politica.permitido("recepcao", "usar_simulador") is True
+    assert politica.permitido("gestor", "usar_simulador") is True
+    assert politica.permitido("staff", "usar_simulador") is False
 
 
 def test_nenhuma_operacao_da_matriz_contem_parametro_no_nome():

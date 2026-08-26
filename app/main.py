@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.comum.log import configurar_log
 from app.modulos.acesso.router import roteador as roteador_acesso
@@ -20,6 +23,13 @@ def criar_aplicacao() -> FastAPI:
     aplicacao.include_router(roteador_atendimento)
     aplicacao.include_router(roteador_propriedade)
     aplicacao.include_router(roteador_mercado)
+    dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+    if dist.is_dir():
+        aplicacao.mount(
+            "/demo",
+            StaticFiles(directory=str(dist), html=True),
+            name="demo",
+        )
     return aplicacao
 
 

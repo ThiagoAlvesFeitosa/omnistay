@@ -631,6 +631,8 @@ telefone ou da disponibilidade da Meta no dia.
 **Depende de:** F3.1.
 **Referência:** Artefato 5 §5.1 e §12.1.
 
+**Status: concluída.** Canal de demonstração por configuração `MENSAGERIA_MODO`, fábrica no worker (`MensageriaSimulada` em demo; WhatsApp só em `real`), tela React em `frontend/` com estáticos em `/demo/` se houver build. GET/POST `/simulador/conversas` reusam `receber_evento_entrada` e a tabela `mensagem`; operação única `usar_simulador`. Sem túnel, sem painel operacional React, sem migração, sem instância de WhatsApp na suíte.
+
 > **Esta é a fatia que garante a apresentação à banca.** Vale tratá-la como prioridade alta
 > assim que a Fase 3 estiver caminhando.
 

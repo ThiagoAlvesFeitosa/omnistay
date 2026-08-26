@@ -113,6 +113,39 @@ def ler_titular_da_reserva(
     return dict(linha) if linha else None
 
 
+def listar_rotulos_para_simulador(conexao: Connection, *, id_hotel: int) -> list[dict]:
+    linhas = conexao.execute(
+        text(
+            "SELECT r.id_reserva, r.status, r.telefone_contato,"
+            " h.nome_completo AS nome_titular"
+            " FROM reserva r"
+            " JOIN reserva_hospede rh ON rh.id_reserva = r.id_reserva AND rh.titular"
+            " JOIN hospede h ON h.id_hospede = rh.id_hospede"
+            " WHERE r.id_hotel = :id_hotel"
+            " ORDER BY r.id_reserva DESC"
+        ),
+        {"id_hotel": id_hotel},
+    ).mappings().all()
+    return [dict(linha) for linha in linhas]
+
+
+def obter_rotulo_para_simulador(
+    conexao: Connection, *, id_hotel: int, id_reserva: int
+) -> dict | None:
+    linha = conexao.execute(
+        text(
+            "SELECT r.id_reserva, r.status, r.telefone_contato,"
+            " h.nome_completo AS nome_titular"
+            " FROM reserva r"
+            " JOIN reserva_hospede rh ON rh.id_reserva = r.id_reserva AND rh.titular"
+            " JOIN hospede h ON h.id_hospede = rh.id_hospede"
+            " WHERE r.id_hotel = :id_hotel AND r.id_reserva = :id_reserva"
+        ),
+        {"id_hotel": id_hotel, "id_reserva": id_reserva},
+    ).mappings().first()
+    return dict(linha) if linha else None
+
+
 def atualizar_hospede_titular(
     conexao: Connection,
     *,

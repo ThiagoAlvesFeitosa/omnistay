@@ -21,6 +21,9 @@ class Configuracao(BaseSettings):
     # MVP: um hotel por numero de negocio; se 0, resolve pelo telefone da reserva.
     whatsapp_id_hotel: int = 0
 
+    # Canal com o hospede. A fabrica recusa valor vazio ou desconhecido.
+    mensageria_modo: str = ""
+
 
 @lru_cache
 def obter_configuracao() -> Configuracao:

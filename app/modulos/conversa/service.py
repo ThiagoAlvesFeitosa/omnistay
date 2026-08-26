@@ -2698,3 +2698,116 @@ def anonimizar_payloads_vencidos(
         meses=meses,
         marca_json=json.dumps(MARCA_PAYLOAD),
     )
+
+
+class ModoRealRecusado(Exception):
+    pass
+
+
+class EntradaSimuladorInvalida(Exception):
+    def __init__(self, codigo: str) -> None:
+        self.codigo = codigo
+        super().__init__(codigo)
+
+
+class ConversaSimuladorNaoEncontrada(Exception):
+    pass
+
+
+def exigir_modo_demonstracao(modo: str) -> None:
+    if modo != "demonstracao":
+        raise ModoRealRecusado()
+
+
+def listar_conversas_simulador(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    modo: str,
+    repositorio=repositorio_padrao,
+    listar_rotulos=None,
+):
+    exigir_modo_demonstracao(modo)
+    if listar_rotulos is None:
+        from app.modulos.hospedagem import service as hospedagem
+
+        listar_rotulos = hospedagem.listar_rotulos_para_simulador
+    conversas = listar_rotulos(conexao, id_hotel=id_hotel)
+    logger.info("simulador_lista id_hotel=%s n=%s", id_hotel, len(conversas))
+    del repositorio
+    return {"modo": modo, "conversas": conversas}
+
+
+def obter_conversa_simulador(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    modo: str,
+    repositorio=repositorio_padrao,
+    obter_rotulo=None,
+):
+    exigir_modo_demonstracao(modo)
+    if obter_rotulo is None:
+        from app.modulos.hospedagem import service as hospedagem
+
+        obter_rotulo = hospedagem.obter_rotulo_para_simulador
+    rotulo = obter_rotulo(conexao, id_hotel=id_hotel, id_reserva=id_reserva)
+    if rotulo is None:
+        raise ConversaSimuladorNaoEncontrada()
+    mensagens = repositorio.listar_mensagens_simulador(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    logger.info(
+        "simulador_fio id_hotel=%s id_reserva=%s n=%s",
+        id_hotel,
+        id_reserva,
+        len(mensagens),
+    )
+    return {**rotulo, "mensagens": mensagens}
+
+
+def enviar_turno_hospede_simulador(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    modo: str,
+    texto: str,
+    id_externo: str | None,
+    repositorio=repositorio_padrao,
+    receber_evento=None,
+    obter_rotulo=None,
+):
+    exigir_modo_demonstracao(modo)
+    identificador = (id_externo or "").strip()
+    if not identificador:
+        raise EntradaSimuladorInvalida("id_externo_ausente")
+    corpo = (texto or "").strip()
+    if not corpo:
+        raise EntradaSimuladorInvalida("texto_vazio")
+    if obter_rotulo is None:
+        from app.modulos.hospedagem import service as hospedagem
+
+        obter_rotulo = hospedagem.obter_rotulo_para_simulador
+    rotulo = obter_rotulo(conexao, id_hotel=id_hotel, id_reserva=id_reserva)
+    if rotulo is None:
+        raise ConversaSimuladorNaoEncontrada()
+    evento = EventoEntrada(
+        id_externo=identificador,
+        telefone_origem=rotulo["telefone_contato"],
+        texto=corpo,
+        tem_texto_utilizavel=True,
+        id_mensagem_canal=identificador,
+    )
+    receber = receber_evento or receber_evento_entrada
+    resultado = receber(
+        conexao, evento=evento, id_hotel=id_hotel, repositorio=repositorio
+    )
+    logger.info(
+        "simulador_entrada id_reserva=%s id_externo=%s status=%s",
+        id_reserva,
+        identificador,
+        resultado.get("status"),
+    )
+    return {**resultado, "id_reserva": id_reserva}

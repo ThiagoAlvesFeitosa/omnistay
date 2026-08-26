@@ -29,6 +29,7 @@ OPERACOES: Final[dict[str, frozenset[str]]] = {
     "ler_concorrentes": frozenset({"gestor"}),
     "ler_mercado": frozenset({"gestor"}),
     "ler_retencao": frozenset({"gestor"}),
+    "usar_simulador": frozenset({"recepcao", "gestor"}),
 }
 
 

@@ -5,12 +5,22 @@ import hmac
 import json
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import JSONResponse
 
 from app.config import obter_configuracao
-from app.modulos.acesso.dependencias import Conexao
+from app.modulos.acesso.dependencias import Conexao, exigir_operacao
+from app.modulos.acesso.service import SessaoAtual
 from app.modulos.conversa import service as conversa
-from app.modulos.conversa.schema import EventoEntrada
+from app.modulos.conversa.schema import (
+    EventoEntrada,
+    FioConversaSimulador,
+    ListaConversasSimulador,
+    TurnoHospedeEntrada,
+    TurnoHospedeResposta,
+)
 
 roteador = APIRouter(tags=["webhook"])
 
@@ -138,3 +148,90 @@ async def receber_webhook(request: Request, conexao: Conexao) -> dict:
         conexao, evento=evento, id_hotel=int(id_hotel)
     )
     return {"ok": True, "status": resultado.get("status")}
+
+
+def _traduzir_simulador(erro: Exception) -> None:
+    if isinstance(erro, conversa.ModoRealRecusado):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"codigo": "modo_real"},
+        ) from erro
+    if isinstance(erro, conversa.ConversaSimuladorNaoEncontrada):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nao encontrado.",
+        ) from erro
+    if isinstance(erro, conversa.EntradaSimuladorInvalida):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"codigo": erro.codigo},
+        ) from erro
+    raise erro
+
+
+@roteador.get("/simulador/conversas", response_model=ListaConversasSimulador)
+def listar_conversas_simulador(
+    conexao: Conexao,
+    sessao: Annotated[SessaoAtual, Depends(exigir_operacao("usar_simulador"))],
+) -> ListaConversasSimulador:
+    try:
+        dados = conversa.listar_conversas_simulador(
+            conexao,
+            id_hotel=sessao.id_hotel,
+            modo=obter_configuracao().mensageria_modo,
+        )
+    except Exception as erro:
+        _traduzir_simulador(erro)
+    return ListaConversasSimulador.model_validate(dados)
+
+
+@roteador.get(
+    "/simulador/conversas/{id_reserva}",
+    response_model=FioConversaSimulador,
+)
+def obter_conversa_simulador(
+    id_reserva: int,
+    conexao: Conexao,
+    sessao: Annotated[SessaoAtual, Depends(exigir_operacao("usar_simulador"))],
+) -> FioConversaSimulador:
+    try:
+        dados = conversa.obter_conversa_simulador(
+            conexao,
+            id_hotel=sessao.id_hotel,
+            id_reserva=id_reserva,
+            modo=obter_configuracao().mensageria_modo,
+        )
+    except Exception as erro:
+        _traduzir_simulador(erro)
+    return FioConversaSimulador.model_validate(dados)
+
+
+@roteador.post("/simulador/conversas/{id_reserva}/mensagens")
+def enviar_turno_hospede_simulador(
+    id_reserva: int,
+    corpo: TurnoHospedeEntrada,
+    conexao: Conexao,
+    sessao: Annotated[SessaoAtual, Depends(exigir_operacao("usar_simulador"))],
+) -> JSONResponse:
+    try:
+        dados = conversa.enviar_turno_hospede_simulador(
+            conexao,
+            id_hotel=sessao.id_hotel,
+            id_reserva=id_reserva,
+            modo=obter_configuracao().mensageria_modo,
+            texto=corpo.texto,
+            id_externo=corpo.id_externo,
+        )
+    except Exception as erro:
+        _traduzir_simulador(erro)
+    resposta = TurnoHospedeResposta(
+        status=dados["status"],
+        id_mensagem=dados.get("id_mensagem"),
+        id_reserva=id_reserva,
+    )
+    codigo = (
+        status.HTTP_200_OK
+        if dados.get("status") == "duplicado"
+        else status.HTTP_201_CREATED
+    )
+    return JSONResponse(status_code=codigo, content=resposta.model_dump())

@@ -5,7 +5,8 @@ from sqlalchemy.engine import Connection, Engine
 from app.adaptadores.catalogo_banco import CatalogoBanco
 from app.adaptadores.fonte_falsa import FonteFalsa
 from app.adaptadores.llm_falso import LLMFalso
-from app.adaptadores.mensageria_falsa import MensageriaFalsa
+from app.adaptadores.fabrica_mensageria import construir_mensageria
+from app.config import obter_configuracao
 from app.comum.log import obter_logger
 from app.fila import repository as fila_repository
 from app.modulos.atendimento import service as atendimento_service
@@ -147,7 +148,7 @@ def processar_uma_passagem_na_engine(
     catalogo=None,
     fonte: FontePublica | None = None,
 ) -> int:
-    porta = gateway or MensageriaFalsa()
+    porta = gateway or construir_mensageria(obter_configuracao())
     with engine.begin() as conexao:
         return processar_uma_passagem(
             conexao, gateway=porta, llm=llm, catalogo=catalogo, fonte=fonte

@@ -270,6 +270,27 @@ def ler_ficha_titular(
     )
 
 
+def listar_rotulos_para_simulador(
+    conexao,
+    *,
+    id_hotel: int,
+    repositorio=repositorio_padrao,
+) -> list[dict]:
+    return repositorio.listar_rotulos_para_simulador(conexao, id_hotel=id_hotel)
+
+
+def obter_rotulo_para_simulador(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    repositorio=repositorio_padrao,
+) -> dict | None:
+    return repositorio.obter_rotulo_para_simulador(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+
+
 def listar_reservas_aguardando_cadastro(
     conexao,
     repositorio=repositorio_padrao,

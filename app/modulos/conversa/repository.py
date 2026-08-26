@@ -86,6 +86,23 @@ def listar_mensagens_da_reserva(conexao: Connection, *, id_reserva: int) -> list
     return [dict(linha) for linha in linhas]
 
 
+def listar_mensagens_simulador(
+    conexao: Connection, *, id_hotel: int, id_reserva: int
+) -> list[dict]:
+    linhas = conexao.execute(
+        text(
+            "SELECT m.id_mensagem, m.direcao, m.conteudo, m.status_envio,"
+            " m.enviada_em"
+            " FROM mensagem m"
+            " JOIN reserva r ON r.id_reserva = m.id_reserva"
+            " WHERE m.id_reserva = :id_reserva AND r.id_hotel = :id_hotel"
+            " ORDER BY m.enviada_em ASC, m.id_mensagem ASC"
+        ),
+        {"id_reserva": id_reserva, "id_hotel": id_hotel},
+    ).mappings().all()
+    return [dict(linha) for linha in linhas]
+
+
 def ler_telefone_da_reserva(conexao: Connection, *, id_reserva: int) -> str | None:
     return conexao.execute(
         text("SELECT telefone_contato FROM reserva WHERE id_reserva = :id"),
