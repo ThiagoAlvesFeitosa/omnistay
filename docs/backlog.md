@@ -666,3 +666,450 @@ Em paralelo, a partir de F0.2:  F6.1 (expurgo)
 **Se o prazo apertar**, o corte defensável é a Fase 5 reduzida — coleta manual em vez de
 agendada, com o painel funcionando. O que **não** pode ser cortado: F3.1 (segurança do
 webhook), F6.1 (expurgo declarado) e F6.2 (simulador da apresentação).
+
+---
+
+---
+
+# Plano de uma semana — decidido em 26/08/2026
+
+**Prazo real: sete dias.** As Fases 7 e 8 somam doze fatias e não cabem. Este plano registra o
+que entra, o que sai e **por quê** — para que o corte seja escopo declarado, e não lacuna
+descoberta pela banca.
+
+## O que entra
+
+| Dia | Entrega | Por quê |
+| --- | --- | --- |
+| 1 | **F7.1** adaptador real de IA **+ aviso de assistente virtual** | Sem isso a demonstração mostra um sistema que responde "a recepção vai atender" a qualquer pergunta. É a fatia com maior efeito por hora gasta |
+| 2 | **F8.1** casca do painel: Tailwind + shadcn/ui, login, rota por perfil | Toda tela depende dela. Inclui montar o ferramental de interface, que só se paga uma vez |
+| 3 | **F8.2** fila do dia, nova reserva, confirmar chegada | É a tela que decide a adoção. Se só uma tela existisse, seria esta |
+| 4 | **F8.4** chamados, pedidos e a tela da equipe no celular | O Alert Center é o que substituiu o app da equipe. Sem ele o corte fica visível |
+| 5 | **F8.6** catálogo, itens vendáveis e recado de boas-vindas — com a **F7.3** (linha de convite) junto | São as telas que alimentam a IA. Sem elas, configurar a demonstração vira digitar JSON no `/docs` |
+| 6 | **F8.3** ficha do hóspede + **F8.5** consumos e saída | Fecham o ciclo completo de uma estadia, do cadastro ao checkout |
+| 7 | **Documento acadêmico, slides, vídeo e ensaio da demonstração** | É o que é avaliado. Não é dia de sobra: é dia de entrega |
+
+## O que sai — escopo declarado
+
+| Fatia | Motivo do corte | O que dizer à banca |
+| --- | --- | --- |
+| **F7.4** módulos por propriedade | Coerência com o Canvas, mas nenhum efeito na demonstração | "Os três planos estão desenhados e a estrutura (`parametro_hotel`) já existe; ligar e desligar é fatia mapeada" |
+| **F7.5** canal de e-mail | Maior fatia da fase. Exige caixa IMAP monitorada e uma segunda identidade de hóspede | "O miolo já é agnóstico de canal — tudo entra pela mesma porta. O e-mail é porta nova, não sistema novo, e está especificado" |
+| **F8.7** painel da gestão, mercado, usuários e retenção | Todas são telas de leitura. O `/docs` demonstra os mesmos dados | "As funcionalidades existem e são demonstráveis pela API; a interface delas é a próxima entrega" |
+| **Personalidade configurável** | Só o **aviso de IA** entra (uma linha, custo zero). O campo de tom fica para depois | "A porta está pronta; o campo de tom entra sem tocar no resto" |
+
+## Como acelerar sem perder o método
+
+O ciclo completo do Spec Kit — `specify` → `clarify` → `plan` → `tasks` → `analyze` →
+`implement` — custa caro. Nas fatias de tela, **os wireframes já são a especificação**: layout,
+campos, perfis e endpoints estão em `docs/wireframes-painel.html`.
+
+Recomendação para os dias 2 a 6: `specify` → `plan` → `tasks` → `implement`, sem `clarify` nem
+`analyze`. A F7.1 mantém o ciclo completo, porque toca o comportamento do sistema e não só a
+apresentação dele.
+
+**O que não se corta:** TDD. O Artigo XII não é cerimônia — é o que permitiu mexer no esquema
+onze vezes sem quebrar nada. Numa semana apertada, é justamente ele que evita o dia perdido
+caçando regressão.
+
+## Decisões de frontend fechadas em 26/08/2026
+
+| Tema | Decisão |
+| --- | --- |
+| Onde mora | **Estende o `frontend/` que já existe** (Vite + React + TypeScript), com rotas. Não é aplicação nova: o simulador vira uma rota entre as outras |
+| Visual | **Tailwind + shadcn/ui.** Componentes copiados para dentro do projeto, sem dependência de runtime. É o mesmo ferramental do protótipo do Replit, então o visual dele pode ser aproveitado sem o código |
+| Celular | **Só a tela da equipe.** Recepção e gestão usam computador, no balcão e na sala. Responsividade completa custa em dezesseis telas e resolve um problema que não existe |
+| Sessão | Cookie `HttpOnly` já entregue pela API. A tela nunca toca o token, e não há estado de autenticação para guardar no navegador |
+| Estado | Sem biblioteca de estado global. Cada tela busca o que precisa; a fila do dia recarrega ao concluir uma ação |
+
+---
+
+# Fase 7 — Assistente, personalização e canais
+
+**Por que esta fase existe.** As 24 fatias originais entregaram o comportamento do sistema, mas
+com três lacunas que só apareceram quando o produto foi visto rodando:
+
+1. A camada de IA não tem implementação real — o worker de produção usa o adaptador falso, e toda
+   pergunta cai no ramo humano.
+2. Não há como o hotel ajustar o tom da assistente, nem como o hóspede saber que fala com uma IA.
+3. Todo hotel recebe tudo, enquanto o Canvas promete três planos com escopos diferentes.
+
+**Ela vem antes da Fase 8 (painel) de propósito.** Se a modularização chegar depois das telas, as
+telas nascem sem saber esconder módulo desligado e precisam ser refeitas.
+
+## Decisões que governam a fase
+
+| Tema | Decisão | Motivo |
+| --- | --- | --- |
+| Personalidade da assistente | Texto livre em `parametro_hotel`, entra no prompt **antes** das regras fixas | O hotel muda o tom; nunca o limite do que a IA pode afirmar |
+| Regra do catálogo | Continua no código, e é sempre a última instrução do prompt | Ordem importa: o que vem por último pesa mais, e o hotel não alcança essa parte |
+| Aviso de IA | Frase fixa na primeira mensagem de cada estadia | Não é escolha do hotel — é postura do produto |
+| Módulos | Linhas em `parametro_hotel`, não tabela nova | Mesmo padrão dos prazos e dos textos de boas-vindas |
+| Núcleo | Reserva, ficha, chamados e catálogo **nunca** desligam | Sem eles não existe produto |
+| Canal proativo | Sempre WhatsApp | Templates, janela e custo já foram desenhados em cima dele |
+| Canal reativo | O mesmo em que o hóspede escreveu | Regra única, sem tabela de preferência e sem escolha a errar |
+
+---
+
+## F7.1 — Adaptador real de IA
+
+**Objetivo:** o sistema passa a pensar de verdade.
+
+**Descrição para o `/specify`:**
+> O sistema conversa com um serviço de modelo de linguagem real para classificar mensagens e
+> redigir respostas, no lugar da implementação falsa que hoje o worker utiliza. Escolher entre o
+> serviço real e o falso é configuração, não mudança de código. Falha, demora excessiva ou
+> resposta em formato inválido do serviço não perdem a mensagem: ela segue para atendimento
+> humano, como já acontece hoje.
+
+**Critérios de aceite:**
+
+- Alternar entre serviço real e falso é configuração
+- Chave de acesso vem do ambiente e nunca aparece em arquivo versionado nem em log
+- Chamada que ultrapassa o tempo limite encaminha para humano, sem travar o worker
+- Resposta em formato inválido encaminha para humano
+- Nenhum teste depende de rede ou consome chamada do serviço real
+- Conteúdo de mensagem de hóspede continua fora do log
+
+**Depende de:** F3.2, F3.3, F6.2.
+
+> É a menor fatia da fase e a que mais muda a demonstração. Sem ela, o painel da Fase 8 exibe um
+> sistema que responde "a recepção vai atender" a qualquer pergunta.
+
+---
+
+## F7.2 — Personalidade da assistente e aviso de IA
+
+**Objetivo:** a assistente soa como a casa, e o hóspede sabe com quem fala.
+
+**Descrição para o `/specify`:**
+> A propriedade descreve, em texto livre, o tom que a assistente deve ter ao conversar com o
+> hóspede. Esse tom afeta a forma das respostas automáticas, nunca o conteúdo: a assistente
+> continua limitada aos fatos do catálogo, e nenhuma instrução da propriedade é capaz de remover
+> esse limite. A primeira mensagem de cada estadia informa ao hóspede que o atendimento inicial é
+> feito por uma assistente virtual e que uma pessoa assume quando necessário.
+
+**Critérios de aceite:**
+
+- Descrição de tom vazia mantém a assistente funcionando, com voz padrão
+- Tom configurado altera a redação das respostas automáticas
+- Texto que instrua a assistente a ignorar o catálogo não surte efeito: a resposta continua fiel
+- A primeira mensagem de cada estadia informa que o atendimento é por assistente virtual
+- Hóspede que pede para falar com uma pessoa é encaminhado, sem insistência
+- Descrição de tom tem tamanho máximo e é recusada acima dele
+
+**Depende de:** F7.1.
+
+> O terceiro critério é de segurança, não de qualidade. Campo de texto livre que entra num prompt
+> é superfície de ataque: a mitigação é a regra do catálogo ser sempre a última instrução, fora do
+> alcance de quem edita o campo.
+
+---
+
+## F7.3 — Linha de convite no recado de boas-vindas
+
+**Objetivo:** o hotel escreve o convite com as próprias palavras.
+
+**Descrição para o `/specify`:**
+> Além das três informações de entrada, o recado de boas-vindas passa a ter uma linha de convite
+> mantida pela propriedade, que diz ao hóspede o que ele pode perguntar por ali — serviços,
+> cardápio, horários. A linha segue as mesmas restrições de formato dos outros campos e nunca fica
+> vazia.
+
+**Critérios de aceite:**
+
+- A linha de convite aparece no recado enviado
+- Valor com quebra de linha, tabulação ou espaços múltiplos é recusado ao salvar
+- Propriedade recém-instalada já tem um convite padrão preenchido
+- Convite vazio impede o envio e sinaliza na fila do dia, como os outros três campos
+- Recepção edita; gestão lê; perfil operacional recebe recusa
+
+**Depende de:** F2.2.
+
+> Estrutura de template já aprovada não muda: é uma variável a mais com rótulo fixo, no mesmo
+> molde dos outros três.
+
+---
+
+## F7.4 — Módulos por propriedade
+
+**Objetivo:** o escopo do sistema acompanha o plano contratado.
+
+**Descrição para o `/specify`:**
+> Cada propriedade tem um conjunto de funcionalidades opcionais que podem estar ligadas ou
+> desligadas: inteligência de mercado, pulso do segundo dia, consumo faturável e pesquisa de
+> saída. Funcionalidade desligada não é executada pelo sistema nem oferecida na interface. O
+> núcleo da operação — reserva, ficha, chamados e catálogo — não é desligável.
+
+**Critérios de aceite:**
+
+- Funcionalidade desligada não dispara mensagem nem tarefa agendada
+- Recurso de funcionalidade desligada responde como inexistente, sem revelar que existe
+- Ligar uma funcionalidade passa a valer sem reiniciar o sistema
+- Desligar não apaga dado já gravado
+- Só a gestão altera o estado dos módulos
+- Núcleo não aparece na lista do que pode ser desligado
+
+**Depende de:** F5.3, F3.8, F3.7, F4.1.
+
+> Isto é a expressão técnica dos três planos do Business Model Canvas. Sem ela, o Canvas promete
+> escopos que o sistema não sabe entregar.
+
+---
+
+## F7.5 — E-mail como segundo canal
+
+**Objetivo:** o hub conversacional deixa de ser só WhatsApp.
+
+**Descrição para o `/specify`:**
+> O hóspede pode ter um endereço de e-mail registrado, e pode conversar com a propriedade por
+> esse endereço. Mensagem recebida por e-mail entra pelo mesmo caminho de uma mensagem de
+> WhatsApp e recebe o mesmo tratamento: classificação, resposta automática pelo catálogo,
+> abertura de chamado. A resposta sai pelo mesmo canal em que o hóspede escreveu. Mensagens que o
+> sistema inicia continuam saindo por WhatsApp.
+
+**Critérios de aceite:**
+
+- Mensagem recebida por e-mail é classificada e respondida como a de WhatsApp
+- A resposta sai pelo canal de origem da mensagem
+- Cada mensagem registra por qual canal entrou ou saiu
+- Remetente desconhecido não é tratado como hóspede e não recebe dado de ninguém
+- Mensagem repetida não gera atendimento duplicado
+- Falha do canal de e-mail não afeta o WhatsApp, e vice-versa
+- E-mail é opcional: reserva sem e-mail funciona como hoje
+
+**Depende de:** F3.1, F3.2, F3.3, F7.4.
+
+> **É a maior fatia da fase, e o corte defensável se o prazo apertar.** A promessa de hub
+> conversacional se sustenta com WhatsApp; o e-mail a amplia. Se cortar, registrar como escopo
+> declarado e não como esquecimento.
+
+---
+
+## Ordem recomendada da Fase 7
+
+```
+F7.1 → F7.2 → F7.3 → F7.4 → F7.5
+```
+
+F7.1 primeiro porque muda a demonstração inteira. F7.4 antes da Fase 8 porque as telas precisam
+nascer sabendo esconder módulo desligado.
+
+## Perguntas a resolver com teste, não no papel
+
+Estas ficam abertas de propósito. São coisas que só o uso responde, e cada uma deve virar ajuste
+depois da primeira rodada com gente de verdade:
+
+- **O tom configurado muda mesmo a percepção do hóspede**, ou o efeito some depois de duas frases?
+- **Onde o aviso de IA incomoda menos** — na primeira mensagem, na assinatura de cada resposta, ou
+  só quando o hóspede pergunta?
+- **Quantos hóspedes respondem por e-mail** quando têm as duas opções. Se for perto de zero, o
+  canal vira custo de manutenção sem retorno.
+- **Qual das linhas do recado de boas-vindas o hóspede usa** — se ninguém pergunta sobre cardápio
+  depois do convite, o convite está mal escrito ou mal posicionado.
+- **Se desligar um módulo confunde o recepcionista** que já se acostumou com ele.
+
+---
+
+# Fase 8 — Painel de operação (React)
+
+**Por que esta fase existe.** As 24 fatias entregaram o backend inteiro — 27 operações
+autorizadas, 21 revisões de esquema, worker, fila e webhook. Mas **nenhuma delas construiu o
+painel**: todas diziam "sem tela React". A única interface que existe é o simulador da F6.2,
+feito para demonstrar a conversa do hóspede, não para operar o hotel.
+
+Hoje o sistema só é operável pelo `/docs` do FastAPI. Isso não é entregável.
+
+## A decisão: construir do zero, não adaptar o protótipo
+
+| | Construir fatias novas (**escolhido**) | Ligar o protótipo do Replit |
+| --- | --- | --- |
+| Cobertura | As 27 operações, por desenho | 5 telas: painel, mercado, simulador, alertas, conversas |
+| O que falta | Nada — o backend está pronto | Fila do dia, reserva, ficha, catálogo, itens vendáveis, consumos, saída, boas-vindas, usuários, sessões, retenção |
+| Alinhamento com a API | Contratos reais desde a primeira linha | Protótipo desenhado antes da API; nomes e formatos divergem |
+| Perfis | Recusa por perfil testada, como no backend | Não previstos |
+| Esforço | Maior | Menor no início, maior no acerto |
+| Risco | Baixo — repete um método já validado 24 vezes | Alto — retrabalho invisível até aparecer |
+
+**Motivo da escolha:** o protótipo cobre a parte gerencial e deixa de fora justamente o núcleo
+operacional, que é onde mora o risco de adoção do projeto. Ele serve como **referência visual**,
+não como base de código.
+
+**Referência de layout:** `docs/wireframes-painel.html` — 15 telas, com o endpoint de cada uma.
+
+## Regras da fase
+
+- Nenhuma fatia da Fase 7 altera o backend. Se uma tela precisar de algo que a API não oferece,
+  isso é achado a registrar, não licença para mudar contrato no meio do caminho.
+- Cada fatia entrega tela **funcionando contra a API real**, não maquete.
+- Toda tela respeita a matriz de perfis: o que a API recusa, a tela não oferece.
+- Dado pessoal não trafega para quem não pode vê-lo. Filtro na origem, nunca na tela.
+
+---
+
+## F8.1 — Casca do painel e login
+
+**Objetivo:** entrar no sistema e chegar à tela certa do seu perfil.
+
+**Descrição para o `/specify`:**
+> O funcionário entra com e-mail e senha e é levado à tela inicial correspondente ao seu papel:
+> a recepção à fila do dia, a equipe operacional aos seus chamados, a gestão ao painel de
+> indicadores. A sessão permanece válida entre visitas no mesmo dispositivo, e sair encerra a
+> sessão no servidor. Enquanto a sessão for válida, o funcionário não precisa autenticar de novo.
+
+**Critérios de aceite:**
+
+- Credencial inválida recusa sem revelar se o e-mail existe
+- Cada perfil chega à sua tela inicial após entrar
+- Recarregar a página mantém a sessão
+- Sair encerra a sessão no servidor, não apenas no navegador
+- Item de menu que o perfil não pode usar não aparece
+- Sessão expirada devolve à tela de entrada sem erro de tela branca
+
+**Depende de:** F0.3.
+
+---
+
+## F8.2 — Fila do dia e cadastro de reserva
+
+**Objetivo:** o turno inteiro da recepção numa tela só.
+
+**Descrição para o `/specify`:**
+> A recepção vê, na tela inicial, quem chega hoje, quem já está hospedado e quem deveria ter
+> chegado e não foi confirmado. Da mesma tela ela cadastra uma reserva nova com nome, telefone e
+> datas, e confirma a chegada de quem apareceu no balcão. Reservas com pendência — ficha
+> incompleta, recado de boas-vindas não enviado, chegada vencida — são destacadas.
+
+**Critérios de aceite:**
+
+- A fila mostra chegadas do dia, hospedados e chegadas vencidas, e não reservas futuras
+- Cadastro de reserva pede apenas nome, telefone e datas, com telefone validado na digitação
+- Confirmar chegada muda a situação na própria lista, sem recarregar a página
+- Sinalização de chegada vencida e de recado não enviado aparecem distintas
+- Perfil de gestão e perfil operacional recebem recusa nesta tela
+
+**Depende de:** F8.1, F1.1, F2.2.
+
+> É a tela que decide a adoção. Se o Cléber precisar navegar para fazer o trabalho do turno,
+> ele volta para o caderno.
+
+---
+
+## F8.3 — Ficha do hóspede e transcrição para o PMS
+
+**Objetivo:** transportar a ficha para o sistema do hotel sem redigitar.
+
+**Descrição para o `/specify`:**
+> A recepção abre a ficha de um hóspede, completa no balcão o que faltou, e copia os dados para
+> o sistema de gestão do hotel. Fichas parciais são identificadas com os campos ausentes. O
+> consentimento para contato futuro é visível e revogável.
+
+**Critérios de aceite:**
+
+- Ficha completa e ficha parcial são distinguíveis, com os campos ausentes nomeados
+- Campos editáveis no balcão gravam sem nova rodada de mensagens
+- Existe forma de copiar a ficha para colagem externa
+- Consentimento aparece com data e pode ser revogado
+- Perfil operacional recebe recusa
+
+**Depende de:** F8.2, F1.3.
+
+> Testar a colagem no PMS real continua pendente. A fatia entrega uma variação; qual formato
+> funciona é achado de campo.
+
+---
+
+## F8.4 — Chamados, pedidos e a tela da equipe
+
+**Objetivo:** o Alert Center funcionando, e a equipe resolvendo pelo celular.
+
+**Descrição para o `/specify`:**
+> A recepção acompanha chamados e pedidos abertos, com o tempo decorrido visível, e distingue
+> reclamação, serviço operacional e consumo. A equipe operacional acessa pelo celular uma lista
+> apenas dos chamados atribuídos a ela, com um único botão para marcar como resolvido, sem
+> qualquer dado cadastral do hóspede na tela.
+
+**Critérios de aceite:**
+
+- Chamados abertos aparecem com tempo decorrido e natureza distinta
+- Resolver confirma ao hóspede automaticamente
+- A tela da equipe não exibe nome, telefone nem documento de hóspede
+- A tela da equipe é utilizável em tela de celular, sem autenticar a cada chamado
+- Perfil operacional recebe recusa ao tentar abrir ficha por qualquer caminho
+
+**Depende de:** F8.1, F3.5, F3.6.
+
+---
+
+## F8.5 — Consumos a lançar e saída do hóspede
+
+**Objetivo:** a fila com consequência financeira, e o checkout.
+
+**Descrição para o `/specify`:**
+> Os consumos faturáveis pendentes de lançamento aparecem em fila destacada, com o valor
+> praticado e há quanto tempo esperam. A recepção marca cada um como lançado ou dispensado. Na
+> saída, ela confirma o checkout e vê a lista de pedidos feitos pelo chat daquela estadia,
+> avisada se ainda houver consumo pendente.
+
+**Critérios de aceite:**
+
+- A fila de pendentes mostra valor e tempo de espera, e o total pendente
+- Marcar como lançado registra quem lançou e quando
+- Consumo pendente da estadia é avisado antes da confirmação da saída
+- A lista nunca é chamada de "extrato" nem de "conta", em nenhum ponto da interface
+- Pedido de serviço sem cobrança não aparece na lista da saída
+
+**Depende de:** F8.2, F3.7, F4.1, F4.2.
+
+---
+
+## F8.6 — Catálogo, itens vendáveis e recado de boas-vindas
+
+**Objetivo:** o hotel mantém sozinho o que o sistema pode afirmar e cobrar.
+
+**Descrição para o `/specify`:**
+> A recepção mantém o catálogo por categoria, cadastra e ajusta os itens vendáveis com seus
+> preços, e edita os três textos de entrada do recado de boas-vindas. Itens são desativados em
+> vez de apagados. Valor recusado pela regra de formato é avisado no momento de salvar.
+
+**Critérios de aceite:**
+
+- Itens do catálogo são criados, editados e desativados por categoria
+- Item vendável tem preço editável em campo próprio, sem reescrever texto
+- Item desativado deixa de ser considerado pelo atendimento automático
+- Texto de boas-vindas com quebra de linha ou espaços múltiplos é recusado ao salvar, com aviso claro
+- Gestão lê e não altera; perfil operacional recebe recusa
+
+**Depende de:** F8.1, F2.1, F2.2.
+
+---
+
+## F8.7 — Painel da gestão, mercado e administração
+
+**Objetivo:** a visão de quem responde pelo hotel, sem ver dado pessoal.
+
+**Descrição para o `/specify`:**
+> A gestão vê indicadores agregados da operação, o comparativo de mercado com os concorrentes
+> cadastrados, a relação de usuários com criação e desativação, e o registro das execuções de
+> expurgo por retenção. Nenhum dado cadastral de hóspede aparece em nenhuma dessas telas.
+
+**Critérios de aceite:**
+
+- Os indicadores são números agregados; nenhuma lista nominal é servida à gestão
+- Criar usuário exige perfil e senha com o mínimo exigido, e desativar não apaga
+- Concorrente com coleta falhada aparece marcado, e não como dado atual
+- O registro de expurgo mostra data, tipo e quantidade de registros
+- Revogar sessão não aparece para a gestão — é da recepção
+
+**Depende de:** F8.1, F5.3, F6.1.
+
+---
+
+## Ordem recomendada da Fase 8
+
+```
+F8.1 → F8.2 → F8.3 → F8.4 → F8.5 → F8.6 → F8.7
+```
+
+**Se o prazo apertar**, o mínimo apresentável é **F8.1 + F8.2 + F8.4**: entrar, operar o turno e
+resolver chamado. As demais telas continuam acessíveis pelo `/docs` durante a demonstração.

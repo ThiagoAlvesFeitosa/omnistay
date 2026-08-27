@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OmniStay — Wireframes do painel</title>
+<style>
+:root{
+  --tinta:#1a1a1a; --meio:#6b6b6b; --fraco:#9a9a9a;
+  --linha:#d4d4d4; --fundo:#ffffff; --caixa:#f4f4f2; --realce:#e8e4dc;
+  --alerta:#8a3324; --ok:#2f5d3f;
+}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--tinta);background:#eceae6}
+.app{display:flex;min-height:100vh}
+nav{width:250px;background:var(--tinta);color:#fff;padding:20px 0;flex-shrink:0}
+nav h1{font-size:15px;margin:0 20px 4px;letter-spacing:.02em}
+nav p{font-size:12px;color:#999;margin:0 20px 20px}
+nav .grupo{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#777;margin:18px 20px 6px}
+nav a{display:block;padding:7px 20px;color:#ddd;text-decoration:none;font-size:13.5px;border-left:3px solid transparent;cursor:pointer}
+nav a:hover{background:#2a2a2a;color:#fff}
+nav a.ativo{background:#2f2f2f;color:#fff;border-left-color:#fff}
+main{flex:1;padding:28px 34px;max-width:1120px}
+.tela{display:none}
+.tela.ativa{display:block}
+.cabeca{border-bottom:2px solid var(--tinta);padding-bottom:10px;margin-bottom:6px}
+.cabeca h2{margin:0;font-size:22px}
+.cabeca .perfil{font-size:12px;color:var(--meio);text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
+.nota{background:var(--realce);border-left:3px solid var(--meio);padding:10px 14px;margin:14px 0 22px;font-size:13.5px;color:#3a3a3a}
+.nota strong{color:var(--tinta)}
+.quadro{background:var(--fundo);border:1px solid var(--linha);border-radius:3px;padding:18px;margin-bottom:18px}
+.quadro > h3{margin:0 0 14px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--meio)}
+.barra{display:flex;justify-content:space-between;align-items:center;background:var(--caixa);border:1px solid var(--linha);padding:10px 14px;margin-bottom:14px;font-size:13.5px}
+.abas{display:flex;gap:2px;margin-bottom:14px;border-bottom:1px solid var(--linha)}
+.abas span{padding:8px 16px;font-size:13.5px;color:var(--meio);border:1px solid transparent;border-bottom:none;cursor:default}
+.abas span.on{background:#fff;border-color:var(--linha);color:var(--tinta);font-weight:600;margin-bottom:-1px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--meio);border-bottom:1px solid var(--linha);padding:7px 8px;font-weight:600}
+td{padding:9px 8px;border-bottom:1px solid #eee;vertical-align:middle}
+tr.destaque td{background:#fdf6f4}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--caixa);border:1px solid var(--linha);color:var(--meio);white-space:nowrap}
+.tag.vermelha{background:#f7e9e6;border-color:#e0c4bd;color:var(--alerta)}
+.tag.verde{background:#e9f0eb;border-color:#c2d6c8;color:var(--ok)}
+.bt{display:inline-block;padding:6px 13px;font-size:13px;border:1px solid var(--tinta);background:var(--tinta);color:#fff;border-radius:2px}
+.bt.sec{background:#fff;color:var(--tinta)}
+.bt.min{padding:3px 9px;font-size:12px}
+.campo{margin-bottom:12px}
+.campo label{display:block;font-size:12px;color:var(--meio);margin-bottom:3px}
+.campo .entrada{border:1px solid var(--linha);background:#fafafa;padding:8px 10px;font-size:13.5px;color:var(--fraco);border-radius:2px}
+.grade2{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+.grade3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.kpi{background:#fff;border:1px solid var(--linha);padding:14px}
+.kpi .n{font-size:28px;font-weight:600;line-height:1.1}
+.kpi .r{font-size:12px;color:var(--meio);text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
+.celular{width:310px;border:10px solid var(--tinta);border-radius:22px;padding:14px;background:#fff}
+.chat{background:var(--caixa);padding:14px;border:1px solid var(--linha);max-height:330px;overflow:hidden}
+.bolha{max-width:78%;padding:8px 12px;border-radius:12px;margin-bottom:9px;font-size:13.5px}
+.bolha.dele{background:#fff;border:1px solid var(--linha)}
+.bolha.nossa{background:var(--realce);margin-left:auto;border:1px solid #ddd6cb}
+.legenda{font-size:12px;color:var(--fraco);margin-top:5px}
+.rodape{font-size:12.5px;color:var(--meio);border-top:1px solid var(--linha);padding-top:12px;margin-top:22px}
+.rodape code{background:var(--caixa);padding:1px 5px;font-size:12px;border-radius:2px}
+ul.enxuta{margin:8px 0 0;padding-left:18px;font-size:13.5px}
+ul.enxuta li{margin-bottom:4px}
+</style>
+</head>
+<body>
+<div class="app">
+<nav>
+  <h1>OmniStay</h1>
+  <p>Wireframes do painel · v1</p>
+
+  <div class="grupo">Entrada</div>
+  <a data-t="login" class="ativo">Login</a>
+
+  <div class="grupo">Recepção</div>
+  <a data-t="fila">Fila do dia</a>
+  <a data-t="reserva">Nova reserva</a>
+  <a data-t="ficha">Ficha do hóspede</a>
+  <a data-t="chamados">Chamados e pedidos</a>
+  <a data-t="consumos">Consumos a lançar</a>
+  <a data-t="saida">Saída do hóspede</a>
+  <a data-t="catalogo">Catálogo</a>
+  <a data-t="vendaveis">Itens vendáveis</a>
+  <a data-t="boasvindas">Recado de boas-vindas</a>
+  <a data-t="sessoes">Dispositivos conectados</a>
+
+  <div class="grupo">Equipe (celular)</div>
+  <a data-t="staff">Meus chamados</a>
+
+  <div class="grupo">Gestão</div>
+  <a data-t="gestao">Painel</a>
+  <a data-t="mercado">Mercado</a>
+  <a data-t="usuarios">Usuários</a>
+  <a data-t="retencao">Retenção de dados</a>
+  <a data-t="config">Configurações</a>
+
+  <div class="grupo">Demonstração</div>
+  <a data-t="simulador">Simulador</a>
+</nav>
+
+<main>
+
+<!-- LOGIN -->
+<section class="tela ativa" id="login">
+  <div class="cabeca"><h2>Login</h2><div class="perfil">Todos os perfis</div></div>
+  <div class="nota">A sessão dura semanas no mesmo dispositivo — decisão do projeto, para o pessoal de manutenção não digitar senha a cada chamado. O token vive em cookie <code>HttpOnly</code>; a tela nunca o enxerga.</div>
+  <div class="quadro" style="max-width:380px">
+    <h3>Entrar</h3>
+    <div class="campo"><label>E-mail</label><div class="entrada">cleber@hotelexemplo.com.br</div></div>
+    <div class="campo"><label>Senha</label><div class="entrada">••••••••••••</div></div>
+    <div class="bt">Entrar</div>
+  </div>
+  <div class="rodape">Depois do login, cada perfil cai numa tela inicial diferente: recepção na <strong>fila do dia</strong>, equipe em <strong>meus chamados</strong>, gestão no <strong>painel</strong>.</div>
+</section>
+
+<!-- FILA DO DIA -->
+<section class="tela" id="fila">
+  <div class="cabeca"><h2>Fila do dia</h2><div class="perfil">Recepção · tela inicial do turno</div></div>
+  <div class="nota"><strong>Esta é a tela mais importante do sistema.</strong> O Cléber é o risco de adoção do projeto: se ele abandonar o painel, o sistema para. Tudo que ele faz num turno precisa caber aqui, sem navegar.</div>
+
+  <div class="barra">
+    <div><strong>Terça, 26 de agosto</strong> &nbsp;·&nbsp; <span class="tag">4 chegadas</span> <span class="tag">2 hospedados</span> <span class="tag vermelha">1 atrasada</span></div>
+    <div><span class="bt">+ Nova reserva</span></div>
+  </div>
+
+  <div class="quadro">
+    <table>
+      <tr><th>Hóspede</th><th>Entrada</th><th>Saída</th><th>Situação</th><th>Ficha</th><th style="text-align:right">Ação</th></tr>
+      <tr class="destaque">
+        <td><strong>Marina Duarte</strong><br><span class="legenda">+55 11 98••••-1234</span></td>
+        <td>25/08 <span class="tag vermelha">ontem</span></td><td>28/08</td>
+        <td><span class="tag vermelha">não confirmada</span></td>
+        <td><span class="tag verde">completa</span></td>
+        <td style="text-align:right"><span class="bt min">Confirmar chegada</span></td>
+      </tr>
+      <tr>
+        <td><strong>Rafael Nunes</strong><br><span class="legenda">+55 21 97••••-8899</span></td>
+        <td>26/08</td><td>27/08</td>
+        <td><span class="tag">aguardando cadastro</span></td>
+        <td><span class="tag">não enviada</span></td>
+        <td style="text-align:right"><span class="bt min">Confirmar chegada</span></td>
+      </tr>
+      <tr>
+        <td><strong>Ana Prado</strong><br><span class="legenda">+55 11 99••••-4455</span></td>
+        <td>26/08</td><td>30/08</td>
+        <td><span class="tag">ficha recebida</span></td>
+        <td><span class="tag">parcial</span> <span class="legenda">faltam 3 campos</span></td>
+        <td style="text-align:right"><span class="bt min">Confirmar chegada</span></td>
+      </tr>
+      <tr>
+        <td><strong>Carlos Beltrão</strong><br><span class="legenda">+55 31 98••••-2211</span></td>
+        <td>24/08</td><td>26/08 <span class="tag">hoje</span></td>
+        <td><span class="tag verde">hospedado</span></td>
+        <td><span class="tag verde">completa</span></td>
+        <td style="text-align:right"><span class="bt min sec">Confirmar saída</span></td>
+      </tr>
+      <tr>
+        <td><strong>Júlia Manso</strong><br><span class="legenda">+55 11 96••••-7788</span></td>
+        <td>24/08</td><td>29/08</td>
+        <td><span class="tag verde">hospedado</span> <span class="tag vermelha">recado não enviado</span></td>
+        <td><span class="tag verde">completa</span></td>
+        <td style="text-align:right"><span class="bt min sec">Ver ficha</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="rodape">
+    <strong>O que cada sinal resolve:</strong>
+    <ul class="enxuta">
+      <li><span class="tag vermelha">não confirmada</span> — a data de entrada passou e ninguém clicou. É a detecção de divergência temporal do Artefato 2: o sistema não sabe que o hóspede chegou, mas sabe que ele deveria ter chegado.</li>
+      <li><span class="tag vermelha">recado não enviado</span> — os três textos de boas-vindas estavam vazios na hora da chegada. Preencher e o worker recupera sozinho, dentro de 12 horas.</li>
+      <li><span class="tag">parcial</span> — o hóspede respondeu só parte da lista. Completa-se no balcão, sem nova rodada de mensagens.</li>
+    </ul>
+    Endpoints: <code>GET /fila-do-dia</code> · <code>POST /reservas/{id}/chegada</code> · <code>POST /reservas/{id}/saida</code>
+  </div>
+</section>
+
+<!-- NOVA RESERVA -->
+<section class="tela" id="reserva">
+  <div class="cabeca"><h2>Nova reserva</h2><div class="perfil">Recepção</div></div>
+  <div class="nota">Só três campos, por decisão fechada do projeto. O resto da ficha vem pelo WhatsApp, ou é preenchido no balcão. Pedir mais aqui seria "mais uma tela para preencher".</div>
+  <div class="quadro" style="max-width:520px">
+    <h3>Dados da reserva</h3>
+    <div class="campo"><label>Nome do hóspede</label><div class="entrada">Marina Duarte</div></div>
+    <div class="campo"><label>Telefone com DDD</label><div class="entrada">(11) 98765-4321</div>
+      <div class="legenda">Validado na digitação — um dígito errado manda a conversa para um desconhecido.</div></div>
+    <div class="campo"><label>E-mail <span class="tag">opcional</span></label><div class="entrada">marina.duarte@email.com</div>
+      <div class="legenda">Se preenchido, o hóspede também pode conversar por e-mail. Mensagens que o sistema inicia continuam saindo por WhatsApp.</div></div>
+    <div class="grade2">
+      <div class="campo"><label>Entrada</label><div class="entrada">26/08/2026</div></div>
+      <div class="campo"><label>Saída</label><div class="entrada">28/08/2026</div></div>
+    </div>
+    <div class="bt">Cadastrar</div> &nbsp; <span class="bt sec">Cancelar</span>
+  </div>
+  <div class="rodape">Ao salvar, a mensagem de coleta entra na fila e o worker envia. Se o envio falhar, <strong>a reserva continua gravada</strong> e a fila do dia sinaliza. Endpoint: <code>POST /reservas</code></div>
+</section>
+
+<!-- FICHA -->
+<section class="tela" id="ficha">
+  <div class="cabeca"><h2>Ficha do hóspede</h2><div class="perfil">Recepção · dado pessoal, gestão não acessa</div></div>
+  <div class="nota">Existe para ser <strong>copiada para o PMS</strong>. O OmniStay não se integra ao PMS — o recepcionista é a ponte. Por isso o botão de copiar é o elemento principal da tela, não um detalhe.</div>
+
+  <div class="barra">
+    <div><strong>Marina Duarte</strong> · reserva #1042 · <span class="tag verde">ficha completa</span></div>
+    <div><span class="bt">Copiar tudo</span> <span class="bt sec">Editar</span></div>
+  </div>
+
+  <div class="quadro">
+    <div class="grade2">
+      <div class="campo"><label>Nome completo</label><div class="entrada">Marina Duarte Fonseca</div></div>
+      <div class="campo"><label>Profissão</label><div class="entrada">Gerente de contas</div></div>
+      <div class="campo"><label>Data de nascimento</label><div class="entrada">14/03/1992</div></div>
+      <div class="campo"><label>Documento</label><div class="entrada">CPF · 123.456.789-00</div></div>
+      <div class="campo"><label>Endereço</label><div class="entrada">Rua das Acácias, 220 — apto 71</div></div>
+      <div class="campo"><label>CEP</label><div class="entrada">04567-000</div></div>
+      <div class="campo"><label>Cidade</label><div class="entrada">São Paulo</div></div>
+      <div class="campo"><label>Telefone</label><div class="entrada">+55 11 98765-4321</div></div>
+      <div class="campo"><label>E-mail <span class="tag">opcional</span></label><div class="entrada">marina.duarte@email.com</div>
+        <div class="legenda">Segundo canal de conversa. Reserva sem e-mail funciona igual.</div></div>
+    </div>
+  </div>
+
+  <div class="quadro">
+    <h3>Consentimento</h3>
+    <table>
+      <tr><td>Contato para ofertas futuras</td><td><span class="tag verde">concedido em 26/08/2026</span></td><td style="text-align:right"><span class="bt min sec">Revogar</span></td></tr>
+    </table>
+  </div>
+
+  <div class="rodape">
+    Idade não é campo guardado — é calculada de <code>data_nascimento</code> na exibição.
+    Endpoints: <code>GET /reservas/{id}/ficha</code> · <code>GET|POST /hospedes/{id}/consentimento</code>
+  </div>
+</section>
+
+<!-- CHAMADOS -->
+<section class="tela" id="chamados">
+  <div class="cabeca"><h2>Chamados e pedidos</h2><div class="perfil">Recepção · o Alert Center</div></div>
+  <div class="nota">O app da equipe foi cortado do escopo, e esta tela assumiu o papel dele. Duas naturezas convivem aqui: <strong>serviço operacional</strong> (toalha) e <strong>consumo faturável</strong> (bar, lavanderia). Só o faturável vai para o checkout.</div>
+
+  <div class="abas"><span class="on">Abertos (5)</span><span>Em andamento (2)</span><span>Resolvidos hoje (11)</span></div>
+
+  <div class="quadro">
+    <table>
+      <tr><th>Quando</th><th>Hóspede</th><th>O quê</th><th>Tipo</th><th>Canal</th><th>Atribuído</th><th style="text-align:right">Ação</th></tr>
+      <tr class="destaque">
+        <td>14:32<br><span class="legenda">há 8 min</span></td><td>Júlia Manso<br><span class="legenda">quarto 304</span></td>
+        <td>Ar-condicionado não está gelando</td>
+        <td><span class="tag vermelha">reclamação</span></td>
+        <td><span class="tag">WhatsApp</span></td>
+        <td><span class="tag">Manutenção</span></td>
+        <td style="text-align:right"><span class="bt min">Abrir</span></td>
+      </tr>
+      <tr>
+        <td>14:20</td><td>Carlos Beltrão<br><span class="legenda">quarto 210</span></td>
+        <td>Toalha extra</td><td><span class="tag">serviço</span></td>
+        <td><span class="tag">WhatsApp</span></td>
+        <td><span class="tag">Governança</span></td>
+        <td style="text-align:right"><span class="bt min">Abrir</span></td>
+      </tr>
+      <tr>
+        <td>13:58</td><td>Ana Prado<br><span class="legenda">quarto 512</span></td>
+        <td>2 caipirinhas · R$ 56,00</td><td><span class="tag">consumo</span></td>
+        <td><span class="tag">WhatsApp</span></td>
+        <td><span class="tag">Bar</span></td>
+        <td style="text-align:right"><span class="bt min">Abrir</span></td>
+      </tr>
+      <tr>
+        <td>13:31</td><td>Rafael Nunes</td>
+        <td>Pergunta fora do catálogo: "tem berço?"</td>
+        <td><span class="tag">atender</span></td><td><span class="tag">E-mail</span></td><td>—</td>
+        <td style="text-align:right"><span class="bt min">Responder</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="rodape">Reclamação tem o recebimento confirmado ao hóspede <strong>imediatamente</strong>, antes de qualquer tramitação. A resposta sai sempre <strong>pelo canal em que o hóspede escreveu</strong>. Endpoints: <code>GET /solicitacoes</code> · <code>POST /solicitacoes/{id}/resolucao</code></div>
+</section>
+
+<!-- CONSUMOS -->
+<section class="tela" id="consumos">
+  <div class="cabeca"><h2>Consumos a lançar</h2><div class="perfil">Recepção · a fila com consequência financeira</div></div>
+  <div class="nota"><strong>Se o lançamento falha, o hotel presta o serviço e não cobra — e ninguém percebe</strong>, porque o hóspede não reclama de item que não foi cobrado. Por isso esta fila é destacada e aparece também na passagem de turno.</div>
+
+  <div class="barra">
+    <div><strong>3 pendentes</strong> · R$ 132,00 · o mais antigo há 2 dias</div>
+    <div><span class="tag vermelha">passagem de turno mostra esta fila</span></div>
+  </div>
+
+  <div class="quadro">
+    <table>
+      <tr><th>Quando</th><th>Hóspede</th><th>Item</th><th>Valor</th><th style="text-align:right">Ação</th></tr>
+      <tr class="destaque"><td>24/08 21:10</td><td>Carlos Beltrão</td><td>Lavanderia — 1 camisa</td><td>R$ 32,00</td>
+        <td style="text-align:right"><span class="bt min">Marcar lançado</span> <span class="bt min sec">Dispensar</span></td></tr>
+      <tr><td>26/08 13:58</td><td>Ana Prado</td><td>2 caipirinhas</td><td>R$ 56,00</td>
+        <td style="text-align:right"><span class="bt min">Marcar lançado</span> <span class="bt min sec">Dispensar</span></td></tr>
+      <tr><td>26/08 12:04</td><td>Júlia Manso</td><td>Impressão — 8 páginas</td><td>R$ 44,00</td>
+        <td style="text-align:right"><span class="bt min">Marcar lançado</span> <span class="bt min sec">Dispensar</span></td></tr>
+    </table>
+  </div>
+
+  <div class="rodape">O valor é o <strong>praticado no momento do pedido</strong>, não uma referência à tabela de preços — reajuste depois não altera o histórico. Marcar como lançado exige identificar quem lançou e quando. Endpoints: <code>GET /consumos/pendentes</code> · <code>POST /solicitacoes/{id}/lancamento</code></div>
+</section>
+
+<!-- SAIDA -->
+<section class="tela" id="saida">
+  <div class="cabeca"><h2>Saída do hóspede</h2><div class="perfil">Recepção</div></div>
+  <div class="nota"><strong>Nunca chamar de "extrato" nem de "conta".</strong> O rótulo é sempre "pedidos feitos pelo chat" — decisão fechada, porque a cobrança é do PMS e não do OmniStay. Confundir os dois cria expectativa errada no hóspede.</div>
+
+  <div class="barra">
+    <div><strong>Carlos Beltrão</strong> · quarto 210 · entrada 24/08 · saída hoje</div>
+    <div><span class="bt">Confirmar saída</span></div>
+  </div>
+
+  <div class="quadro">
+    <h3>Pedidos feitos pelo chat</h3>
+    <table>
+      <tr><th>Quando</th><th>Item</th><th>Valor</th><th>Lançamento no PMS</th></tr>
+      <tr><td>24/08 21:10</td><td>Lavanderia — 1 camisa</td><td>R$ 32,00</td><td><span class="tag vermelha">pendente</span></td></tr>
+      <tr><td>25/08 19:44</td><td>1 água com gás</td><td>R$ 9,00</td><td><span class="tag verde">lançado</span></td></tr>
+      <tr><td colspan="2" style="text-align:right"><strong>Total dos pedidos pelo chat</strong></td><td><strong>R$ 41,00</strong></td><td></td></tr>
+    </table>
+    <div class="legenda" style="margin-top:8px">Pedidos de serviço sem cobrança (toalha, arrumação) não aparecem aqui.</div>
+  </div>
+
+  <div class="nota" style="background:#f7e9e6;border-left-color:var(--alerta)">Há <strong>1 consumo pendente de lançamento</strong>. Confirmar a saída não impede, mas o aviso aparece porque depois do checkout ninguém mais volta nessa conta.</div>
+
+  <div class="rodape">Ao confirmar, a pesquisa de saída é enviada — e é nela que mora o pedido de consentimento para contato futuro. Endpoints: <code>GET /reservas/{id}/pedidos-feitos-pelo-chat</code> · <code>POST /reservas/{id}/saida</code></div>
+</section>
+
+<!-- CATALOGO -->
+<section class="tela" id="catalogo">
+  <div class="cabeca"><h2>Catálogo da propriedade</h2><div class="perfil">Recepção edita · gestão só lê</div></div>
+  <div class="nota">É a <strong>única fonte</strong> a partir da qual o atendimento automático pode afirmar qualquer coisa. O que não está aqui, o sistema não responde — abre chamado e avisa o hóspede.</div>
+
+  <div class="abas"><span class="on">Horários</span><span>Cardápio</span><span>Serviços</span><span>Programação</span><span>Regras</span></div>
+
+  <div class="barra"><div>4 itens ativos · 1 desativado</div><div><span class="bt">+ Novo item</span></div></div>
+
+  <div class="quadro">
+    <table>
+      <tr><th>Título</th><th>Conteúdo</th><th>Situação</th><th style="text-align:right">Ação</th></tr>
+      <tr><td>Café da manhã</td><td>Das 7h às 10h, no salão térreo. Aos domingos até 11h.</td><td><span class="tag verde">ativo</span></td><td style="text-align:right"><span class="bt min sec">Editar</span> <span class="bt min sec">Desativar</span></td></tr>
+      <tr><td>Piscina</td><td>Aberta das 8h às 22h. Crianças acompanhadas.</td><td><span class="tag verde">ativo</span></td><td style="text-align:right"><span class="bt min sec">Editar</span> <span class="bt min sec">Desativar</span></td></tr>
+      <tr><td>Academia</td><td>24 horas, acesso pela chave do quarto.</td><td><span class="tag verde">ativo</span></td><td style="text-align:right"><span class="bt min sec">Editar</span> <span class="bt min sec">Desativar</span></td></tr>
+      <tr style="opacity:.55"><td>Sauna</td><td>Em reforma.</td><td><span class="tag">desativado</span></td><td style="text-align:right"><span class="bt min sec">Reativar</span></td></tr>
+    </table>
+  </div>
+
+  <div class="rodape">Item desativado some da conversa mas não é apagado — histórico preservado. O catálogo ativo inteiro vai no prompt da IA, sem busca por palavra-chave: o hóspede escreve "desjejum", o catálogo diz "café da manhã", e a resposta sai certa. Endpoints: <code>GET|POST /catalogo</code> · <code>PATCH /catalogo/{id}</code></div>
+</section>
+
+<!-- ITENS VENDAVEIS -->
+<section class="tela" id="vendaveis">
+  <div class="cabeca"><h2>Itens vendáveis</h2><div class="perfil">Recepção</div></div>
+  <div class="nota"><strong>A IA nunca escreve o preço.</strong> Ela identifica qual item o hóspede pediu; o sistema busca o valor aqui e monta a resposta. Modelo que não emite número não erra número — e o valor informado ao hóspede é o mesmo que vai para a cobrança.</div>
+
+  <div class="barra"><div>Preço editado num campo, sem reescrever texto nenhum</div><div><span class="bt">+ Novo item</span></div></div>
+
+  <div class="quadro">
+    <table>
+      <tr><th>Item</th><th>Descrição</th><th>Preço</th><th>Situação</th><th style="text-align:right">Ação</th></tr>
+      <tr><td>Caipirinha</td><td>Bar da piscina</td><td><strong>R$ 28,00</strong></td><td><span class="tag verde">ativo</span></td><td style="text-align:right"><span class="bt min sec">Editar</span></td></tr>
+      <tr><td>Água com gás 500ml</td><td>Frigobar</td><td><strong>R$ 9,00</strong></td><td><span class="tag verde">ativo</span></td><td style="text-align:right"><span class="bt min sec">Editar</span></td></tr>
+      <tr><td>Lavanderia — camisa</td><td>Entrega em 24h</td><td><strong>R$ 32,00</strong></td><td><span class="tag verde">ativo</span></td><td style="text-align:right"><span class="bt min sec">Editar</span></td></tr>
+      <tr style="opacity:.55"><td>Cesta de frutas</td><td>Sob encomenda</td><td>R$ 45,00</td><td><span class="tag">desativado</span></td><td style="text-align:right"><span class="bt min sec">Reativar</span></td></tr>
+    </table>
+  </div>
+
+  <div class="rodape">Desativar não apaga: pedidos antigos continuam íntegros, e o valor praticado já é retrato do momento. Endpoints: <code>GET|POST /itens-vendaveis</code> · <code>PATCH /itens-vendaveis/{id}</code></div>
+</section>
+
+<!-- BOAS VINDAS -->
+<section class="tela" id="boasvindas">
+  <div class="cabeca"><h2>Recado de boas-vindas</h2><div class="perfil">Recepção edita · gestão só lê</div></div>
+  <div class="nota">Os rótulos ficam <strong>congelados no template aprovado pela Meta</strong> — trocar "café" por "piscina" exigiria aprovar um template novo. O que a propriedade edita é o conteúdo de cada linha, não quais linhas existem.</div>
+
+  <div class="quadro" style="max-width:620px">
+    <h3>Os quatro campos</h3>
+    <div class="campo"><label>Café da manhã</label><div class="entrada">das 7h às 10h no salão térreo</div></div>
+    <div class="campo"><label>Wi-fi</label><div class="entrada">rede HotelExemplo, senha na recepção</div></div>
+    <div class="campo"><label>Saída até</label><div class="entrada">12h</div></div>
+    <div class="campo"><label>Convite <span class="tag">novo</span></label><div class="entrada">Quer saber dos nossos serviços, do cardápio ou dos horários? É só perguntar por aqui.</div>
+      <div class="legenda">A linha que abre a conversa. É ela que transforma o recado num canal, em vez de um aviso.</div></div>
+    <div class="bt">Salvar</div>
+    <div class="legenda" style="margin-top:10px">Uma linha só cada, sem quebra de linha e sem espaços múltiplos — a API da Meta recusa esses caracteres em variável de template. A validação acontece <strong>ao salvar</strong>, não na hora do envio: assim o erro aparece para quem pode corrigir.</div>
+  </div>
+
+  <div class="quadro" style="max-width:620px">
+    <h3>Como o hóspede recebe</h3>
+    <div class="chat">
+      <div class="bolha nossa">Olá, Marina! Sua chegada no Hotel Exemplo está confirmada.<br><br>Café da manhã: das 7h às 10h no salão térreo<br>Wi-fi: rede HotelExemplo, senha na recepção<br>Saída até: 12h<br><br>Quer saber dos nossos serviços, do cardápio ou dos horários? É só perguntar por aqui.</div>
+    </div>
+  </div>
+
+  <div class="rodape">Campo vazio bloqueia o envio e sinaliza na fila do dia. Ao preencher, o worker recupera sozinho as chegadas das últimas 12 horas. Endpoints: <code>GET|PUT /propriedade/boas-vindas</code></div>
+</section>
+
+<!-- SESSOES -->
+<section class="tela" id="sessoes">
+  <div class="cabeca"><h2>Dispositivos conectados</h2><div class="perfil">Recepção · urgência, não autoridade</div></div>
+  <div class="nota">Revogar sessão é da <strong>recepção</strong>, não da gestão. Celular perdido às 2h da manhã não pode depender do gerente aparecer. Já criar e desativar usuário é da gestão — isso é autoridade e não tem pressa.</div>
+
+  <div class="quadro">
+    <table>
+      <tr><th>Usuário</th><th>Dispositivo</th><th>Entrou em</th><th>Último uso</th><th style="text-align:right">Ação</th></tr>
+      <tr><td>Cléber Rocha <span class="tag">recepção</span></td><td>Chrome · Windows</td><td>26/08 13:02</td><td>agora</td><td style="text-align:right"><span class="legenda">sessão atual</span></td></tr>
+      <tr><td>Ivan Souza <span class="tag">equipe</span></td><td>Android · celular</td><td>12/08 08:20</td><td>há 14 min</td><td style="text-align:right"><span class="bt min sec">Revogar</span></td></tr>
+      <tr class="destaque"><td>Ivan Souza <span class="tag">equipe</span></td><td>Android · celular</td><td>03/07 19:41</td><td>há 22 dias</td><td style="text-align:right"><span class="bt min">Revogar</span></td></tr>
+    </table>
+  </div>
+
+  <div class="rodape">O banco guarda apenas o hash do token, nunca o token. Vazamento da tabela não vira acesso. Endpoints: <code>GET /sessoes</code> · <code>DELETE /sessoes/{id}</code></div>
+</section>
+
+<!-- STAFF -->
+<section class="tela" id="staff">
+  <div class="cabeca"><h2>Meus chamados</h2><div class="perfil">Equipe operacional · celular</div></div>
+  <div class="nota">Tela de mão ocupada: letra grande, poucos botões, nenhum dado cadastral de hóspede. O perfil operacional recebe recusa se tentar ler ficha — é regra da matriz de permissões, não escolha de layout.</div>
+
+  <div style="display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap">
+    <div class="celular">
+      <div style="font-size:12px;color:var(--meio);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Meus chamados · 2</div>
+
+      <div style="border:1px solid var(--linha);padding:14px;margin-bottom:12px;background:#fdf6f4">
+        <div style="font-size:12px;color:var(--alerta);margin-bottom:5px">RECLAMAÇÃO · há 8 min</div>
+        <div style="font-size:17px;font-weight:600;margin-bottom:3px">Quarto 304</div>
+        <div style="font-size:14px;margin-bottom:12px">Ar-condicionado não está gelando</div>
+        <div class="bt" style="display:block;text-align:center;padding:11px">Resolvido</div>
+      </div>
+
+      <div style="border:1px solid var(--linha);padding:14px">
+        <div style="font-size:12px;color:var(--meio);margin-bottom:5px">SERVIÇO · há 20 min</div>
+        <div style="font-size:17px;font-weight:600;margin-bottom:3px">Quarto 210</div>
+        <div style="font-size:14px;margin-bottom:12px">Toalha extra</div>
+        <div class="bt" style="display:block;text-align:center;padding:11px">Resolvido</div>
+      </div>
+    </div>
+
+    <div style="flex:1;min-width:280px">
+      <div class="quadro">
+        <h3>Por que assim</h3>
+        <ul class="enxuta">
+          <li>Sem login a cada chamado — a sessão dura semanas no mesmo aparelho.</li>
+          <li>Sem nome, telefone ou documento do hóspede. Só o número do quarto.</li>
+          <li>Um botão por chamado. Resolver confirma ao hóspede automaticamente.</li>
+          <li>Nenhuma navegação: a lista é a tela inteira.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="rodape">Endpoints: <code>GET /solicitacoes</code> (filtrado ao perfil) · <code>POST /solicitacoes/{id}/resolucao</code></div>
+</section>
+
+<!-- GESTAO -->
+<section class="tela" id="gestao">
+  <div class="cabeca"><h2>Painel da gestão</h2><div class="perfil">Gestão · somente leitura de dado de domínio</div></div>
+  <div class="nota">A gestão vê <strong>números, não pessoas</strong>. "4 chegadas hoje" serve para dimensionar equipe; nome e telefone não aparecem, e a API devolve só a contagem — não uma lista que a tela esconde.</div>
+
+  <div class="grade3">
+    <div class="kpi"><div class="n">4</div><div class="r">Chegadas hoje</div></div>
+    <div class="kpi"><div class="n">2</div><div class="r">Hospedados</div></div>
+    <div class="kpi"><div class="n">5</div><div class="r">Chamados abertos</div></div>
+    <div class="kpi"><div class="n">R$ 132</div><div class="r">Consumo a lançar</div></div>
+    <div class="kpi"><div class="n">78%</div><div class="r">Fichas antecipadas</div></div>
+    <div class="kpi"><div class="n">4,3</div><div class="r">Nota média · 30 dias</div></div>
+  </div>
+
+  <div class="quadro" style="margin-top:18px">
+    <h3>Últimos 30 dias</h3>
+    <div style="height:150px;background:var(--caixa);border:1px dashed var(--linha);display:flex;align-items:center;justify-content:center;color:var(--fraco);font-size:13px">gráfico — mensagens trocadas e chamados abertos por dia</div>
+  </div>
+
+  <div class="rodape">A gestão recebe recusa ao tentar alterar reserva, hóspede, solicitação, consumo ou avaliação. Endpoints: <code>GET /indicadores/chegadas-do-dia</code> e demais leituras de indicador</div>
+</section>
+
+<!-- MERCADO -->
+<section class="tela" id="mercado">
+  <div class="cabeca"><h2>Inteligência de mercado</h2><div class="perfil">Gestão</div></div>
+  <div class="nota">O ativo do produto é o <strong>catálogo da propriedade</strong>, não o conteúdo das conversas dos hóspedes. Esta tela olha para fora: concorrentes cadastrados pelo próprio hotel, com coleta agendada.</div>
+
+  <div class="abas"><span class="on">Painel</span><span>Concorrentes</span></div>
+
+  <div class="quadro">
+    <table>
+      <tr><th>Concorrente</th><th>Diária média</th><th>Variação 7 dias</th><th>Última coleta</th></tr>
+      <tr><td><strong>Hotel Exemplo</strong> <span class="tag">você</span></td><td>R$ 320</td><td>—</td><td>—</td></tr>
+      <tr><td>Pousada Alvorada</td><td>R$ 289</td><td><span class="tag verde">−4%</span></td><td>hoje 06:00</td></tr>
+      <tr><td>Hotel Central</td><td>R$ 355</td><td><span class="tag vermelha">+11%</span></td><td>hoje 06:00</td></tr>
+      <tr><td>Ibis Centro</td><td>R$ 240</td><td><span class="tag">0%</span></td><td><span class="tag vermelha">falhou</span></td></tr>
+    </table>
+  </div>
+
+  <div class="rodape">Coleta falhada aparece explicitamente — dado velho apresentado como atual seria pior que dado ausente. Endpoints: <code>GET /mercado</code> · <code>GET|POST /concorrentes</code> · <code>PATCH /concorrentes/{id}</code></div>
+</section>
+
+<!-- USUARIOS -->
+<section class="tela" id="usuarios">
+  <div class="cabeca"><h2>Usuários</h2><div class="perfil">Gestão · autoridade</div></div>
+  <div class="nota">Criar e desativar usuário é da gestão. A permissão é escopada a esta operação — a recepção não herda por acidente o poder de mudar prazos e comportamento do sistema.</div>
+
+  <div class="barra"><div>3 ativos · 1 desativado</div><div><span class="bt">+ Novo usuário</span></div></div>
+
+  <div class="quadro">
+    <table>
+      <tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Situação</th><th style="text-align:right">Ação</th></tr>
+      <tr><td>Thiago Feitosa</td><td>thiago@hotel.com.br</td><td><span class="tag">gestão</span></td><td><span class="tag verde">ativo</span></td><td style="text-align:right"><span class="legenda">você</span></td></tr>
+      <tr><td>Cléber Rocha</td><td>cleber@hotel.com.br</td><td><span class="tag">recepção</span></td><td><span class="tag verde">ativo</span></td><td style="text-align:right"><span class="bt min sec">Desativar</span></td></tr>
+      <tr><td>Ivan Souza</td><td>ivan@hotel.com.br</td><td><span class="tag">equipe</span></td><td><span class="tag verde">ativo</span></td><td style="text-align:right"><span class="bt min sec">Desativar</span></td></tr>
+      <tr style="opacity:.55"><td>Paula Reis</td><td>paula@hotel.com.br</td><td><span class="tag">recepção</span></td><td><span class="tag">desativado</span></td><td style="text-align:right"><span class="bt min sec">Reativar</span></td></tr>
+    </table>
+  </div>
+
+  <div class="rodape">Senha nunca é armazenada em texto legível: PBKDF2-HMAC-SHA256 com 600 mil iterações, mínimo de 12 caracteres. Endpoints: <code>POST /usuarios</code> · <code>DELETE /usuarios/{id}</code></div>
+</section>
+
+<!-- RETENCAO -->
+<section class="tela" id="retencao">
+  <div class="cabeca"><h2>Retenção de dados</h2><div class="perfil">Gestão · a tela da LGPD</div></div>
+  <div class="nota">Existe para o hotel <strong>provar</strong> que o expurgo acontece. Numa fiscalização ou numa pergunta de hóspede, a resposta não é "o sistema faz" — é esta tela.</div>
+
+  <div class="grade3">
+    <div class="kpi"><div class="n">5 anos</div><div class="r">Ficha após checkout</div></div>
+    <div class="kpi"><div class="n">12 meses</div><div class="r">Conversas</div></div>
+    <div class="kpi"><div class="n">hoje 03:00</div><div class="r">Última execução</div></div>
+  </div>
+
+  <div class="quadro" style="margin-top:18px">
+    <h3>Últimos expurgos</h3>
+    <table>
+      <tr><th>Quando</th><th>O quê</th><th>Registros</th><th>Resultado</th></tr>
+      <tr><td>26/08 03:00</td><td>Conversas acima de 12 meses</td><td>412</td><td><span class="tag verde">anonimizados</span></td></tr>
+      <tr><td>25/08 03:00</td><td>Conversas acima de 12 meses</td><td>38</td><td><span class="tag verde">anonimizados</span></td></tr>
+      <tr><td>25/08 03:00</td><td>Fichas acima de 5 anos</td><td>0</td><td><span class="tag">nada a expurgar</span></td></tr>
+    </table>
+  </div>
+
+  <div class="rodape">A rotina é tarefa agendada do worker, com anonimização e registro de auditoria. Endpoint: <code>GET /retencao</code></div>
+</section>
+
+<!-- CONFIGURACOES -->
+<section class="tela" id="config">
+  <div class="cabeca"><h2>Configurações da propriedade</h2><div class="perfil">Gestão · planejada, fora da entrega de sete dias</div></div>
+
+  <div class="nota" style="background:#f7e9e6;border-left-color:var(--alerta)">
+    <strong>Esta tela não entra na entrega atual.</strong> O desenho está fechado e a estrutura no banco (<code>parametro_hotel</code>) já existe — o que falta é a checagem de módulo desligado em cada ponto do sistema, mais os testes de cada módulo ligado e desligado. Cerca de um dia, que sairia da ficha e do checkout.<br><br>
+    Trocar o ciclo completo de uma estadia por um recurso sem momento visual seria mau negócio numa demonstração. Módulo é argumento de modelo de negócio, e argumento se explica falando.<br><br>
+    <strong>Do que está aqui, só o aviso de assistente virtual entra</strong> — custa uma linha e vai junto com a F7.1, no dia 1.
+  </div>
+
+  <div class="nota">Duas coisas moram aqui: <strong>o que o hotel contratou</strong> e <strong>como a assistente fala</strong>. As duas mudam sem reiniciar nada, e nenhuma delas apaga dado já gravado.</div>
+
+  <div class="quadro">
+    <h3>Módulos</h3>
+    <table>
+      <tr><th>Funcionalidade</th><th>O que faz</th><th>Situação</th><th style="text-align:right"></th></tr>
+      <tr><td><strong>Inteligência de mercado</strong></td><td>Coleta agendada de concorrentes e painel comparativo</td><td><span class="tag verde">ligado</span></td><td style="text-align:right"><span class="bt min sec">Desligar</span></td></tr>
+      <tr><td><strong>Pulso do segundo dia</strong></td><td>Micro-pesquisa durante a estadia</td><td><span class="tag verde">ligado</span></td><td style="text-align:right"><span class="bt min sec">Desligar</span></td></tr>
+      <tr><td><strong>Consumo faturável</strong></td><td>Pedidos que geram cobrança e fila de lançamento</td><td><span class="tag verde">ligado</span></td><td style="text-align:right"><span class="bt min sec">Desligar</span></td></tr>
+      <tr style="opacity:.55"><td><strong>Pesquisa de saída</strong></td><td>Avaliação e consentimento no checkout</td><td><span class="tag">desligado</span></td><td style="text-align:right"><span class="bt min">Ligar</span></td></tr>
+      <tr style="opacity:.55"><td><strong>Canal de e-mail</strong></td><td>Segundo canal de conversa, além do WhatsApp</td><td><span class="tag">desligado</span></td><td style="text-align:right"><span class="bt min">Ligar</span></td></tr>
+    </table>
+    <div class="legenda" style="margin-top:10px"><strong>Reserva, ficha, chamados e catálogo não aparecem aqui</strong> — são o núcleo e não desligam. Módulo desligado some da interface e o recurso responde como inexistente, sem revelar que existe.</div>
+  </div>
+
+  <div class="quadro">
+    <h3>A assistente virtual</h3>
+    <div class="campo"><label>Personalidade</label>
+      <div class="entrada" style="min-height:64px">Cordial e direta. Trate o hóspede por você. Frases curtas, sem formalidade excessiva. Se não souber algo, diga que a recepção vai atender — nunca invente.</div>
+      <div class="legenda">Até 500 caracteres. Muda o <strong>tom</strong> das respostas, nunca o conteúdo: a regra de só afirmar o que está no catálogo é fixa no sistema e vem depois deste texto, fora do alcance de quem edita aqui.</div>
+    </div>
+    <div class="campo"><label>Aviso de assistente virtual</label>
+      <div class="entrada" style="color:var(--tinta)">O atendimento inicial é feito por uma assistente virtual. Quando precisar, uma pessoa da recepção assume.</div>
+      <div class="legenda">Texto fixo, enviado na primeira mensagem de cada estadia. <strong>Não é editável</strong> — é postura do produto, não escolha da propriedade.</div>
+    </div>
+    <div class="bt">Salvar</div>
+  </div>
+
+  <div class="quadro">
+    <h3>Como fica na conversa</h3>
+    <div class="chat">
+      <div class="bolha nossa">Oi, Marina! Aqui é do Hotel Exemplo. O atendimento inicial é feito por uma assistente virtual — quando precisar, uma pessoa da recepção assume.<br><br>Quer adiantar seu cadastro e chegar com a chave pronta?</div>
+      <div class="bolha dele">quero sim</div>
+      <div class="bolha nossa">Ótimo! Me manda numa mensagem só:<br>1. Nome completo<br>2. Profissão<br>…</div>
+    </div>
+  </div>
+
+  <div class="rodape">
+    <strong>Onde isso vive:</strong> linhas em <code>parametro_hotel</code>, no mesmo padrão dos prazos e dos textos de boas-vindas. Sem tabela nova.
+    Os módulos são a expressão técnica dos três planos do Business Model Canvas — Essencial, Padrão e Avançado.
+  </div>
+</section>
+
+<!-- SIMULADOR -->
+<section class="tela" id="simulador">
+  <div class="cabeca"><h2>Simulador de conversa</h2><div class="perfil">Recepção e gestão · já existe (fatia F6.2)</div></div>
+  <div class="nota">Esta tela <strong>já foi construída</strong>. É a única que existe hoje. Serve para demonstrar o sistema sem depender de rede, telefone ou da Meta — e o comportamento é idêntico ao modo real.</div>
+
+  <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+    <div class="quadro" style="width:250px">
+      <h3>Reservas</h3>
+      <div style="border-left:3px solid var(--tinta);padding:8px 10px;background:var(--realce);margin-bottom:6px"><strong>Marina Duarte</strong><br><span class="legenda">hospedada · quarto 304</span></div>
+      <div style="border-left:3px solid transparent;padding:8px 10px"><strong>Rafael Nunes</strong><br><span class="legenda">aguardando cadastro</span></div>
+      <div style="border-left:3px solid transparent;padding:8px 10px"><strong>Ana Prado</strong><br><span class="legenda">ficha recebida</span></div>
+    </div>
+
+    <div class="quadro" style="flex:1;min-width:320px">
+      <h3>Conversa · Marina Duarte</h3>
+      <div class="chat">
+        <div class="bolha nossa">Olá, Marina! Sua chegada está confirmada. Café da manhã: das 7h às 10h...</div>
+        <div class="bolha dele">que horas abre a piscina?</div>
+        <div class="bolha nossa">A piscina fica aberta das 8h às 22h.</div>
+        <div class="bolha dele">manda uma toalha por favor</div>
+        <div class="bolha nossa">Já anotei seu pedido, chega no quarto em até 20 minutos.</div>
+      </div>
+      <div class="campo" style="margin-top:12px"><div class="entrada">escreva como se fosse o hóspede…</div></div>
+      <div class="bt">Enviar</div>
+    </div>
+  </div>
+
+  <div class="rodape">Alternar entre simulado e real é configuração (<code>MENSAGERIA_MODO</code>), nunca mudança de código. Endpoints: <code>GET|POST /simulador/conversas</code></div>
+</section>
+
+</main>
+</div>
+
+<script>
+document.querySelectorAll('nav a').forEach(function(a){
+  a.addEventListener('click', function(){
+    document.querySelectorAll('nav a').forEach(function(x){x.classList.remove('ativo')});
+    document.querySelectorAll('.tela').forEach(function(s){s.classList.remove('ativa')});
+    a.classList.add('ativo');
+    var alvo = document.getElementById(a.dataset.t);
+    if(alvo){alvo.classList.add('ativa');}
+    window.scrollTo(0,0);
+  });
+});
+</script>
+</body>
+</html>

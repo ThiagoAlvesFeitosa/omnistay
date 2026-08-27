@@ -24,6 +24,12 @@ class Configuracao(BaseSettings):
     # Canal com o hospede. A fabrica recusa valor vazio ou desconhecido.
     mensageria_modo: str = ""
 
+    # Cerebro. A fabrica recusa valor vazio ou desconhecido.
+    llm_modo: str = ""
+    gemini_api_key: str = ""
+    llm_timeout_seconds: float = 15.0
+    llm_modelo: str = "gemini-2.0-flash"
+
 
 @lru_cache
 def obter_configuracao() -> Configuracao:

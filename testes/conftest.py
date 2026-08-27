@@ -17,6 +17,8 @@ def ambiente_de_teste() -> None:
     # Custo real da derivacao vive na configuracao de producao. Aqui o numero
     # baixo mantem o ciclo de TDD rapido o bastante para ser rodado a cada minuto.
     os.environ.setdefault("SENHA_ITERACOES", "1000")
+    # A suíte nunca herda LLM_MODO=real do .env local — nenhum teste chama a rede.
+    os.environ["LLM_MODO"] = "controlado"
     from app.config import obter_configuracao
 
     obter_configuracao.cache_clear()

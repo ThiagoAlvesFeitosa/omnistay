@@ -38,6 +38,14 @@ def test_saudacao_usa_apenas_primeiro_nome():
     assert "Silva" not in texto.split("!")[0]
 
 
+def test_coleta_nao_traz_aviso_de_assistente_virtual():
+    texto = montar_texto_coleta(
+        nome_completo="Maria Silva", contato_responsavel_dados=CONTATO
+    )
+    assert "assistente virtual" not in texto.lower()
+    assert "recepcao assume" not in texto.lower()
+
+
 def test_corpo_nao_vaza_telefone_documento_endereco_do_titular():
     texto = montar_texto_coleta(
         nome_completo="Maria Silva", contato_responsavel_dados=CONTATO

@@ -7,9 +7,9 @@
 
 ## Onde paramos
 
-**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog concluída.**
+**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1 (IA real) + aviso de assistente virtual feitos em 26/08/2026.
 
-**Progresso:** 24 de 24 fatias concluídas.
+**Progresso:** 24 de 24 do backlog original; F7.1 do plano de uma semana concluída.
 
 | Fatia | Estado |
 | --- | --- |
@@ -37,7 +37,124 @@
 | F5.3 Painel de mercado | ✅ Concluída — `GET /mercado` (visão atual) e `GET /mercado/concorrentes/{id}` (histórico); operação `ler_mercado` só gestão; visão atual = último **sucesso** datado; `situacao` (`atual` · `desatualizado` · `cadencia_ausente` · `sem_coleta` · `so_falha`); limiar = periodicidade da casa; escrita da série `405`; sem migração, sem React, sem disparo de coleta |
 | F6.1 Expurgo por retenção | ✅ Concluída — `verificar_retencao` no `worker/agendador.py` (sem APScheduler, sem tipo na fila, sem botão “expurgar agora”); conteúdo livre vira marca 12 meses após `checkout_em`; ficha apagada 5 anos após a última saída vinculada; comprovante `execucao_retencao` (1/hotel/dia UTC); `GET /retencao` com `ler_retencao` só gestão; revisão `0021_expurgo_retencao`. Payload órfão fora; sem React; sem pedido avulso de esquecimento |
 | F6.2 Simulador de conversa | ✅ Concluída — `MENSAGERIA_MODO` (`demonstracao` \| `real`) na config de plataforma; fábrica escolhe `MensageriaSimulada` ou WhatsApp; worker de processo **não** instancia `MensageriaFalsa`; `GET/POST /simulador/conversas` com `usar_simulador`; tela React em `frontend/` servida em `/demo/` se houver `dist`. Sem túnel, sem painel operacional React, sem migração |
-| Demais fatias | Nenhuma pendente no backlog. **Próxima entrega:** implantação em nuvem (ADR-008). Não há F2.3 nem F3.9 |
+| F7.1 Adaptador real de IA + aviso | ✅ Concluída — `LLM_MODO` (`controlado` \| `real`); `construir_llm` no worker (não cai em `LLMFalso` por omissão); `LLMGemini` via `httpx` + `generateContent` (sem SDK); timeout/429/formato → `Falha*` já tratada; aviso fixo no recado de boas-vindas (histórico/simulador). Suíte com `MockTransport`, sem rede. Template Meta `boas_vindas` não republicado. Sem personalidade (resto da F7.2). Sem migração |
+| Demais fatias | Nenhuma pendente no backlog original. Não há F2.3 nem F3.9 |
+
+## A demonstração à banca — como funciona
+
+**Duas peças independentes, e a confusão entre elas é fácil de fazer:**
+
+| Peça | O que é | Na demonstração |
+| --- | --- | --- |
+| **Canal** (`MENSAGERIA_MODO`) | Como a mensagem viaja: WhatsApp real ou a tela do simulador | **Simulado** — sem telefone, sem Meta, sem depender de rede externa |
+| **Cérebro** (`LLM_MODO`) | A IA que classifica e redige | **Real** — Gemini, camada gratuita |
+
+O simulador substitui apenas o WhatsApp. A inteligência é a mesma dos dois modos.
+
+**Frase para a banca:** *"O canal está simulado para a apresentação não depender da Meta. A
+inteligência é real: a resposta veio do modelo, montada a partir do catálogo cadastrado. Trocar
+o simulador pelo WhatsApp de verdade é mudar uma linha de configuração."* — e isso é literal.
+
+**Custo:** zero. A camada gratuita do Gemini não pede cartão. Uma demonstração gasta algo como
+30 a 40 chamadas.
+
+**Cuidado no dia:** o limite gratuito é por minuto, algo entre 10 e 15 chamadas. Cada mensagem do
+hóspede consome **duas** (classificar + responder), então cabem 5 ou 6 mensagens por minuto.
+Conversa normal sobra; disparo em sequência rápida, não. Se estourar, o sistema **não quebra** —
+cai no comportamento que já existe, "a recepção vai te atender". Feio, mas não é tela de erro.
+
+**Variáveis novas no `.env` (a partir da F7.1):**
+
+```
+LLM_MODO=real
+GEMINI_API_KEY=...
+```
+
+O `.env` está no `.gitignore` — verificado em 26/08/2026. A chave nunca vai para print, slide ou
+conversa.
+
+## Prazo: sete dias (a partir de 26/08/2026)
+
+O plano dia a dia está em `docs/backlog.md`, seção **"Plano de uma semana"**. Resumo:
+
+| Dia | Entrega |
+| --- | --- |
+| 1 | Adaptador real de IA + aviso de assistente virtual |
+| 2 | Casca do painel — Tailwind + shadcn/ui, login, rota por perfil |
+| 3 | Fila do dia, nova reserva, confirmar chegada |
+| 4 | Chamados, pedidos e a tela da equipe no celular |
+| 5 | Catálogo, itens vendáveis e recado de boas-vindas com a linha de convite |
+| 6 | Ficha do hóspede, consumos e saída |
+| 7 | Documento acadêmico, slides, vídeo e ensaio da demonstração |
+
+**Cortado como escopo declarado, não como esquecimento:** módulos por propriedade (F7.4), canal
+de e-mail (F7.5), telas de gestão/mercado/usuários/retenção (F8.7) e o campo de personalidade
+configurável — do qual entra só o aviso de IA, que custa uma linha.
+
+**Aceleração adotada:** nas fatias de tela, os wireframes são a especificação. Ciclo reduzido a
+`specify` → `plan` → `tasks` → `implement`, sem `clarify` nem `analyze`. **TDD não se corta** —
+é o que permitiu onze mudanças de esquema sem regressão.
+
+## O que falta para o sistema ser usável (26/08/2026)
+
+O backend está inteiro: 27 operações autorizadas, 21 revisões de esquema, worker, fila, webhook
+e cérebro real (F7.1). Falta o **painel operacional** — nenhuma fatia original o construiu.
+
+### 1. O painel não existe
+
+Todas as 24 fatias diziam "sem tela React". A única interface construída é o simulador da F6.2,
+feito para demonstrar a conversa do hóspede — não para operar o hotel. Hoje o sistema só é
+operável pelo `/docs` do FastAPI.
+
+**Decisão (26/08/2026): construir do zero, em fatias novas.** O protótipo do Replit
+(`OmniStay Replit.zip`) tem cinco telas — painel, mercado, simulador, alertas e conversas —, todas
+gerenciais. Falta nele exatamente o núcleo operacional: fila do dia, cadastro de reserva, ficha,
+catálogo, itens vendáveis, consumos, saída, boas-vindas, usuários, sessões e retenção. Ele foi
+desenhado antes da API, então nomes e formatos divergem. Serve como **referência visual**, não
+como base de código.
+
+**Onde está:** `docs/backlog.md` seção "Fase 8", com sete fatias (F8.1 a F8.7).
+**Wireframes:** `docs/wireframes-painel.html` — 16 telas, com o endpoint de cada uma.
+
+### 2. A camada de IA real (F7.1, 26/08/2026)
+
+Porta `LLMProvider` inalterada. `construir_llm(config)` escolhe `LLMFalso` (`controlado`) ou
+`LLMGemini` (`real`). O worker de processo constrói na subida, junto com a mensageria; modo
+ausente/inválido ou `real` sem `GEMINI_API_KEY` **falha alto** (0 trabalhos). A suíte injeta a
+porta e força `LLM_MODO=controlado` no `conftest` — nenhum teste chama a rede.
+
+`LLMGemini` usa só `httpx` (Artigo XI): POST `generateContent`, chave no header `x-goog-api-key`,
+timeout padrão 15 s, sem retry, sem SDK. Falha de transporte vira a `Falha*` do método
+(`llm_tempo_esgotado`, `llm_quota`, `llm_recusa`, `llm_indisponivel`, `llm_formato_invalido`);
+o domínio segue o caminho humano que já existia.
+
+Aviso de assistente virtual: constante de produto em `texto_boas_vindas.py`, antes do convite.
+Visível no histórico e no simulador. O template Meta de quatro variáveis **não** carrega o aviso
+até republicar (Artigo XV, fora desta fatia). Coleta e demais recados não repetem a frase.
+
+**O que continua faltando da Fase 7:** personalidade em `parametro_hotel` (resto da F7.2), linha
+de convite editável (F7.3), módulos por propriedade (F7.4), canal de e-mail (F7.5).
+
+### 3. Ampliações decididas em 26/08/2026
+
+Vieram de revisão das telas com o autor, e formam a **Fase 7 do backlog** — que vem antes do
+painel porque as telas precisam nascer já sabendo esconder módulo desligado.
+
+| Decisão | Forma | Fatia |
+| --- | --- | --- |
+| **Personalidade da assistente** | Texto livre em `parametro_hotel`, entra no prompt **antes** das regras fixas. A regra do catálogo continua no código e é sempre a última instrução — o hotel muda o tom, nunca o limite | F7.2 (pendente) |
+| **Aviso de assistente virtual** | Frase fixa na primeira mensagem de cada estadia. Não editável: é postura do produto | F7.1 (feito; saiu junto com o adaptador) |
+| **Linha de convite no recado** | Quarto campo do recado de boas-vindas, com o mesmo formato de uma linha só | F7.3 |
+| **Módulos por propriedade** | Mercado, pulso, consumo faturável, pesquisa de saída e canal de e-mail ligam e desligam. Núcleo — reserva, ficha, chamados, catálogo — nunca desliga | F7.4 |
+| **E-mail como segundo canal** | Segunda porta de entrada para o mesmo miolo. Proativo sempre por WhatsApp; resposta pelo canal em que o hóspede escreveu | F7.5 |
+
+**Por que a personalidade é campo de texto e não lista de opções:** o hotel de nicho não cabe em
+três rótulos. O risco de campo livre num prompt é injeção — mitigado por a regra do catálogo vir
+depois, fora do alcance de quem edita, com teste que tenta subvertê-la.
+
+**Por que o e-mail cabe:** o miolo já é agnóstico de canal — tudo entra por
+`receber_evento_entrada` e o resto não sabe a origem. É porta nova, não sistema novo. Ainda assim
+é a maior fatia da fase, e o corte defensável se o prazo apertar.
 
 **Ambiente montado:** repositório em `omnistay/`, Cursor com Spec Kit inicializado
 (`--integration cursor-agent`, scripts PowerShell), constituição carregada em
@@ -51,7 +168,8 @@ commit.
 > O estado mora nos arquivos — spec, plano, tarefas, código e este documento —, nunca no
 > histórico da conversa.
 
-**Para a próxima entrega:** implantação em nuvem, que o ADR-008 deixou deliberadamente adiada para ser decidida contra um sistema funcionando.
+**Próximos passos, em ordem:** adaptador real de IA → Fase 7 (painel) → implantação em nuvem,
+que o ADR-008 deixou deliberadamente adiada para ser decidida contra um sistema funcionando.
 
 ## Decisões tomadas durante a implementação
 
@@ -172,6 +290,9 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Divergência do Artefato 5 §9.1 | `solicitacao.descricao` e `classificacao_bruta` entram no prazo de 12 meses (conteúdo livre). Payload de webhook órfão (sem mensagem) fica **fora** desta fatia | F6.1 |
 | `MENSAGERIA_MODO` | Configuração de **plataforma**, não `parametro_hotel`. Vazio ou lixo: a fábrica falha alto; o Settings aceita `""` para a suíte que não constrói a porta | F6.2 |
 | Fábrica no worker | `construir_mensageria(config)` escolhe `MensageriaSimulada` ou `MensageriaWhatsapp`. `MensageriaFalsa` permanece só na suíte | F6.2 |
+| `LLM_MODO` | Independente do canal. `controlado` → `LLMFalso`; `real` → `LLMGemini` (exige `GEMINI_API_KEY`). Vazio ou lixo: a fábrica falha alto; a suíte força `controlado` e injeta a porta | F7.1 |
+| Fábrica de inteligência | `construir_llm` na subida do worker e em `processar_uma_passagem_na_engine` se `llm` omitido. `processar_uma_passagem(..., llm=)` continua aceitando injeção. `conversa.service` não importa adaptador | F7.1 |
+| Aviso no recado | Constante ASCII antes do convite; uma `?` na última linha; coleta intacta; WhatsApp segue com 4 variáveis | F7.1 |
 | Tela `/simulador` | Cookie + `usar_simulador` (recepção e gestão). Modo `real` → `409` `modo_real`, não `403`. Outro hotel → `404`. Sem HMAC | F6.2 |
 | Frontend da banca | `frontend/` Vite+React, uma tela; estáticos em `/demo/` se existir `frontend/dist`. Sem kit UI, sem React Router, sem painel operacional | F6.2 |
 
@@ -371,6 +492,23 @@ Lacunas encontradas no backlog (agosto/2026) — nenhuma tem fatia dedicada:
       amplifica a consequência
 
 Ainda abertas:
+
+- [x] ~~**Adaptador real de `LLMProvider`**~~ F7.1: `LLMGemini` + `construir_llm`; worker usa a
+      fábrica; suíte sem rede. Aviso de assistente virtual no recado de boas-vindas
+- [x] ~~**Pegar a chave do Gemini**~~ chave no `.env` local (não versionado); `GEMINI_API_KEY=`
+      vazio no `.env.example`
+- [ ] **Tela de Configurações (módulos) desenhada mas não construída** — o wireframe traz aviso
+      no topo. Custa ~1 dia: a checagem de módulo desligado em cada ponto do sistema, mais teste
+      de cada módulo ligado e desligado. Sairia do dia 6 (ficha e checkout), troca recusada
+      porque ligar chavinha não tem momento visual e o ciclo completo da estadia tem
+- [ ] **Painel de operação** — Fase 8 do backlog, sete fatias. Wireframes em
+      `docs/wireframes-painel.html`
+- [ ] **Fase 7 — personalização e canais** — F7.1 feita; restam personalidade (F7.2), linha de
+      convite (F7.3), módulos por propriedade (F7.4), canal de e-mail (F7.5)
+- [ ] **Perguntas que só o teste responde** (registradas ao fim da Fase 7 no backlog): se o tom
+      configurado muda mesmo a percepção do hóspede · onde o aviso de IA incomoda menos · quantos
+      hóspedes respondem por e-mail tendo as duas opções · se o convite do recado é usado · se
+      desligar módulo confunde recepcionista já acostumado
 
 - [ ] **Documento de entrega desatualizado.** `Entrega_de_Projeto_OmniStay_v2.docx` é de
       06/08 e os slides de 11/08 — anteriores a toda a implementação. Dezenas de decisões

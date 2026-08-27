@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from sqlalchemy import create_engine
 
+from app.adaptadores.fabrica_llm import construir_llm
 from app.adaptadores.fabrica_mensageria import construir_mensageria
 from app.config import obter_configuracao
 from app.comum import relogio
@@ -102,8 +103,9 @@ def main(argv: list[str] | None = None) -> None:
     configuracao = obter_configuracao()
     engine = create_engine(configuracao.database_url)
     gateway = construir_mensageria(configuracao)
+    llm = construir_llm(configuracao)
     if args.uma_passagem:
-        n = processar_uma_passagem_na_engine(engine, gateway=gateway)
+        n = processar_uma_passagem_na_engine(engine, gateway=gateway, llm=llm)
         logger.info("passagem_concluida processados=%s", n)
         return
     if args.verificar_cadastros:
@@ -124,7 +126,7 @@ def main(argv: list[str] | None = None) -> None:
     logger.info("worker_iniciado")
     ultima_verificacao = None
     while True:
-        processar_uma_passagem_na_engine(engine, gateway=gateway)
+        processar_uma_passagem_na_engine(engine, gateway=gateway, llm=llm)
         agora = relogio.agora()
         if (
             ultima_verificacao is None
