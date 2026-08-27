@@ -53,3 +53,5 @@ def test_texto_traz_aviso_de_assistente_virtual():
     assert "Silva" not in texto
     parametros = inspect.signature(montar_texto_boas_vindas).parameters
     assert "aviso" not in parametros
+    assert "tom" not in parametros
+    assert "personalidade" not in parametros

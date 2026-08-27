@@ -415,6 +415,24 @@ def test_upsell_encaminha_humano(monkeypatch):
     assert pedidos == []
 
 
+def test_fora_de_escopo_nao_chama_redacao_mesmo_com_tom(monkeypatch):
+    repo = RepoClassificar()
+    llm = LLMFalso()
+    llm.configurar_classificacao(
+        ResultadoClassificacao(
+            intencao="fora_de_escopo",
+            sentimento="neutro",
+            urgencia="baixa",
+            bruto={"intencao": "fora_de_escopo"},
+        )
+    )
+    _, enfileirados = _processar(monkeypatch, repo, llm)
+    assert repo.eixos["intencao"] == "fora_de_escopo"
+    assert repo.classificacao["desfecho"] == "encaminhado_humano"
+    assert enfileirados == []
+    assert llm.chamadas_responder == []
+
+
 def test_ja_classificada_nao_chama_llm(monkeypatch):
     repo = RepoClassificar(
         classificacao={"tipo": "classificacao_intencao", "desfecho": "classificado"}

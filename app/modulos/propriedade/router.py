@@ -21,6 +21,8 @@ from app.modulos.propriedade.schema import (
     ListaItensVendaveisResposta,
     ListaManutencaoResposta,
     ListaRetencaoResposta,
+    PersonalidadeEntrada,
+    PersonalidadeResposta,
 )
 
 roteador = APIRouter(tags=["propriedade"])
@@ -152,6 +154,46 @@ def gravar_boas_vindas(
             detail=str(erro),
         ) from erro
     return BoasVindasResposta(**gravados)
+
+
+@roteador.get(
+    "/propriedade/personalidade", response_model=PersonalidadeResposta
+)
+def ler_personalidade(
+    conexao: Conexao,
+    sessao: Annotated[
+        SessaoAtual, Depends(exigir_operacao("ler_personalidade_assistente"))
+    ],
+) -> PersonalidadeResposta:
+    texto = catalogo.ler_personalidade_assistente(
+        conexao, id_hotel=sessao.id_hotel
+    )
+    return PersonalidadeResposta(texto=texto)
+
+
+@roteador.put(
+    "/propriedade/personalidade", response_model=PersonalidadeResposta
+)
+def gravar_personalidade(
+    entrada: PersonalidadeEntrada,
+    conexao: Conexao,
+    sessao: Annotated[
+        SessaoAtual,
+        Depends(exigir_operacao("alterar_personalidade_assistente")),
+    ],
+) -> PersonalidadeResposta:
+    try:
+        texto = catalogo.gravar_personalidade_assistente(
+            conexao,
+            id_hotel=sessao.id_hotel,
+            texto=entrada.texto,
+        )
+    except catalogo.DadosInvalidos as erro:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(erro),
+        ) from erro
+    return PersonalidadeResposta(texto=texto)
 
 
 @roteador.post(

@@ -70,3 +70,37 @@ $$ LANGUAGE plpgsql;
             "fn_valida_transicao_reserva" in linha
             for linha in diferencas(referencia, migrado)
         )
+
+
+def _tipo_valor(inventario) -> str | None:
+    for item in inventario["tabelas"]:
+        if item[0] == "parametro_hotel" and item[1] == "valor":
+            return item[2]
+    return None
+
+
+@pytest.mark.postgres
+def test_valor_de_parametro_hotel_cabe_quinhentos_caracteres(inventarios):
+    referencia, migrado = inventarios
+    assert _tipo_valor(referencia) == "character varying(500)"
+    assert _tipo_valor(migrado) == "character varying(500)"
+
+
+@pytest.mark.postgres
+def test_comentario_de_parametro_hotel_cita_personalidade():
+    from sqlalchemy import create_engine, text
+
+    from testes.suporte.banco_descartavel import banco_vazio
+    from testes.suporte.migracao import aplicar_migracoes
+
+    with banco_vazio() as url:
+        aplicar_migracoes(url)
+        engine = create_engine(url)
+        try:
+            with engine.connect() as conexao:
+                comentario = conexao.execute(
+                    text("SELECT obj_description('parametro_hotel'::regclass)")
+                ).scalar_one()
+        finally:
+            engine.dispose()
+    assert "personalidade_assistente" in comentario

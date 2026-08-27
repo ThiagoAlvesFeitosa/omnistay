@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from decimal import Decimal
+import unicodedata
 
 from sqlalchemy.engine import Connection
 
@@ -70,6 +71,12 @@ CHAVES_SLOTS_BOAS_VINDAS = {
     "checkout": "boas_vindas_checkout",
 }
 
+CHAVE_PERSONALIDADE_ASSISTENTE = "personalidade_assistente"
+TAMANHO_MAXIMO_PERSONALIDADE = 500
+PARAMETROS_PERSONALIDADE_PADRAO = {
+    CHAVE_PERSONALIDADE_ASSISTENTE: "",
+}
+
 CHAVE_DE_DURACAO_POR_PERFIL = {
     "recepcao": "duracao_sessao_recepcao_horas",
     "staff": "duracao_sessao_staff_horas",
@@ -136,6 +143,8 @@ def criar_instalacao_inicial(
     for chave, valor in PARAMETROS_MERCADO_PADRAO.items():
         repositorio.inserir_parametro(conexao, id_hotel, chave, valor)
     for chave, valor in PARAMETROS_RETENCAO_PADRAO.items():
+        repositorio.inserir_parametro(conexao, id_hotel, chave, valor)
+    for chave, valor in PARAMETROS_PERSONALIDADE_PADRAO.items():
         repositorio.inserir_parametro(conexao, id_hotel, chave, valor)
 
     return InstalacaoCriada(id_hotel=id_hotel, email_gestor=email_gestor)
@@ -375,6 +384,48 @@ def gravar_textos_de_boas_vindas(
         repositorio.upsert_parametro(conexao, id_hotel, chave, limpos[campo])
     logger.info("textos_de_boas_vindas_gravados id_hotel=%s", id_hotel)
     return limpos
+
+
+def validar_personalidade(texto: str) -> str:
+    if texto is None:
+        raise DadosInvalidos("O texto e longo demais.")
+    limpo = texto.strip()
+    if len(limpo) > TAMANHO_MAXIMO_PERSONALIDADE:
+        raise DadosInvalidos("O texto e longo demais.")
+    for caractere in limpo:
+        if (
+            unicodedata.category(caractere) == "Cc"
+            and caractere not in "\n\r\t"
+        ):
+            raise DadosInvalidos("O texto contem caractere invalido.")
+    return limpo
+
+
+def ler_personalidade_assistente(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    repositorio=propriedade_repository,
+) -> str:
+    valor = repositorio.ler_parametro(
+        conexao, id_hotel, CHAVE_PERSONALIDADE_ASSISTENTE
+    )
+    return valor if valor is not None else ""
+
+
+def gravar_personalidade_assistente(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    texto: str,
+    repositorio=propriedade_repository,
+) -> str:
+    limpo = validar_personalidade(texto)
+    repositorio.upsert_parametro(
+        conexao, id_hotel, CHAVE_PERSONALIDADE_ASSISTENTE, limpo
+    )
+    logger.info("personalidade_assistente_gravada id_hotel=%s", id_hotel)
+    return limpo
 
 
 @dataclass(frozen=True)

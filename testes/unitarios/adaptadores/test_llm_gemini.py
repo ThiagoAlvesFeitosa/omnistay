@@ -140,6 +140,71 @@ def test_responder_duvida_inclui_itens_no_corpo_e_devolve_resultado():
     assert "7h as 10h" in prompt
 
 
+def test_tom_aparece_antes_da_regra_final_e_classificar_nao_o_interpola():
+    pedidos = []
+    tom = "seja breve e caloroso"
+
+    def handler(pedido: httpx.Request) -> httpx.Response:
+        pedidos.append(pedido)
+        return httpx.Response(
+            200,
+            json=_envelope(
+                {
+                    "coberta": True,
+                    "texto": "7h as 10h",
+                    "trechos_citados": ["7h as 10h"],
+                }
+            ),
+        )
+
+    itens = (
+        ItemCatalogo(
+            id_catalogo_item=1,
+            categoria="horario",
+            titulo="Cafe da manha",
+            conteudo="7h as 10h",
+        ),
+    )
+    _porta(handler).responder_duvida("que horas e o cafe", itens, tom=tom)
+    prompt = json.loads(pedidos[0].content)["contents"][0]["parts"][0]["text"]
+    assert tom in prompt
+    assert prompt.index(tom) < prompt.index("Regra final")
+
+    pedidos.clear()
+
+    def handler_classificar(pedido: httpx.Request) -> httpx.Response:
+        pedidos.append(pedido)
+        return httpx.Response(
+            200,
+            json=_envelope(
+                {
+                    "intencao": "duvida_geral",
+                    "sentimento": "neutro",
+                    "urgencia": "baixa",
+                }
+            ),
+        )
+
+    _porta(handler_classificar).classificar("x")
+    prompt_classificar = json.loads(pedidos[0].content)["contents"][0]["parts"][0][
+        "text"
+    ]
+    assert tom not in prompt_classificar
+
+    pedidos.clear()
+
+    def handler_ficha(pedido: httpx.Request) -> httpx.Response:
+        pedidos.append(pedido)
+        return httpx.Response(
+            200,
+            json=_envelope({"desfecho": "irreconhecivel", "campos": {}}),
+        )
+
+    _porta(handler_ficha).extrair_ficha("x")
+    prompt_ficha = json.loads(pedidos[0].content)["contents"][0]["parts"][0]["text"]
+    assert tom not in prompt_ficha
+
+
 def test_identificar_item_vendavel_parseia_json():
     def handler(_pedido: httpx.Request) -> httpx.Response:
         return httpx.Response(

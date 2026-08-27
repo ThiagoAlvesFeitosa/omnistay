@@ -97,6 +97,7 @@ def _semear_parametros_coleta(
         ("periodicidade_coleta_mercado", "24"),
         ("meses_retencao_conteudo_livre", "12"),
         ("anos_retencao_ficha", "5"),
+        ("personalidade_assistente", ""),
     ):
         conexao.execute(
             text(

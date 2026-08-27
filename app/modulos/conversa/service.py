@@ -1380,6 +1380,7 @@ def processar_trabalho_responder_duvida(
     catalogo,
     gateway: MensageriaGateway,
     repositorio=repositorio_padrao,
+    repositorio_propriedade=propriedade_repository,
 ) -> None:
     from app.fila import repository as fila_repo
 
@@ -1436,8 +1437,16 @@ def processar_trabalho_responder_duvida(
     if not itens:
         motivo = "catalogo_vazio"
     else:
+        tom = (
+            repositorio_propriedade.ler_parametro(
+                conexao,
+                id_hotel,
+                propriedade_service.CHAVE_PERSONALIDADE_ASSISTENTE,
+            )
+            or ""
+        )
         try:
-            resultado = llm.responder_duvida(pergunta, itens)
+            resultado = llm.responder_duvida(pergunta, itens, tom=tom)
         except FalhaDeConversacao as erro:
             motivo = "indisponivel"
             logger.info(

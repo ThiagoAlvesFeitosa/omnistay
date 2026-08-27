@@ -74,8 +74,10 @@ class LLMFalso:
             )
         return self.proximo_classificacao
 
-    def responder_duvida(self, pergunta: str, itens_ativos: tuple) -> ResultadoResposta:
-        self.chamadas_responder.append((pergunta, itens_ativos))
+    def responder_duvida(
+        self, pergunta: str, itens_ativos: tuple, tom: str = ""
+    ) -> ResultadoResposta:
+        self.chamadas_responder.append((pergunta, itens_ativos, tom))
         if self.falhar_conversacao:
             raise FalhaDeConversacao("llm_indisponivel")
         if self.proximo_resposta is not None:

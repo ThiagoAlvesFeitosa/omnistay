@@ -30,6 +30,8 @@ OPERACOES_ESPERADAS = {
     "ler_mercado": {"gestor"},
     "ler_retencao": {"gestor"},
     "usar_simulador": {"recepcao", "gestor"},
+    "ler_personalidade_assistente": {"recepcao", "gestor"},
+    "alterar_personalidade_assistente": {"gestor"},
 }
 
 
@@ -130,6 +132,18 @@ def test_usar_simulador_recepcao_e_gestor_staff_recusado():
     assert politica.permitido("recepcao", "usar_simulador") is True
     assert politica.permitido("gestor", "usar_simulador") is True
     assert politica.permitido("staff", "usar_simulador") is False
+
+
+def test_alterar_personalidade_assistente_so_gestor():
+    assert politica.permitido("gestor", "alterar_personalidade_assistente") is True
+    assert politica.permitido("recepcao", "alterar_personalidade_assistente") is False
+    assert politica.permitido("staff", "alterar_personalidade_assistente") is False
+
+
+def test_ler_personalidade_assistente_recepcao_e_gestor():
+    assert politica.permitido("recepcao", "ler_personalidade_assistente") is True
+    assert politica.permitido("gestor", "ler_personalidade_assistente") is True
+    assert politica.permitido("staff", "ler_personalidade_assistente") is False
 
 
 def test_nenhuma_operacao_da_matriz_contem_parametro_no_nome():

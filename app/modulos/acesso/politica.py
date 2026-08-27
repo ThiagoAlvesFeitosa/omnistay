@@ -30,6 +30,8 @@ OPERACOES: Final[dict[str, frozenset[str]]] = {
     "ler_mercado": frozenset({"gestor"}),
     "ler_retencao": frozenset({"gestor"}),
     "usar_simulador": frozenset({"recepcao", "gestor"}),
+    "ler_personalidade_assistente": frozenset({"recepcao", "gestor"}),
+    "alterar_personalidade_assistente": frozenset({"gestor"}),
 }
 
 

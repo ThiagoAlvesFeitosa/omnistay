@@ -103,6 +103,7 @@ def test_criacao_inicial_grava_propriedade_gestor_e_duracoes():
         "periodicidade_coleta_mercado",
         "meses_retencao_conteudo_livre",
         "anos_retencao_ficha",
+        "personalidade_assistente",
     }
     valores = {p["chave"]: p["valor"] for p in propriedade.parametros}
     assert valores["duracao_sessao_recepcao_horas"] == "12"
@@ -127,6 +128,7 @@ def test_criacao_inicial_grava_propriedade_gestor_e_duracoes():
     assert valores["periodicidade_coleta_mercado"] == "24"
     assert valores["meses_retencao_conteudo_livre"] == "12"
     assert valores["anos_retencao_ficha"] == "5"
+    assert valores["personalidade_assistente"] == ""
 
 
 def test_criacao_inicial_recusa_quando_ja_existe_propriedade():

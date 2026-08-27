@@ -88,7 +88,7 @@ CREATE TABLE parametro_hotel (
     id_parametro BIGSERIAL    PRIMARY KEY,
     id_hotel     BIGINT       NOT NULL REFERENCES hotel (id_hotel),
     chave        VARCHAR(60)  NOT NULL,
-    valor        VARCHAR(255) NOT NULL,
+    valor        VARCHAR(500) NOT NULL,
     atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT uq_parametro_hotel_chave UNIQUE (id_hotel, chave)
 );
@@ -100,7 +100,8 @@ COMMENT ON TABLE parametro_hotel IS
     'contato_responsavel_dados, tentativas_max_envio_mensagem, boas_vindas_cafe, '
     'boas_vindas_wifi, boas_vindas_checkout, horas_validade_boas_vindas, '
     'horas_destaque_chamado_aberto, horas_atribuicao_pesquisa_saida, '
-    'meses_retencao_conteudo_livre, anos_retencao_ficha.';
+    'meses_retencao_conteudo_livre, anos_retencao_ficha, '
+    'personalidade_assistente.';
 
 
 CREATE TABLE execucao_retencao (

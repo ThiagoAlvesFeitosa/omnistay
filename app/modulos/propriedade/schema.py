@@ -63,6 +63,16 @@ class BoasVindasResposta(BaseModel):
     checkout: str | None = None
 
 
+class PersonalidadeEntrada(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    texto: str
+
+
+class PersonalidadeResposta(BaseModel):
+    texto: str
+
+
 class ItemVendavelEntrada(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
