@@ -122,12 +122,13 @@ CHAVES_BOAS_VINDAS = (
     "boas_vindas_cafe",
     "boas_vindas_wifi",
     "boas_vindas_checkout",
+    "boas_vindas_convite",
     "horas_validade_boas_vindas",
 )
 
 
 @pytest.mark.postgres
-def test_bootstrap_semeia_quatro_chaves_de_boas_vindas(banco_migrado, monkeypatch):
+def test_bootstrap_semeia_chaves_de_boas_vindas(banco_migrado, monkeypatch):
     from app.bootstrap import executar_bootstrap
 
     monkeypatch.setenv("BOOTSTRAP_SENHA_INICIAL", "senha-inicial-do-gestor")
@@ -138,6 +139,8 @@ def test_bootstrap_semeia_quatro_chaves_de_boas_vindas(banco_migrado, monkeypatc
         email_gestor="gestor@hotel.com.br",
     )
     assert resultado.ok
+
+    from app.modulos.propriedade import service as propriedade_service
 
     engine = create_engine(banco_migrado)
     try:
@@ -156,6 +159,13 @@ def test_bootstrap_semeia_quatro_chaves_de_boas_vindas(banco_migrado, monkeypatc
     assert set(valores) == set(CHAVES_BOAS_VINDAS)
     for chave in CHAVES_BOAS_VINDAS:
         assert valores[chave].strip()
+    propriedade_service.validar_texto_de_boas_vindas(
+        "convite", valores["boas_vindas_convite"]
+    )
+    convite = valores["boas_vindas_convite"]
+    assert "servicos" in convite
+    assert "cardapio" in convite
+    assert "horarios" in convite
 
 
 @pytest.mark.postgres

@@ -10,6 +10,7 @@ def _corpo(**kwargs):
         "cafe": "Cafe da manha das 7h as 10h30",
         "wifi": "Wi-Fi: rede Hotel-Hospedes, senha 12345678",
         "checkout": "Checkout ate as 12h, bagagem na recepcao",
+        "convite": "Pode perguntar sobre o cardapio e o horario do spa.",
     }
     base.update(kwargs)
     return base
@@ -26,6 +27,7 @@ def test_recepcao_le_e_grava_os_tres_slots(app_sobre_ambiente):
     assert atual["cafe"]
     assert atual["wifi"]
     assert atual["checkout"]
+    assert atual["convite"]
 
     gravacao = cliente.put("/propriedade/boas-vindas", json=_corpo())
     assert gravacao.status_code == 200
@@ -75,3 +77,31 @@ def test_hotel_b_nao_ve_valor_do_hotel_a(app_sobre_ambiente):
     assert valor_b["cafe"] != valor_a["cafe"]
     assert valor_b["wifi"] != valor_a["wifi"]
     assert valor_b["checkout"] != valor_a["checkout"]
+    assert valor_b["convite"] != valor_a["convite"]
+
+
+@pytest.mark.postgres
+def test_put_sem_convite_e_recusado(app_sobre_ambiente):
+    cliente, ambiente = app_sobre_ambiente
+    _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
+    tres = {
+        "cafe": "Cafe da manha das 7h as 10h30",
+        "wifi": "Wi-Fi: rede Hotel-Hospedes, senha 12345678",
+        "checkout": "Checkout ate as 12h, bagagem na recepcao",
+    }
+    resposta = cliente.put("/propriedade/boas-vindas", json=tres)
+    assert resposta.status_code == 422
+
+
+@pytest.mark.postgres
+def test_put_de_convite_com_quebra_nao_altera(app_sobre_ambiente):
+    cliente, ambiente = app_sobre_ambiente
+    _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
+    antes = cliente.get("/propriedade/boas-vindas").json()
+    resposta = cliente.put(
+        "/propriedade/boas-vindas",
+        json=_corpo(convite="Pode\nperguntar"),
+    )
+    assert resposta.status_code == 422
+    assert "convite" in str(resposta.json()["detail"]).lower()
+    assert cliente.get("/propriedade/boas-vindas").json() == antes

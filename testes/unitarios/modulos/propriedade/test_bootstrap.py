@@ -96,6 +96,7 @@ def test_criacao_inicial_grava_propriedade_gestor_e_duracoes():
         "boas_vindas_cafe",
         "boas_vindas_wifi",
         "boas_vindas_checkout",
+        "boas_vindas_convite",
         "horas_validade_boas_vindas",
         "horas_destaque_chamado_aberto",
         "horas_minimas_para_pulso",
@@ -117,10 +118,15 @@ def test_criacao_inicial_grava_propriedade_gestor_e_duracoes():
         "boas_vindas_cafe",
         "boas_vindas_wifi",
         "boas_vindas_checkout",
+        "boas_vindas_convite",
     ):
         propriedade_service.validar_texto_de_boas_vindas(
             chave.removeprefix("boas_vindas_"), valores[chave]
         )
+    convite = valores["boas_vindas_convite"]
+    assert "servicos" in convite
+    assert "cardapio" in convite
+    assert "horarios" in convite
     assert int(valores["horas_validade_boas_vindas"]) > 0
     assert valores["horas_destaque_chamado_aberto"] == "2"
     assert valores["horas_minimas_para_pulso"] == "24"

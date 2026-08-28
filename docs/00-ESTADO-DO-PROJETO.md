@@ -7,9 +7,9 @@
 
 ## Onde paramos
 
-**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1 (IA real + aviso) e F7.2 (personalidade da assistente) feitas em 26–27/08/2026.
+**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1 (IA real + aviso), F7.2 (personalidade da assistente) e F7.3 (linha de convite no recado) feitas em 26–27/08/2026.
 
-**Progresso:** 24 de 24 do backlog original; F7.1 e F7.2 do plano de uma semana concluídas.
+**Progresso:** 24 de 24 do backlog original; F7.1, F7.2 e F7.3 do plano de uma semana concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -39,6 +39,7 @@
 | F6.2 Simulador de conversa | ✅ Concluída — `MENSAGERIA_MODO` (`demonstracao` \| `real`) na config de plataforma; fábrica escolhe `MensageriaSimulada` ou WhatsApp; worker de processo **não** instancia `MensageriaFalsa`; `GET/POST /simulador/conversas` com `usar_simulador`; tela React em `frontend/` servida em `/demo/` se houver `dist`. Sem túnel, sem painel operacional React, sem migração |
 | F7.1 Adaptador real de IA + aviso | ✅ Concluída — `LLM_MODO` (`controlado` \| `real`); `construir_llm` no worker (não cai em `LLMFalso` por omissão); `LLMGemini` via `httpx` + `generateContent` (sem SDK); timeout/429/formato → `Falha*` já tratada; aviso fixo no recado de boas-vindas (histórico/simulador). Suíte com `MockTransport`, sem rede. Template Meta `boas_vindas` não republicado. Sem migração |
 | F7.2 Personalidade da assistente | ✅ Concluída — chave `personalidade_assistente` em `parametro_hotel` (`VARCHAR(500)`); GET/PUT `/propriedade/personalidade` (gestão grava, recepção lê); tom só em `responder_duvida`; injeção cai no `nao_fiel` já existente; aviso da F7.1 intacto. Revisão `0022_personalidade_assistente`. Sem tela React |
+| F7.3 Linha de convite no recado | ✅ Concluída — quarto slot `boas_vindas_convite` na mesma rota GET/PUT `/propriedade/boas-vindas`; recado termina com o texto da casa; aviso da F7.1 imediatamente antes; tupla da porta com cinco variáveis; omissão na fila e recuperação pela janela já existente; semente no bootstrap e na revisão `0023_convite_boas_vindas`. Sem tela React (F8.6). Aprovação do template Meta de cinco parâmetros é passo humano |
 | Demais fatias | Nenhuma pendente no backlog original. Não há F2.3 nem F3.9 |
 
 ## A demonstração à banca — como funciona
@@ -97,8 +98,8 @@ de e-mail (F7.5) e telas de gestão/mercado/usuários/retenção (F8.7).
 
 ## O que falta para o sistema ser usável (27/08/2026)
 
-O backend está inteiro: 29 operações autorizadas, 22 revisões de esquema, worker, fila, webhook
-e cérebro real (F7.1) com tom configurável (F7.2). Falta o **painel operacional** — nenhuma fatia original o construiu.
+O backend está inteiro: 29 operações autorizadas, 23 revisões de esquema, worker, fila, webhook
+e cérebro real (F7.1) com tom configurável (F7.2) e convite editável no recado (F7.3). Falta o **painel operacional** — nenhuma fatia original o construiu.
 
 ### 1. O painel não existe
 
@@ -128,12 +129,12 @@ timeout padrão 15 s, sem retry, sem SDK. Falha de transporte vira a `Falha*` do
 (`llm_tempo_esgotado`, `llm_quota`, `llm_recusa`, `llm_indisponivel`, `llm_formato_invalido`);
 o domínio segue o caminho humano que já existia.
 
-Aviso de assistente virtual: constante de produto em `texto_boas_vindas.py`, antes do convite.
-Visível no histórico e no simulador. O template Meta de quatro variáveis **não** carrega o aviso
-até republicar (Artigo XV, fora desta fatia). Coleta e demais recados não repetem a frase.
+Aviso de assistente virtual: constante de produto em `texto_boas_vindas.py`, imediatamente antes
+da última linha. Visível no histórico e no simulador. A última linha é o convite editável da casa
+(F7.3). O template Meta de cinco variáveis ainda precisa de aprovação humana (Artigo XV). Coleta
+e demais recados não repetem o aviso.
 
-**O que continua faltando da Fase 7:** linha
-de convite editável (F7.3), módulos por propriedade (F7.4), canal de e-mail (F7.5).
+**O que continua faltando da Fase 7:** módulos por propriedade (F7.4), canal de e-mail (F7.5).
 
 ### 3. Ampliações decididas em 26/08/2026
 
@@ -144,7 +145,7 @@ painel porque as telas precisam nascer já sabendo esconder módulo desligado.
 | --- | --- | --- |
 | **Personalidade da assistente** | Texto livre em `parametro_hotel`, entra no prompt **antes** das regras fixas. A regra do catálogo continua no código e é sempre a última instrução — o hotel muda o tom, nunca o limite | F7.2 (feito) |
 | **Aviso de assistente virtual** | Frase fixa na primeira mensagem de cada estadia. Não editável: é postura do produto | F7.1 (feito; saiu junto com o adaptador) |
-| **Linha de convite no recado** | Quarto campo do recado de boas-vindas, com o mesmo formato de uma linha só | F7.3 |
+| **Linha de convite no recado** | Quarto campo do recado de boas-vindas, com o mesmo formato de uma linha só | F7.3 (feito) |
 | **Módulos por propriedade** | Mercado, pulso, consumo faturável, pesquisa de saída e canal de e-mail ligam e desligam. Núcleo — reserva, ficha, chamados, catálogo — nunca desliga | F7.4 |
 | **E-mail como segundo canal** | Segunda porta de entrada para o mesmo miolo. Proativo sempre por WhatsApp; resposta pelo canal em que o hóspede escreveu | F7.5 |
 
@@ -292,8 +293,9 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Fábrica no worker | `construir_mensageria(config)` escolhe `MensageriaSimulada` ou `MensageriaWhatsapp`. `MensageriaFalsa` permanece só na suíte | F6.2 |
 | `LLM_MODO` | Independente do canal. `controlado` → `LLMFalso`; `real` → `LLMGemini` (exige `GEMINI_API_KEY`). Vazio ou lixo: a fábrica falha alto; a suíte força `controlado` e injeta a porta | F7.1 |
 | Fábrica de inteligência | `construir_llm` na subida do worker e em `processar_uma_passagem_na_engine` se `llm` omitido. `processar_uma_passagem(..., llm=)` continua aceitando injeção. `conversa.service` não importa adaptador | F7.1 |
-| Aviso no recado | Constante ASCII antes do convite; uma `?` na última linha; coleta intacta; WhatsApp segue com 4 variáveis | F7.1 |
+| Aviso no recado | Constante ASCII imediatamente antes do convite; coleta intacta; WhatsApp leva 5 variáveis no corpo (aprovação Meta é passo humano) | F7.1 + F7.3 |
 | Tom da assistente | Chave `personalidade_assistente` (vazio = voz padrão). Só `responder_duvida` recebe `tom`; gestão grava, recepção lê; injeção = `nao_fiel` | F7.2 |
+| Convite no recado | Chave `boas_vindas_convite`; última linha do recado; PUT atômico dos quatro slots; omissão = fila `boas_vindas_nao_enviadas`; semente no bootstrap e na `0023` | F7.3 |
 | Tela `/simulador` | Cookie + `usar_simulador` (recepção e gestão). Modo `real` → `409` `modo_real`, não `403`. Outro hotel → `404`. Sem HMAC | F6.2 |
 | Frontend da banca | `frontend/` Vite+React, uma tela; estáticos em `/demo/` se existir `frontend/dist`. Sem kit UI, sem React Router, sem painel operacional | F6.2 |
 
@@ -498,6 +500,8 @@ Ainda abertas:
       fábrica; suíte sem rede. Aviso de assistente virtual no recado de boas-vindas
 - [x] ~~**Personalidade da assistente**~~ F7.2: `personalidade_assistente` em `parametro_hotel`;
       GET/PUT `/propriedade/personalidade`; tom só na composição de dúvida; revisão `0022`
+- [x] ~~**Linha de convite no recado**~~ F7.3: `boas_vindas_convite`; GET/PUT `/propriedade/boas-vindas`
+      com quatro campos; tupla de cinco; revisão `0023_convite_boas_vindas`
 - [x] ~~**Pegar a chave do Gemini**~~ chave no `.env` local (não versionado); `GEMINI_API_KEY=`
       vazio no `.env.example`
 - [ ] **Tela de Configurações (módulos) desenhada mas não construída** — o wireframe traz aviso
@@ -506,8 +510,8 @@ Ainda abertas:
       porque ligar chavinha não tem momento visual e o ciclo completo da estadia tem
 - [ ] **Painel de operação** — Fase 8 do backlog, sete fatias. Wireframes em
       `docs/wireframes-painel.html`
-- [ ] **Fase 7 — personalização e canais** — F7.1 e F7.2 feitas; restam linha de
-      convite (F7.3), módulos por propriedade (F7.4), canal de e-mail (F7.5)
+- [ ] **Fase 7 — personalização e canais** — F7.1, F7.2 e F7.3 feitas; restam módulos por
+      propriedade (F7.4) e canal de e-mail (F7.5)
 - [ ] **Perguntas que só o teste responde** (registradas ao fim da Fase 7 no backlog): se o tom
       configurado muda mesmo a percepção do hóspede · onde o aviso de IA incomoda menos · quantos
       hóspedes respondem por e-mail tendo as duas opções · se o convite do recado é usado · se

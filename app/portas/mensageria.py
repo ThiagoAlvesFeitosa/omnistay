@@ -42,7 +42,7 @@ class MensageriaGateway(Protocol):
         self,
         *,
         telefone_destino: str,
-        variaveis: tuple[str, str, str, str],
+        variaveis: tuple[str, str, str, str, str],
         corpo: str,
         id_mensagem: int,
         id_reserva: int,

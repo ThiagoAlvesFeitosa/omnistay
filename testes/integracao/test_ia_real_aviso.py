@@ -77,9 +77,13 @@ def test_boas_vindas_traz_aviso_e_coleta_nao_traz(app_sobre_ambiente):
     assert len(boas) == 1
     assert "assistente virtual" in boas[0].lower()
     assert "recepcao" in boas[0].lower()
-    assert boas[0].count("?") == 1
+    assert "Quer saber mais alguma coisa da sua estadia?" not in boas[0]
+    linhas = boas[0].splitlines()
+    assert "assistente virtual" in linhas[-2].lower()
+    assert linhas[-1]
     assert len(coletas) == 1
     assert "assistente virtual" not in coletas[0].lower()
 
     envio = next(e for e in porta.envios if e["tipo"] == "boas_vindas")
-    assert len(envio["variaveis"]) == 4
+    assert len(envio["variaveis"]) == 5
+    assert envio["variaveis"][4] == linhas[-1]

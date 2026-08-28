@@ -113,6 +113,7 @@ def _semear_boas_vindas(conexao: Connection, id_hotel: int, sufixo: str) -> None
         ("boas_vindas_cafe", f"Cafe da manha das 7h as 10h ({sufixo})"),
         ("boas_vindas_wifi", f"Wi-Fi: rede {sufixo}, senha na recepcao"),
         ("boas_vindas_checkout", f"Checkout ate as 12h ({sufixo})"),
+        ("boas_vindas_convite", f"Pode perguntar por aqui sobre servicos ({sufixo})."),
         ("horas_validade_boas_vindas", "12"),
     ):
         conexao.execute(

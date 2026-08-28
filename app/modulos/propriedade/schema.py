@@ -55,12 +55,14 @@ class BoasVindasEntrada(BaseModel):
     cafe: str = Field(min_length=1, max_length=255)
     wifi: str = Field(min_length=1, max_length=255)
     checkout: str = Field(min_length=1, max_length=255)
+    convite: str = Field(min_length=1, max_length=255)
 
 
 class BoasVindasResposta(BaseModel):
     cafe: str | None = None
     wifi: str | None = None
     checkout: str | None = None
+    convite: str | None = None
 
 
 class PersonalidadeEntrada(BaseModel):

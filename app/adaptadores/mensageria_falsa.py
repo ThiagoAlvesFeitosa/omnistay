@@ -57,7 +57,7 @@ class MensageriaFalsa:
         self,
         *,
         telefone_destino: str,
-        variaveis: tuple[str, str, str, str],
+        variaveis: tuple[str, str, str, str, str],
         corpo: str,
         id_mensagem: int,
         id_reserva: int,
@@ -66,7 +66,7 @@ class MensageriaFalsa:
             if self.falhas_restantes > 0:
                 self.falhas_restantes -= 1
             raise FalhaDeEnvio("mensageria_indisponivel")
-        prenome, cafe, wifi, checkout = variaveis
+        prenome, cafe, wifi, checkout, convite = variaveis
         registro = {
             "tipo": "boas_vindas",
             "telefone_destino": telefone_destino,
@@ -75,6 +75,7 @@ class MensageriaFalsa:
             "cafe": cafe,
             "wifi": wifi,
             "checkout": checkout,
+            "convite": convite,
             "corpo": corpo,
             "id_mensagem": id_mensagem,
             "id_reserva": id_reserva,

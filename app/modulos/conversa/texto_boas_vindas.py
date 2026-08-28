@@ -10,7 +10,12 @@ AVISO_ASSISTENTE_VIRTUAL = (
 
 
 def montar_texto_boas_vindas(
-    *, nome_completo: str, cafe: str, wifi: str, checkout: str
+    *,
+    nome_completo: str,
+    cafe: str,
+    wifi: str,
+    checkout: str,
+    convite: str,
 ) -> str:
     prenome = primeiro_nome(nome_completo)
     return (
@@ -19,5 +24,5 @@ def montar_texto_boas_vindas(
         f"Wi-Fi: {wifi}\n"
         f"Checkout: {checkout}\n"
         f"{AVISO_ASSISTENTE_VIRTUAL}\n"
-        "Quer saber mais alguma coisa da sua estadia? Pode perguntar por aqui."
+        f"{convite}"
     )

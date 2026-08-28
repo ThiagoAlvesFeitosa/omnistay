@@ -1,7 +1,5 @@
 """Validacao e gravacao da descricao de tom da assistente."""
 
-import logging
-
 import pytest
 
 from app.modulos.propriedade import service as propriedade
@@ -99,14 +97,19 @@ def test_nulo_e_recusado_sem_gravar():
     assert repo.valores["personalidade_assistente"] == "ok"
 
 
-def test_log_de_gravacao_nao_traz_o_tom(caplog):
+def test_log_de_gravacao_nao_traz_o_tom(monkeypatch):
     repo = Repo()
     marca = "NAO_DEVE_APARECER_NO_LOG_TOM_SECRETO"
-    with caplog.at_level(logging.INFO):
-        propriedade.gravar_personalidade_assistente(
-            object(), id_hotel=1, texto=marca, repositorio=repo
-        )
-    conjunto = caplog.text
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(propriedade.logger, "info", fake_info)
+    propriedade.gravar_personalidade_assistente(
+        object(), id_hotel=1, texto=marca, repositorio=repo
+    )
+    conjunto = " ".join(registros)
     assert marca not in conjunto
     assert "personalidade_assistente_gravada" in conjunto
     assert "id_hotel=1" in conjunto

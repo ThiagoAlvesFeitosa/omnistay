@@ -12,14 +12,14 @@ from testes.integracao.test_reservas import _login
 from worker.consumidor import processar_uma_passagem_na_engine
 
 
-def _apagar_slot(ambiente, id_hotel: int) -> None:
+def _apagar_slot(ambiente, id_hotel: int, chave: str = "boas_vindas_wifi") -> None:
     with ambiente.engine.begin() as conexao:
         conexao.execute(
             text(
                 "DELETE FROM parametro_hotel "
-                "WHERE id_hotel = :h AND chave = 'boas_vindas_wifi'"
+                "WHERE id_hotel = :h AND chave = :chave"
             ),
-            {"h": id_hotel},
+            {"h": id_hotel, "chave": chave},
         )
 
 
@@ -62,14 +62,18 @@ def test_worker_entrega_o_pacote_e_falha_nao_desfaz_checkin(app_sobre_ambiente):
     porta = MensageriaFalsa()
     processar_uma_passagem_na_engine(ambiente.engine, gateway=porta)
     envio = next(e for e in porta.envios if e["tipo"] == "boas_vindas")
-    assert len(envio["variaveis"]) == 4
-
+    assert len(envio["variaveis"]) == 5
     with ambiente.conexao() as conexao:
         msg = _mensagens_boas_vindas(conexao, id_reserva)[0]
         assert msg["status_envio"] == "enviada"
         assert msg["enviada_em"] is not None
         assert msg["id_externo"]
         assert _trabalhos_boas_vindas(conexao, id_reserva) == ["concluido"]
+        linhas = msg["conteudo"].splitlines()
+        assert linhas[-1] == envio["variaveis"][4]
+        assert "assistente virtual" in msg["conteudo"].lower()
+        assert "Quer saber mais alguma coisa da sua estadia?" not in msg["conteudo"]
+        assert envio.get("convite") == envio["variaveis"][4]
 
     id_reserva_falha = _criar_elegivel(
         cliente, ambiente, nome="Joao Lima", telefone="11988887777"
@@ -200,3 +204,105 @@ def test_recuperacao_envia_so_dentro_da_janela(app_sobre_ambiente):
         assert len(_trabalhos_boas_vindas(conexao, antiga)) == 0
     itens = {i["id_reserva"]: i for i in cliente.get("/fila-do-dia").json()["itens"]}
     assert itens[antiga]["boas_vindas_nao_enviadas"] is True
+
+
+@pytest.mark.postgres
+def test_convite_ausente_sinaliza_na_fila_sem_enviar(app_sobre_ambiente):
+    cliente, ambiente = app_sobre_ambiente
+    hotel = ambiente.propriedade_a.id_hotel
+    _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
+    _apagar_slot(ambiente, hotel, "boas_vindas_convite")
+    id_reserva = _criar_elegivel(cliente, ambiente)
+
+    resposta = cliente.post(f"/reservas/{id_reserva}/chegada")
+    assert resposta.status_code == 200
+    assert resposta.json()["boas_vindas"] == "nao_enviada_slot_ausente"
+    assert resposta.json()["status"] == "hospedado"
+    with ambiente.conexao() as conexao:
+        assert _trabalhos_boas_vindas(conexao, id_reserva) == []
+        assert _mensagens_boas_vindas(conexao, id_reserva) == []
+    itens = {i["id_reserva"]: i for i in cliente.get("/fila-do-dia").json()["itens"]}
+    assert itens[id_reserva]["boas_vindas_nao_enviadas"] is True
+
+
+@pytest.mark.postgres
+def test_recuperacao_depois_de_completar_o_convite(app_sobre_ambiente):
+    from worker.agendador import verificar_boas_vindas_pendentes
+
+    from testes.integracao.test_boas_vindas_slots import _corpo
+
+    cliente, ambiente = app_sobre_ambiente
+    hotel = ambiente.propriedade_a.id_hotel
+    _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
+    _apagar_slot(ambiente, hotel, "boas_vindas_convite")
+    recente = _criar_elegivel(cliente, ambiente, nome="RecenteC", telefone="11933330001")
+    antiga = _criar_elegivel(
+        cliente,
+        ambiente,
+        nome="AntigaC",
+        telefone="11933330002",
+        data_checkin_prevista=(date.today() - timedelta(days=3)).isoformat(),
+        data_checkout_prevista=date.today().isoformat(),
+    )
+    assert cliente.post(f"/reservas/{recente}/chegada").json()["boas_vindas"] == (
+        "nao_enviada_slot_ausente"
+    )
+    assert cliente.post(f"/reservas/{antiga}/chegada").json()["boas_vindas"] == (
+        "nao_enviada_slot_ausente"
+    )
+    with ambiente.engine.begin() as conexao:
+        conexao.execute(
+            text(
+                "UPDATE reserva SET checkin_em = now() - interval '40 minutes' "
+                "WHERE id_reserva = :id"
+            ),
+            {"id": recente},
+        )
+        conexao.execute(
+            text(
+                "UPDATE reserva SET checkin_em = now() - interval '3 days' "
+                "WHERE id_reserva = :id"
+            ),
+            {"id": antiga},
+        )
+    convite = "Pode perguntar sobre o cardapio vegano."
+    gravacao = cliente.put("/propriedade/boas-vindas", json=_corpo(convite=convite))
+    assert gravacao.status_code == 200
+    with ambiente.engine.begin() as conexao:
+        n = verificar_boas_vindas_pendentes(conexao)
+        n_segunda = verificar_boas_vindas_pendentes(conexao)
+    assert n == 1
+    assert n_segunda == 0
+    with ambiente.conexao() as conexao:
+        assert len(_trabalhos_boas_vindas(conexao, recente)) == 1
+        assert len(_trabalhos_boas_vindas(conexao, antiga)) == 0
+        conteudo = _mensagens_boas_vindas(conexao, recente)[0]["conteudo"]
+    assert conteudo.splitlines()[-1] == convite
+    itens = {i["id_reserva"]: i for i in cliente.get("/fila-do-dia").json()["itens"]}
+    assert itens[antiga]["boas_vindas_nao_enviadas"] is True
+    assert itens[recente]["boas_vindas_nao_enviadas"] is False
+
+
+@pytest.mark.postgres
+def test_alterar_convite_depois_de_enviado_nao_duplica(app_sobre_ambiente):
+    from worker.agendador import verificar_boas_vindas_pendentes
+
+    from testes.integracao.test_boas_vindas_slots import _corpo
+
+    cliente, ambiente = app_sobre_ambiente
+    _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
+    id_reserva = _criar_elegivel(cliente, ambiente)
+    assert cliente.post(f"/reservas/{id_reserva}/chegada").json()["boas_vindas"] == (
+        "agendada"
+    )
+    gravacao = cliente.put(
+        "/propriedade/boas-vindas",
+        json=_corpo(convite="Pode perguntar sobre o horario da sauna."),
+    )
+    assert gravacao.status_code == 200
+    with ambiente.engine.begin() as conexao:
+        n = verificar_boas_vindas_pendentes(conexao)
+    assert n == 0
+    with ambiente.conexao() as conexao:
+        assert len(_trabalhos_boas_vindas(conexao, id_reserva)) == 1
+        assert len(_mensagens_boas_vindas(conexao, id_reserva)) == 1

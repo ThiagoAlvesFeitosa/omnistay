@@ -115,6 +115,7 @@ CHAVES_SLOTS_BOAS_VINDAS = (
     ("cafe", "boas_vindas_cafe"),
     ("wifi", "boas_vindas_wifi"),
     ("checkout", "boas_vindas_checkout"),
+    ("convite", "boas_vindas_convite"),
 )
 
 
@@ -160,6 +161,7 @@ def agendar_boas_vindas(
         cafe=valores["cafe"],
         wifi=valores["wifi"],
         checkout=valores["checkout"],
+        convite=valores["convite"],
     )
     try:
         with _savepoint(conexao):
@@ -513,6 +515,7 @@ def processar_trabalho_enviar_boas_vindas(
                 valores["cafe"],
                 valores["wifi"],
                 valores["checkout"],
+                valores["convite"],
             ),
             corpo=mensagem["conteudo"],
             id_mensagem=id_mensagem,

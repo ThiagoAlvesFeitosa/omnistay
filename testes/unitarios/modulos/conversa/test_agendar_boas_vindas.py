@@ -60,6 +60,7 @@ SLOTS_OK = {
     "boas_vindas_cafe": "Cafe das 7h as 10h",
     "boas_vindas_wifi": "rede Hotel",
     "boas_vindas_checkout": "ate as 12h",
+    "boas_vindas_convite": "Pode perguntar sobre o spa.",
 }
 
 
@@ -98,6 +99,35 @@ def test_slot_ausente_nao_grava_nada():
     assert desfecho == "nao_enviada_slot_ausente"
     assert repo.mensagens == []
     assert fila.itens == []
+
+
+def test_convite_ausente_nao_grava_e_loga_so_a_chave(monkeypatch):
+    repo = RepoMensagem()
+    fila = Fila()
+    incompleto = dict(SLOTS_OK)
+    del incompleto["boas_vindas_convite"]
+    registros: list[str] = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(conversa.logger, "info", fake_info)
+    desfecho = conversa.agendar_boas_vindas(
+        object(),
+        id_hotel=1,
+        id_reserva=42,
+        nome_completo="Maria Silva",
+        repositorio=repo,
+        repositorio_propriedade=RepoPropriedade(incompleto),
+        enfileirar=fila,
+    )
+    assert desfecho == "nao_enviada_slot_ausente"
+    assert repo.mensagens == []
+    assert fila.itens == []
+    texto = " ".join(registros)
+    assert "chave=boas_vindas_convite" in texto
+    assert SLOTS_OK["boas_vindas_convite"] not in texto
+    assert "Pode perguntar sobre o spa." not in texto
 
 
 def test_integridade_do_indice_devolve_ja_agendada():

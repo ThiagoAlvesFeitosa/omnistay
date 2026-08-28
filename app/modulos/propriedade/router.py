@@ -147,6 +147,7 @@ def gravar_boas_vindas(
             cafe=entrada.cafe,
             wifi=entrada.wifi,
             checkout=entrada.checkout,
+            convite=entrada.convite,
         )
     except catalogo.DadosInvalidos as erro:
         raise HTTPException(

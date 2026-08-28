@@ -35,7 +35,7 @@ def test_sucesso_devolve_id_sim_sem_gancho_de_falha():
     assert resultado.id_externo == "sim-41"
     boas = porta.enviar_boas_vindas(
         telefone_destino="5511999990000",
-        variaveis=("Marina", "7h", "wifi", "12h"),
+        variaveis=("Marina", "7h", "wifi", "12h", "Pode perguntar sobre o spa."),
         corpo="boas",
         id_mensagem=42,
         id_reserva=12,

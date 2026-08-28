@@ -104,3 +104,57 @@ def test_comentario_de_parametro_hotel_cita_personalidade():
         finally:
             engine.dispose()
     assert "personalidade_assistente" in comentario
+
+
+@pytest.mark.postgres
+def test_comentario_de_parametro_hotel_cita_convite_de_boas_vindas():
+    from sqlalchemy import create_engine, text
+
+    from testes.suporte.banco_descartavel import banco_vazio
+    from testes.suporte.migracao import aplicar_migracoes
+
+    with banco_vazio() as url:
+        aplicar_migracoes(url)
+        engine = create_engine(url)
+        try:
+            with engine.connect() as conexao:
+                comentario = conexao.execute(
+                    text("SELECT obj_description('parametro_hotel'::regclass)")
+                ).scalar_one()
+        finally:
+            engine.dispose()
+    assert "boas_vindas_convite" in comentario
+
+
+@pytest.mark.postgres
+def test_hotel_existente_recebe_semente_de_convite_na_revisao_0023():
+    from sqlalchemy import create_engine, text
+
+    from app.modulos.propriedade.service import SEMENTE_CONVITE_BOAS_VINDAS
+    from testes.suporte.banco_descartavel import banco_vazio
+    from testes.suporte.migracao import aplicar_migracoes
+
+    with banco_vazio() as url:
+        aplicar_migracoes(url, alvo="0022_personalidade_assistente")
+        engine = create_engine(url)
+        try:
+            with engine.begin() as conexao:
+                id_hotel = conexao.execute(
+                    text(
+                        "INSERT INTO hotel (nome, telefone_whatsapp) "
+                        "VALUES ('Hotel Antigo', '+5511999990000') "
+                        "RETURNING id_hotel"
+                    )
+                ).scalar_one()
+            aplicar_migracoes(url)
+            with engine.connect() as conexao:
+                valor = conexao.execute(
+                    text(
+                        "SELECT valor FROM parametro_hotel "
+                        "WHERE id_hotel = :id AND chave = 'boas_vindas_convite'"
+                    ),
+                    {"id": id_hotel},
+                ).scalar()
+        finally:
+            engine.dispose()
+    assert valor == SEMENTE_CONVITE_BOAS_VINDAS

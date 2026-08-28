@@ -37,10 +37,16 @@ PARAMETROS_SILENCIO_PADRAO = {
     "horas_corte_antes_checkin": "12",
 }
 
+CHAVE_BOAS_VINDAS_CONVITE = "boas_vindas_convite"
+SEMENTE_CONVITE_BOAS_VINDAS = (
+    "Pode perguntar por aqui sobre servicos, cardapio e horarios."
+)
+
 PARAMETROS_BOAS_VINDAS_PADRAO = {
     "boas_vindas_cafe": "Cafe da manha das 7h as 10h",
     "boas_vindas_wifi": "Wi-Fi: rede do hotel, senha na recepcao",
     "boas_vindas_checkout": "Checkout ate as 12h",
+    CHAVE_BOAS_VINDAS_CONVITE: SEMENTE_CONVITE_BOAS_VINDAS,
     "horas_validade_boas_vindas": "12",
 }
 
@@ -69,6 +75,7 @@ CHAVES_SLOTS_BOAS_VINDAS = {
     "cafe": "boas_vindas_cafe",
     "wifi": "boas_vindas_wifi",
     "checkout": "boas_vindas_checkout",
+    "convite": CHAVE_BOAS_VINDAS_CONVITE,
 }
 
 CHAVE_PERSONALIDADE_ASSISTENTE = "personalidade_assistente"
@@ -373,12 +380,14 @@ def gravar_textos_de_boas_vindas(
     cafe: str,
     wifi: str,
     checkout: str,
+    convite: str,
     repositorio=propriedade_repository,
 ) -> dict[str, str]:
     limpos = {
         "cafe": validar_texto_de_boas_vindas("cafe", cafe),
         "wifi": validar_texto_de_boas_vindas("wifi", wifi),
         "checkout": validar_texto_de_boas_vindas("checkout", checkout),
+        "convite": validar_texto_de_boas_vindas("convite", convite),
     }
     for campo, chave in CHAVES_SLOTS_BOAS_VINDAS.items():
         repositorio.upsert_parametro(conexao, id_hotel, chave, limpos[campo])

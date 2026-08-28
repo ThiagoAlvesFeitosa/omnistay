@@ -102,6 +102,7 @@ def test_eventos_de_boas_vindas_nao_levam_conteudo(monkeypatch):
                 "boas_vindas_cafe": "segredo do cafe",
                 "boas_vindas_wifi": "senha-secreta",
                 "boas_vindas_checkout": "12h",
+                "boas_vindas_convite": "segredo do convite",
             }
 
     registros: list[str] = []
@@ -125,6 +126,7 @@ def test_eventos_de_boas_vindas_nao_levam_conteudo(monkeypatch):
     assert "id_mensagem=11" in texto
     assert "segredo do cafe" not in texto
     assert "senha-secreta" not in texto
+    assert "segredo do convite" not in texto
     assert "Maria" not in texto
     assert "5511" not in texto
 
