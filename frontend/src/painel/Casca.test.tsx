@@ -36,6 +36,23 @@ function fetchPorPerfil(perfil: string, nome = "Funcionário") {
     if (String(url).startsWith("/simulador")) {
       return json({ conversas: [] });
     }
+    if (url === "/fila-do-dia" && metodo === "GET") {
+      return json({ itens: [] });
+    }
+    if (url === "/reservas" && metodo === "POST") {
+      return json(
+        {
+          id_reserva: 1,
+          id_hotel: 1,
+          nome: "Nova",
+          telefone_contato: "5511999999999",
+          data_checkin_prevista: "2026-08-31",
+          data_checkout_prevista: "2026-09-02",
+          status: "aguardando_cadastro",
+        },
+        201,
+      );
+    }
     return new Response(null, { status: 404 });
   });
 }
@@ -102,6 +119,9 @@ describe("Casca", () => {
       if (url === "/sessoes/atual" && metodo === "DELETE") {
         autenticado = false;
         return new Response(null, { status: 204 });
+      }
+      if (url === "/fila-do-dia" && metodo === "GET") {
+        return json({ itens: [] });
       }
       return new Response(null, { status: 404 });
     });
@@ -190,7 +210,11 @@ describe("Casca", () => {
       }
       if (String(url).startsWith("/simulador")) {
         statusAtual = 401;
+        await new Promise((resolver) => setTimeout(resolver, 30));
         return json({ detail: "Sessao ausente ou invalida." }, 401);
+      }
+      if (url === "/fila-do-dia") {
+        return json({ itens: [] });
       }
       return new Response(null, { status: 404 });
     });
@@ -200,5 +224,29 @@ describe("Casca", () => {
     await waitFor(() => expect(screen.getByLabelText("E-mail")).toBeInTheDocument());
     expect(screen.getByText("Sessão ausente ou inválida.")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Fila do dia" })).not.toBeInTheDocument();
+  });
+
+  it("staff e gestão em fila ou reserva não disparam GET da lista nem POST", async () => {
+    for (const perfil of ["staff", "gestor"] as const) {
+      const fetchMock = fetchPorPerfil(perfil);
+      vi.stubGlobal("fetch", fetchMock);
+      const casa = perfil === "staff" ? "Meus chamados" : "Painel";
+
+      const fila = renderCasca("/app/fila");
+      expect(await screen.findByRole("heading", { name: casa })).toBeInTheDocument();
+      expect(screen.queryByText("Marina Duarte")).not.toBeInTheDocument();
+      fila.unmount();
+
+      const reserva = renderCasca("/app/reserva");
+      expect(await screen.findByRole("heading", { name: casa })).toBeInTheDocument();
+      expect(screen.queryByLabelText("Nome do hóspede")).not.toBeInTheDocument();
+      const operacionais = fetchMock.mock.calls.filter(
+        (chamada) =>
+          chamada[0] === "/fila-do-dia" ||
+          (chamada[0] === "/reservas" && chamada[1]?.method === "POST"),
+      );
+      expect(operacionais).toHaveLength(0);
+      reserva.unmount();
+    }
   });
 });

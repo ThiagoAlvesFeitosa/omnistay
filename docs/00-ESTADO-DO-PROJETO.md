@@ -7,9 +7,9 @@
 
 ## Onde paramos
 
-**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1–F7.3 feitas em 26–27/08/2026. **F8.1** (casca do painel e login) feita em 31/08/2026.
+**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1–F7.3 feitas em 26–27/08/2026. **F8.1** (casca) e **F8.2** (fila do dia e cadastro de reserva) feitas em 31/08/2026.
 
-**Progresso:** 24 de 24 do backlog original; F7.1, F7.2, F7.3 e **F8.1** (casca do painel e login) do plano de uma semana concluídas.
+**Progresso:** 24 de 24 do backlog original; F7.1, F7.2, F7.3, **F8.1** e **F8.2** do plano de uma semana concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -40,7 +40,8 @@
 | F7.1 Adaptador real de IA + aviso | ✅ Concluída — `LLM_MODO` (`controlado` \| `real`); `construir_llm` no worker (não cai em `LLMFalso` por omissão); `LLMGemini` via `httpx` + `generateContent` (sem SDK); timeout/429/formato → `Falha*` já tratada; aviso fixo no recado de boas-vindas (histórico/simulador). Suíte com `MockTransport`, sem rede. Template Meta `boas_vindas` não republicado. Sem migração |
 | F7.2 Personalidade da assistente | ✅ Concluída — chave `personalidade_assistente` em `parametro_hotel` (`VARCHAR(500)`); GET/PUT `/propriedade/personalidade` (gestão grava, recepção lê); tom só em `responder_duvida`; injeção cai no `nao_fiel` já existente; aviso da F7.1 intacto. Revisão `0022_personalidade_assistente`. Sem tela React |
 | F7.3 Linha de convite no recado | ✅ Concluída — quarto slot `boas_vindas_convite` na mesma rota GET/PUT `/propriedade/boas-vindas`; recado termina com o texto da casa; aviso da F7.1 imediatamente antes; tupla da porta com cinco variáveis; omissão na fila e recuperação pela janela já existente; semente no bootstrap e na revisão `0023_convite_boas_vindas`. Sem tela React (F8.6). Aprovação do template Meta de cinco parâmetros é passo humano |
-| F8.1 Casca do painel e login | ✅ Concluída — SPA em `/app` (Vite + React Router + Tailwind); cookie `omnistay_sessao` com `Secure` só em HTTPS; entrada única; casa por perfil (`/app/fila`, `/app/chamados`, `/app/indicadores`); menu filtrado; simulador como rota sem segundo login; telas nomeadas só com título. Sem operação nova na matriz, sem migração, sem Playwright. Fila/chamados/KPI reais ficam para F8.2+ |
+| F8.1 Casca do painel e login | ✅ Concluída — SPA em `/app` (Vite + React Router + Tailwind); cookie `omnistay_sessao` com `Secure` só em HTTPS; entrada única; casa por perfil (`/app/fila`, `/app/chamados`, `/app/indicadores`); menu filtrado; simulador como rota sem segundo login. Sem operação nova na matriz, sem migração, sem Playwright |
+| F8.2 Fila do dia e cadastro de reserva | ✅ Concluída — `TelaFila` lista o `GET /fila-do-dia`; resumo em partição (hoje · hospedados · vencidas); cadastro de três campos (`POST /reservas`, sem e-mail); **Confirmar chegada** só no botão da linha elegível; pendências com rótulos distintos; staff/gestão redirecionados sem disparar GET/POST. Sem Playwright, sem PMS, sem confirmar saída, sem migração |
 | Demais fatias | Nenhuma pendente no backlog original. Não há F2.3 nem F3.9 |
 
 ## A demonstração à banca — como funciona
@@ -101,14 +102,15 @@ de e-mail (F7.5) e telas de gestão/mercado/usuários/retenção (F8.7).
 
 O backend está inteiro: 29 operações autorizadas, 23 revisões de esquema, worker, fila, webhook
 e cérebro real (F7.1) com tom configurável (F7.2) e convite editável no recado (F7.3). A **casca
-do painel** (F8.1) existe: o funcionário entra e cai na casa do papel. As telas operacionais
-(fila, reserva, chamados, catálogo, ficha) ainda são só título — F8.2 em diante.
+do painel** (F8.1) e a **fila do dia com cadastro e confirmação de chegada** (F8.2) existem.
+Chamados, catálogo, ficha, consumos e saída no React ainda são só título — F8.3 em diante.
 
-### 1. Telas operacionais ainda não existem
+### 1. Telas operacionais ainda incompletas
 
-A casca (login, menu por perfil, Sair, simulador como rota) está em `/app`. Quem opera o hotel
-ainda não vê a fila do dia nem abre chamado pelo React: isso é F8.2–F8.6. O `/docs` do FastAPI
-continua sendo o caminho para exercitar a API além da casca.
+A casca (login, menu por perfil, Sair, simulador como rota) está em `/app`. A recepção já vê o
+turno, cadastra reserva e confirma chegada na lista. Ainda não abre ficha, chamado, catálogo
+nem saída pelo React: isso é F8.3–F8.6. O `/docs` do FastAPI continua sendo o caminho para
+exercitar a API além dessas telas.
 
 **Decisão (26/08/2026): construir do zero, em fatias novas.** O protótipo do Replit
 (`OmniStay Replit.zip`) tem cinco telas — painel, mercado, simulador, alertas e conversas —, todas
@@ -172,7 +174,7 @@ commit.
 > O estado mora nos arquivos — spec, plano, tarefas, código e este documento —, nunca no
 > histórico da conversa.
 
-**Próximos passos, em ordem:** F8.2 (fila do dia e reserva no painel) → F8.3–F8.6 →
+**Próximos passos, em ordem:** F8.3 (ficha do hóspede e transcrição para o PMS) → F8.4–F8.6 →
 implantação em nuvem, que o ADR-008 deixou deliberadamente adiada para ser decidida contra um
 sistema funcionando.
 
@@ -301,11 +303,12 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Tom da assistente | Chave `personalidade_assistente` (vazio = voz padrão). Só `responder_duvida` recebe `tom`; gestão grava, recepção lê; injeção = `nao_fiel` | F7.2 |
 | Convite no recado | Chave `boas_vindas_convite`; última linha do recado; PUT atômico dos quatro slots; omissão = fila `boas_vindas_nao_enviadas`; semente no bootstrap e na `0023` | F7.3 |
 | Tela `/simulador` | Cookie + `usar_simulador` (recepção e gestão). Modo `real` → `409` `modo_real`, não `403`. Outro hotel → `404`. Sem HMAC | F6.2 |
-| Frontend da banca | `frontend/` Vite+React+Router+Tailwind; SPA em `/app` se existir `frontend/dist`; `/demo` → `/app/simulador`. Casca e login na F8.1; telas nomeadas só com título até F8.2+ | F6.2 + F8.1 |
+| Frontend da banca | `frontend/` Vite+React+Router+Tailwind; SPA em `/app` se existir `frontend/dist`; `/demo` → `/app/simulador`. Casca e login na F8.1; fila/reserva/chegada na F8.2; demais telas nomeadas só com título | F6.2 + F8.1 + F8.2 |
 | SPA em `/app`, não em `/` | `GET /fila-do-dia` já existe. Montar o React na raiz faria o primeiro clique na fila acertar JSON, não HTML. Casas: `/app/fila` (recepção), `/app/chamados` (staff), `/app/indicadores` (gestão) | F8.1 |
 | Cookie `Secure` condicional | F0.3 mandava `Secure` sempre. O `TestClient` usa `https://testserver`, então a suíte antiga ficou verde enquanto o Chrome em `http://127.0.0.1` descartava o cookie e o login “não entra”. `_definir_cookie` olha `pedido.url.scheme` | F8.1 |
 | Fallback da SPA | O plano previa `StaticFiles(html=True)`. Starlette devolve **404** em `/app/entrar` (procura o arquivo `entrar`, não cai no `index.html` da raiz). `criar_aplicacao` serve o arquivo real se existir; senão `index.html`. Dist ausente: as rotas `/app` nem registram — a API sobe igual. `/app` entra em `PREFIXOS_IGNORADOS` das rotas protegidas | F8.1 |
 | Sem operação nova na matriz | Login reusa `POST/GET/DELETE /sessoes`. Não existe `ver_painel`. Telas nomeadas não chamam fila, chamado nem KPI (F8.2+) | F8.1 |
+| Fila e reserva no React | Casa da recepção: `GET /fila-do-dia`; cadastro: `POST /reservas` (nome, telefone, datas); chegada: `POST /reservas/{id}/chegada` e GET de novo. Resumo é partição das linhas, não `GET /indicadores/chegadas-do-dia`. Staff/gestão redirecionados sem disparar esses pedidos. Sem e-mail no form, sem confirmar saída | F8.2 |
 
 ## Onde ficam os arquivos
 
@@ -556,6 +559,7 @@ Ainda abertas:
 - [x] ~~Expurgo por retenção~~ F6.1: varredura diária efetiva, marcas, ficha aos 5 anos, `GET /retencao`
 - [x] ~~Simulador de conversa~~ F6.2: fábrica + tela (agora `/app/simulador`) + GET/POST autenticados; worker sem `MensageriaFalsa`
 - [x] ~~Casca do painel e login~~ F8.1: `/app`, cookie `Secure` conforme o esquema, casas por perfil, menu filtrado, simulador como rota
+- [x] ~~Fila do dia e cadastro de reserva~~ F8.2: lista do turno, três campos, confirmar chegada no botão, pendências distintas, só recepção
 - [ ] Confirmar a lista oficial vigente de campos exigidos por lei para registro de hóspede
 - [ ] Testar colagem no PMS real
 - [ ] Confirmar junto à Meta a categoria do template de pulso do segundo dia

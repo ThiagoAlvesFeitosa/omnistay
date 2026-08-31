@@ -12,7 +12,9 @@ import {
 import type { SessaoAtual } from "./sessao";
 import { definirManipulador401, obterAtual, sair } from "./sessao";
 import { TelaEntrada } from "./TelaEntrada";
+import { TelaFila } from "./TelaFila";
 import { TelaNomeada } from "./TelaNomeada";
+import { TelaNovaReserva } from "./TelaNovaReserva";
 
 export function Casca() {
   const [carregando, setCarregando] = useState(true);
@@ -128,6 +130,10 @@ export function Casca() {
                 />
               ) : destino.id === "simulador" ? (
                 <TelaSimulacao />
+              ) : destino.id === "fila" ? (
+                <TelaFila />
+              ) : destino.id === "reserva" ? (
+                <TelaNovaReserva />
               ) : (
                 <TelaNomeada titulo={destino.titulo} compacto={compacto} />
               )
