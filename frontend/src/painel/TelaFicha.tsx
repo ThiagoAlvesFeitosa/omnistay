@@ -229,7 +229,7 @@ export function TelaFicha() {
       </div>
 
       {estado === "vazio" ? (
-        <p>A ficha se abre pela fila do dia.</p>
+        <p>A ficha se abre pela fila do dia ou por Chamados e pedidos.</p>
       ) : null}
 
       {estado === "carregando" ? (

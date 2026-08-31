@@ -39,6 +39,9 @@ function fetchPorPerfil(perfil: string, nome = "Funcionário") {
     if (url === "/fila-do-dia" && metodo === "GET") {
       return json({ itens: [] });
     }
+    if (url === "/solicitacoes" && metodo === "GET") {
+      return json({ itens: [] });
+    }
     if (url === "/reservas" && metodo === "POST") {
       return json(
         {
@@ -245,6 +248,44 @@ describe("Casca", () => {
         expect(ficha).toHaveLength(0);
         visao.unmount();
       }
+    }
+  });
+
+  it("staff em /alertas não monta Chamados e pedidos nem busca a lista da recepção", async () => {
+    const fetchMock = fetchPorPerfil("staff");
+    vi.stubGlobal("fetch", fetchMock);
+    renderCasca("/app/alertas");
+    expect(await screen.findByRole("heading", { name: "Meus chamados" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Chamados e pedidos" })).not.toBeInTheDocument();
+    const gets = fetchMock.mock.calls.filter(
+      (chamada) => chamada[0] === "/solicitacoes" && (chamada[1]?.method ?? "GET") === "GET",
+    );
+    expect(gets).toHaveLength(1);
+  });
+
+  it("staff recarrega Meus chamados compacto sem pedir senha", async () => {
+    vi.stubGlobal("fetch", fetchPorPerfil("staff"));
+    renderCasca("/app/chamados");
+    expect(await screen.findByRole("heading", { name: "Meus chamados" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sair" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("E-mail")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Fila do dia" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Chamados e pedidos" })).not.toBeInTheDocument();
+  });
+
+  it("gestão em /alertas e /chamados não opera as listas", async () => {
+    for (const rota of ["/app/alertas", "/app/chamados"]) {
+      const fetchMock = fetchPorPerfil("gestor");
+      vi.stubGlobal("fetch", fetchMock);
+      const visao = renderCasca(rota);
+      expect(await screen.findByRole("heading", { name: "Painel" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Chamados e pedidos" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Meus chamados" })).not.toBeInTheDocument();
+      const gets = fetchMock.mock.calls.filter(
+        (chamada) => chamada[0] === "/solicitacoes" && (chamada[1]?.method ?? "GET") === "GET",
+      );
+      expect(gets).toHaveLength(0);
+      visao.unmount();
     }
   });
 

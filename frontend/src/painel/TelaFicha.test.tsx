@@ -87,10 +87,11 @@ describe("TelaFicha", () => {
     vi.restoreAllMocks();
   });
 
-  it("menu sem reserva não busca ficha e aponta para a fila", async () => {
+  it("menu sem reserva não busca ficha e aponta para a fila e para Chamados e pedidos", async () => {
     const fetchMock = vi.fn();
     renderFicha("/app/ficha", fetchMock);
     expect(await screen.findByText(/abre pela fila do dia/i)).toBeInTheDocument();
+    expect(screen.getByText(/chamados e pedidos/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /fila do dia/i })).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });

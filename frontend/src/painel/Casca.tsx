@@ -11,6 +11,8 @@ import {
 } from "./destinos";
 import type { SessaoAtual } from "./sessao";
 import { definirManipulador401, obterAtual, sair } from "./sessao";
+import { TelaAlertas } from "./TelaAlertas";
+import { TelaChamados } from "./TelaChamados";
 import { TelaEntrada } from "./TelaEntrada";
 import { TelaFicha } from "./TelaFicha";
 import { TelaFila } from "./TelaFila";
@@ -141,6 +143,10 @@ export function Casca() {
                 <TelaNovaReserva />
               ) : destino.id === "ficha" ? (
                 <TelaFicha />
+              ) : destino.id === "alertas" ? (
+                <TelaAlertas />
+              ) : destino.id === "chamados" ? (
+                <TelaChamados />
               ) : (
                 <TelaNomeada titulo={destino.titulo} compacto={compacto} />
               )
