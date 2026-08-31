@@ -23,14 +23,16 @@ MENSAGEM_CREDENCIAIS = "Credenciais invalidas."
 MENSAGEM_SESSAO = "Sessao ausente ou invalida."
 
 
-def _definir_cookie(resposta: Response, token: str, expira_em: datetime) -> None:
+def _definir_cookie(
+    resposta: Response, token: str, expira_em: datetime, pedido: Request
+) -> None:
     agora = datetime.now(UTC)
     max_age = max(0, int((expira_em - agora).total_seconds()))
     resposta.set_cookie(
         key=NOME_DO_COOKIE,
         value=token,
         httponly=True,
-        secure=True,
+        secure=pedido.url.scheme == "https",
         samesite="strict",
         path="/",
         max_age=max_age,
@@ -74,7 +76,7 @@ def criar_sessao(
             detail=MENSAGEM_CREDENCIAIS,
         ) from erro
 
-    _definir_cookie(resposta, autenticada.token, autenticada.expira_em)
+    _definir_cookie(resposta, autenticada.token, autenticada.expira_em, pedido)
     return SessaoCriada(
         id_usuario=autenticada.id_usuario,
         nome=autenticada.nome,

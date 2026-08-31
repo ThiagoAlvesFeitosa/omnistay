@@ -90,12 +90,14 @@ npm install
 npm run dev
 ```
 
-Proxy Vite para o uvicorn. Login pelo `POST /sessoes` já existente
-(mesmo origin via proxy). Abrir a tela, escolher a reserva, ver o fio,
-digitar como hóspede, esperar o recado do hotel aparecer **sem**
-telefone e **sem** Meta.
+Proxy Vite para o uvicorn. Entrar pelo painel em `/app/entrar`
+(`POST /sessoes` já existente, mesmo origin via proxy). Com sessão de
+recepção ou gestão, abrir `/app/simulador`, escolher a reserva, ver o
+fio, digitar como hóspede, esperar o recado do hotel aparecer **sem**
+telefone e **sem** Meta. Staff não vê essa rota.
 
-Build de banca (opcional): `npm run build`; uvicorn serve `/demo/`.
+Build de banca (opcional): `npm run build`; uvicorn serve a SPA em
+`/app`. `GET /demo` redireciona para `/app/simulador`.
 
 ---
 

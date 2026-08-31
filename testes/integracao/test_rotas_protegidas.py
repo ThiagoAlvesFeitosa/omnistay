@@ -14,7 +14,7 @@ ROTAS_PUBLICAS = {
 }
 
 # Documentacao automatica do FastAPI — nao sao recursos de dominio.
-PREFIXOS_IGNORADOS = ("/docs", "/redoc", "/openapi.json", "/demo")
+PREFIXOS_IGNORADOS = ("/docs", "/redoc", "/openapi.json", "/demo", "/app")
 
 
 def test_nenhuma_rota_protegida_dispensa_sessao():

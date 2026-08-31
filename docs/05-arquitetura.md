@@ -516,11 +516,14 @@ opcional.
 > o perfil `staff` só enxerga chamados, nunca dados cadastrais de hóspede, e a sessão é
 > revogável pelo painel da recepção.
 
-**Como a sessão existe (F0.3):** token opaco de 32 bytes no cookie `omnistay_sessao`
-(`HttpOnly`, `Secure`, `SameSite=Strict`); o banco guarda apenas o SHA-256 do token na
-tabela `sessao`. JWT foi rejeitado porque não é revogável sem lista de revogados — e a
-revogação precisa valer na requisição seguinte. As durações por perfil vivem em
-`parametro_hotel` (`duracao_sessao_*_horas`).
+**Como a sessão existe (F0.3, ajuste F8.1):** token opaco de 32 bytes no cookie
+`omnistay_sessao` (`HttpOnly`, `SameSite=Strict`; `Secure` **somente** quando o pedido é
+HTTPS — em HTTP local o navegador descarta cookie `Secure` e o login parece “não entrar”
+com a suíte verde). O banco guarda apenas o SHA-256 do token na tabela `sessao`. JWT foi
+rejeitado porque não é revogável sem lista de revogados — e a revogação precisa valer na
+requisição seguinte. As durações por perfil vivem em `parametro_hotel`
+(`duracao_sessao_*_horas`). O painel da F8.1 consome essas rotas; a SPA vive em `/app`
+(não em `/`, para não colidir com `GET /fila-do-dia`).
 
 Senhas armazenadas apenas como hash, com algoritmo de derivação lenta
 (PBKDF2-HMAC-SHA256). O valor gravado carrega algoritmo, iterações e sal na própria linha.

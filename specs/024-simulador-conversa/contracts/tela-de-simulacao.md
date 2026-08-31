@@ -53,9 +53,11 @@ Retry de envio reusa o mesmo `id_externo` gerado no cliente.
 
 ## Origem no navegador
 
-Mesmo origin que a API (proxy Vite em desenvolvimento; `/demo/`
-estático na demonstração). Sem isso o cookie `SameSite=Strict` não
-viaja. Sem `file://`.
+Mesmo origin que a API (proxy Vite em desenvolvimento; SPA em `/app`
+quando o uvicorn serve `frontend/dist`). Atalho `GET /demo` redireciona
+para `/app/simulador`. Sem isso o cookie `SameSite=Strict` não viaja.
+Sem `file://`. Sem segundo formulário de login na tela — a casca
+(F8.1) autentica.
 
 ---
 

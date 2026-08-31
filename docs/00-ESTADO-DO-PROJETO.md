@@ -1,15 +1,15 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 27/08/2026
+**Atualizado em:** 31/08/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
 
 ---
 
 ## Onde paramos
 
-**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1 (IA real + aviso), F7.2 (personalidade da assistente) e F7.3 (linha de convite no recado) feitas em 26–27/08/2026.
+**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1–F7.3 feitas em 26–27/08/2026. **F8.1** (casca do painel e login) feita em 31/08/2026.
 
-**Progresso:** 24 de 24 do backlog original; F7.1, F7.2 e F7.3 do plano de uma semana concluídas.
+**Progresso:** 24 de 24 do backlog original; F7.1, F7.2, F7.3 e **F8.1** (casca do painel e login) do plano de uma semana concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -36,10 +36,11 @@
 | F5.2 Coleta agendada de mercado | ✅ Concluída — `verificar_coletas_mercado` no `worker/agendador.py` (sem APScheduler, sem rota HTTP); tipo `coletar_mercado` com unicidade só do trabalho aberto; porta `FontePublica` + `FonteFalsa` / `FonteHttp` (stdlib, JSON-LD, User-Agent `OmniStay-Coletor/1.0`); diretiva ausente **não** autoriza visita; falha grava `sucesso=false`; `periodicidade_coleta_mercado=24` horas; revisão `0020_coleta_agendada`. Sem painel (F5.3), sem disparo manual, sem mensagem ao hóspede |
 | F5.3 Painel de mercado | ✅ Concluída — `GET /mercado` (visão atual) e `GET /mercado/concorrentes/{id}` (histórico); operação `ler_mercado` só gestão; visão atual = último **sucesso** datado; `situacao` (`atual` · `desatualizado` · `cadencia_ausente` · `sem_coleta` · `so_falha`); limiar = periodicidade da casa; escrita da série `405`; sem migração, sem React, sem disparo de coleta |
 | F6.1 Expurgo por retenção | ✅ Concluída — `verificar_retencao` no `worker/agendador.py` (sem APScheduler, sem tipo na fila, sem botão “expurgar agora”); conteúdo livre vira marca 12 meses após `checkout_em`; ficha apagada 5 anos após a última saída vinculada; comprovante `execucao_retencao` (1/hotel/dia UTC); `GET /retencao` com `ler_retencao` só gestão; revisão `0021_expurgo_retencao`. Payload órfão fora; sem React; sem pedido avulso de esquecimento |
-| F6.2 Simulador de conversa | ✅ Concluída — `MENSAGERIA_MODO` (`demonstracao` \| `real`) na config de plataforma; fábrica escolhe `MensageriaSimulada` ou WhatsApp; worker de processo **não** instancia `MensageriaFalsa`; `GET/POST /simulador/conversas` com `usar_simulador`; tela React em `frontend/` servida em `/demo/` se houver `dist`. Sem túnel, sem painel operacional React, sem migração |
+| F6.2 Simulador de conversa | ✅ Concluída — `MENSAGERIA_MODO` (`demonstracao` \| `real`) na config de plataforma; fábrica escolhe `MensageriaSimulada` ou WhatsApp; worker de processo **não** instancia `MensageriaFalsa`; `GET/POST /simulador/conversas` com `usar_simulador`; tela React em `frontend/`. A partir da F8.1 a casa da SPA é `/app`; `/demo` redireciona para `/app/simulador`. Sem túnel, sem migração |
 | F7.1 Adaptador real de IA + aviso | ✅ Concluída — `LLM_MODO` (`controlado` \| `real`); `construir_llm` no worker (não cai em `LLMFalso` por omissão); `LLMGemini` via `httpx` + `generateContent` (sem SDK); timeout/429/formato → `Falha*` já tratada; aviso fixo no recado de boas-vindas (histórico/simulador). Suíte com `MockTransport`, sem rede. Template Meta `boas_vindas` não republicado. Sem migração |
 | F7.2 Personalidade da assistente | ✅ Concluída — chave `personalidade_assistente` em `parametro_hotel` (`VARCHAR(500)`); GET/PUT `/propriedade/personalidade` (gestão grava, recepção lê); tom só em `responder_duvida`; injeção cai no `nao_fiel` já existente; aviso da F7.1 intacto. Revisão `0022_personalidade_assistente`. Sem tela React |
 | F7.3 Linha de convite no recado | ✅ Concluída — quarto slot `boas_vindas_convite` na mesma rota GET/PUT `/propriedade/boas-vindas`; recado termina com o texto da casa; aviso da F7.1 imediatamente antes; tupla da porta com cinco variáveis; omissão na fila e recuperação pela janela já existente; semente no bootstrap e na revisão `0023_convite_boas_vindas`. Sem tela React (F8.6). Aprovação do template Meta de cinco parâmetros é passo humano |
+| F8.1 Casca do painel e login | ✅ Concluída — SPA em `/app` (Vite + React Router + Tailwind); cookie `omnistay_sessao` com `Secure` só em HTTPS; entrada única; casa por perfil (`/app/fila`, `/app/chamados`, `/app/indicadores`); menu filtrado; simulador como rota sem segundo login; telas nomeadas só com título. Sem operação nova na matriz, sem migração, sem Playwright. Fila/chamados/KPI reais ficam para F8.2+ |
 | Demais fatias | Nenhuma pendente no backlog original. Não há F2.3 nem F3.9 |
 
 ## A demonstração à banca — como funciona
@@ -96,16 +97,18 @@ de e-mail (F7.5) e telas de gestão/mercado/usuários/retenção (F8.7).
 `specify` → `plan` → `tasks` → `implement`, sem `clarify` nem `analyze`. **TDD não se corta** —
 é o que permitiu onze mudanças de esquema sem regressão.
 
-## O que falta para o sistema ser usável (27/08/2026)
+## O que falta para o sistema ser usável (31/08/2026)
 
 O backend está inteiro: 29 operações autorizadas, 23 revisões de esquema, worker, fila, webhook
-e cérebro real (F7.1) com tom configurável (F7.2) e convite editável no recado (F7.3). Falta o **painel operacional** — nenhuma fatia original o construiu.
+e cérebro real (F7.1) com tom configurável (F7.2) e convite editável no recado (F7.3). A **casca
+do painel** (F8.1) existe: o funcionário entra e cai na casa do papel. As telas operacionais
+(fila, reserva, chamados, catálogo, ficha) ainda são só título — F8.2 em diante.
 
-### 1. O painel não existe
+### 1. Telas operacionais ainda não existem
 
-Todas as 24 fatias diziam "sem tela React". A única interface construída é o simulador da F6.2,
-feito para demonstrar a conversa do hóspede — não para operar o hotel. Hoje o sistema só é
-operável pelo `/docs` do FastAPI.
+A casca (login, menu por perfil, Sair, simulador como rota) está em `/app`. Quem opera o hotel
+ainda não vê a fila do dia nem abre chamado pelo React: isso é F8.2–F8.6. O `/docs` do FastAPI
+continua sendo o caminho para exercitar a API além da casca.
 
 **Decisão (26/08/2026): construir do zero, em fatias novas.** O protótipo do Replit
 (`OmniStay Replit.zip`) tem cinco telas — painel, mercado, simulador, alertas e conversas —, todas
@@ -169,8 +172,9 @@ commit.
 > O estado mora nos arquivos — spec, plano, tarefas, código e este documento —, nunca no
 > histórico da conversa.
 
-**Próximos passos, em ordem:** adaptador real de IA → Fase 7 (painel) → implantação em nuvem,
-que o ADR-008 deixou deliberadamente adiada para ser decidida contra um sistema funcionando.
+**Próximos passos, em ordem:** F8.2 (fila do dia e reserva no painel) → F8.3–F8.6 →
+implantação em nuvem, que o ADR-008 deixou deliberadamente adiada para ser decidida contra um
+sistema funcionando.
 
 ## Decisões tomadas durante a implementação
 
@@ -185,14 +189,14 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Credenciais em arquivo versionado | `testes/conftest.py` trazia URL com senha embutida, herdada da F0.1. Removida na F0.2: sem valor padrão, a suíte exige `DATABASE_URL` do ambiente e falha alto se ausente. `.env.example` registra as chaves **sem valor** | F0.2 |
 | Fonte do esquema | ~~A migração executa o próprio `docs/04-schema.sql`~~ **Superada no planejamento da F0.2.** Migração precisa ser imutável: uma revisão que lê um arquivo mutável muda de significado a cada edição e deixa de ser reprodutível. A revisão inicial carrega **cópia congelada** em `alembic/versions/sql/`; `docs/04-schema.sql` segue como documento vivo; a equivalência é garantida por teste, não por disciplina | F0.2 |
 | Verificação do esquema | Teste que compara o inventário do banco migrado com as estruturas do documento, **nos dois sentidos** — para detectar migração futura que altere o banco sem atualizar o arquivo | F0.2 |
-| Sessão do painel | Token opaco em cookie `HttpOnly`/`Secure`/`SameSite=Strict`; banco guarda só SHA-256. JWT rejeitado porque não é revogável na requisição seguinte | F0.3 |
+| Sessão do painel | Token opaco em cookie `HttpOnly`/`SameSite=Strict`; `Secure` só quando o pedido é HTTPS (HTTP local da banca precisa grudar o cookie). Banco guarda só SHA-256. JWT rejeitado porque não é revogável na requisição seguinte | F0.3 + F8.1 |
 | Derivação de senha | PBKDF2-HMAC-SHA256 com **600.000 iterações** (recomendação OWASP), da biblioteca padrão. Sem bcrypt/Argon2id: são pacotes compilados e o risco de wheel ausente no Python 3.14 está registrado desde a F0.1. Formato autodescritivo (algoritmo + iterações + sal no valor gravado), então elevar o custo ou trocar de algoritmo **não invalida senhas existentes**. Revisitar antes de produção com hóspede real, ou quando `argon2-cffi` tiver wheel para 3.14 | F0.3 |
 | Ataque de tempo no login | E-mail inexistente também paga a derivação, contra hash de referência — resposta com duração igual nos dois casos | F0.3 |
 | Ciclo entre módulos | Apareceu ciclo `acesso.service` ↔ `propriedade.service`. **Regra: ciclo se resolve movendo código, nunca com import local.** Orquestração entre módulos pertence a `app/bootstrap.py`, não a um dos módulos. O valor do monolito modular está em as fronteiras serem reais — primeiro ciclo na 3ª fatia de 24 é aviso, não acidente | F0.3 |
 | Administração de acesso | Gestão cria/desativa usuários; recepção revoga sessões. Autoridade ≠ urgência | F0.3 |
 | Bootstrap | Comando `python -m app.bootstrap` cria hotel, gestor e parâmetros de duração. Sem senha padrão | F0.3 |
 | Módulo `acesso` | Acrescentado aos módulos do monólito; governa `usuario` e `sessao`. Camada ORM `model` permanece vazia | F0.3 |
-| Tela React na F1.1 | **Não.** A previsão da F0.3 de que a tela de login viria “junto da primeira tela com conteúdo na F1.1” escorregou: F1.1 entregou API autenticada (`POST /reservas`, `GET /fila-do-dia`, `GET /indicadores/chegadas-do-dia`) sem painel. A primeira tela fica para fatia de UI ou início da F1.2 | F1.1 |
+| Tela React na F1.1 | **Não.** A previsão da F0.3 de que a tela de login viria “junto da primeira tela com conteúdo na F1.1” escorregou: F1.1 entregou API autenticada sem painel. A primeira tela chegou na F8.1 (`/app/entrar`) | F1.1 + F8.1 |
 | Titular provisório | Nome digitado na criação vira `hospede` mínimo + `reserva_hospede` titular (`ficha_completa = false`) na mesma transação. Sem coluna `nome` em `reserva` | F1.1 |
 | Telefone repetido | Sempre cria hóspede novo. Casal/telefone de empresa não podem misturar fichas. Consolidação por pessoa, se existir, é passo futuro explícito | F1.1 |
 | Fila vs contagem | Lista nominada (`ler_fila_do_dia`) só recepção; contagem do dia (`ler_indicadores`) só o número, para recepção e gestão — dado cadastral não trafega para a gestão filtrar no frontend | F1.1 |
@@ -297,7 +301,11 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Tom da assistente | Chave `personalidade_assistente` (vazio = voz padrão). Só `responder_duvida` recebe `tom`; gestão grava, recepção lê; injeção = `nao_fiel` | F7.2 |
 | Convite no recado | Chave `boas_vindas_convite`; última linha do recado; PUT atômico dos quatro slots; omissão = fila `boas_vindas_nao_enviadas`; semente no bootstrap e na `0023` | F7.3 |
 | Tela `/simulador` | Cookie + `usar_simulador` (recepção e gestão). Modo `real` → `409` `modo_real`, não `403`. Outro hotel → `404`. Sem HMAC | F6.2 |
-| Frontend da banca | `frontend/` Vite+React, uma tela; estáticos em `/demo/` se existir `frontend/dist`. Sem kit UI, sem React Router, sem painel operacional | F6.2 |
+| Frontend da banca | `frontend/` Vite+React+Router+Tailwind; SPA em `/app` se existir `frontend/dist`; `/demo` → `/app/simulador`. Casca e login na F8.1; telas nomeadas só com título até F8.2+ | F6.2 + F8.1 |
+| SPA em `/app`, não em `/` | `GET /fila-do-dia` já existe. Montar o React na raiz faria o primeiro clique na fila acertar JSON, não HTML. Casas: `/app/fila` (recepção), `/app/chamados` (staff), `/app/indicadores` (gestão) | F8.1 |
+| Cookie `Secure` condicional | F0.3 mandava `Secure` sempre. O `TestClient` usa `https://testserver`, então a suíte antiga ficou verde enquanto o Chrome em `http://127.0.0.1` descartava o cookie e o login “não entra”. `_definir_cookie` olha `pedido.url.scheme` | F8.1 |
+| Fallback da SPA | O plano previa `StaticFiles(html=True)`. Starlette devolve **404** em `/app/entrar` (procura o arquivo `entrar`, não cai no `index.html` da raiz). `criar_aplicacao` serve o arquivo real se existir; senão `index.html`. Dist ausente: as rotas `/app` nem registram — a API sobe igual. `/app` entra em `PREFIXOS_IGNORADOS` das rotas protegidas | F8.1 |
+| Sem operação nova na matriz | Login reusa `POST/GET/DELETE /sessoes`. Não existe `ver_painel`. Telas nomeadas não chamam fila, chamado nem KPI (F8.2+) | F8.1 |
 
 ## Onde ficam os arquivos
 
@@ -546,7 +554,8 @@ Ainda abertas:
 - [x] ~~Coleta agendada de mercado~~ F5.2: varredura + `coleta_mercado` append-only
 - [x] ~~Painel de mercado~~ F5.3: `GET /mercado` + histórico; dado velho sinalizado; série somente leitura
 - [x] ~~Expurgo por retenção~~ F6.1: varredura diária efetiva, marcas, ficha aos 5 anos, `GET /retencao`
-- [x] ~~Simulador de conversa~~ F6.2: fábrica + tela `/demo/` + GET/POST autenticados; worker sem `MensageriaFalsa`
+- [x] ~~Simulador de conversa~~ F6.2: fábrica + tela (agora `/app/simulador`) + GET/POST autenticados; worker sem `MensageriaFalsa`
+- [x] ~~Casca do painel e login~~ F8.1: `/app`, cookie `Secure` conforme o esquema, casas por perfil, menu filtrado, simulador como rota
 - [ ] Confirmar a lista oficial vigente de campos exigidos por lei para registro de hóspede
 - [ ] Testar colagem no PMS real
 - [ ] Confirmar junto à Meta a categoria do template de pulso do segundo dia
