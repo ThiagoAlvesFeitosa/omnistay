@@ -226,6 +226,28 @@ describe("Casca", () => {
     expect(screen.queryByRole("heading", { name: "Fila do dia" })).not.toBeInTheDocument();
   });
 
+  it("staff e gestão em /ficha não vêem a ficha nem disparam GET", async () => {
+    for (const perfil of ["staff", "gestor"] as const) {
+      const fetchMock = fetchPorPerfil(perfil);
+      vi.stubGlobal("fetch", fetchMock);
+      const casa = perfil === "staff" ? "Meus chamados" : "Painel";
+
+      for (const rota of ["/app/ficha", "/app/ficha/1"]) {
+        const visao = renderCasca(rota);
+        expect(await screen.findByRole("heading", { name: casa })).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "Ficha do hóspede" })).not.toBeInTheDocument();
+        expect(screen.queryByText("Marina Duarte")).not.toBeInTheDocument();
+        const ficha = fetchMock.mock.calls.filter(
+          (chamada) =>
+            String(chamada[0]).includes("/ficha") ||
+            String(chamada[0]).includes("/consentimento"),
+        );
+        expect(ficha).toHaveLength(0);
+        visao.unmount();
+      }
+    }
+  });
+
   it("staff e gestão em fila ou reserva não disparam GET da lista nem POST", async () => {
     for (const perfil of ["staff", "gestor"] as const) {
       const fetchMock = fetchPorPerfil(perfil);

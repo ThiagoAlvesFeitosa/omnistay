@@ -85,6 +85,10 @@ export function destinoPorCaminho(pathname: string): Destino | undefined {
   const absoluto = pathname.startsWith("/app")
     ? pathname
     : `/app${pathname === "/" ? "" : pathname}`;
+  const ficha = DESTINOS.find((destino) => destino.id === "ficha");
+  if (ficha && (absoluto === ficha.caminho || absoluto.startsWith(`${ficha.caminho}/`))) {
+    return ficha;
+  }
   return DESTINOS.find((destino) => destino.caminho === absoluto);
 }
 

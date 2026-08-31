@@ -13,6 +13,7 @@ from app.modulos.hospedagem.schema import (
     ConsentimentoEntrada,
     ConsentimentoResposta,
     ContagemChegadasResposta,
+    FichaTitularEntrada,
     FichaTitularResposta,
     FilaDoDiaResposta,
     ListaPedidosFeitosPeloChat,
@@ -87,6 +88,39 @@ def ler_ficha(
     except hospedagem.DadosInvalidos as erro:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(erro),
+        ) from erro
+
+
+@roteador.put("/reservas/{id_reserva}/ficha", response_model=FichaTitularResposta)
+def alterar_ficha(
+    id_reserva: int,
+    entrada: FichaTitularEntrada,
+    conexao: Conexao,
+    sessao: Annotated[
+        SessaoAtual, Depends(exigir_operacao("alterar_ficha_de_hospede"))
+    ],
+) -> FichaTitularResposta:
+    try:
+        return hospedagem.completar_ficha_titular(
+            conexao,
+            id_hotel=sessao.id_hotel,
+            id_reserva=id_reserva,
+            campos=entrada.model_dump(),
+        )
+    except hospedagem.ReservaNaoEncontrada as erro:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reserva nao encontrada.",
+        ) from erro
+    except hospedagem.DocumentoEmUso as erro:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Documento ja cadastrado para outro hospede.",
+        ) from erro
+    except hospedagem.DadosInvalidos as erro:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(erro),
         ) from erro
 

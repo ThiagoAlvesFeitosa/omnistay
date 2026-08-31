@@ -240,4 +240,19 @@ describe("TelaFila", () => {
     expect(screen.getByText("Em dia").closest("tr")).not.toHaveTextContent("recado não enviado");
     expect(screen.getByText("Em dia").closest("tr")).not.toHaveTextContent("não confirmada");
   });
+
+  it("Ver ficha na linha navega para a ficha da reserva", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchFila([item({ id_reserva: 10, nome: "Elegível", status: "ficha_recebida", estado_cadastro: "completa" })]),
+    );
+    renderFila();
+    const link = await screen.findByRole("link", { name: "Ver ficha" });
+    expect(link).toHaveAttribute("href", expect.stringMatching(/\/ficha\/10$/));
+    fireEvent.click(screen.getByText("Elegível"));
+    const fetchMock = vi.mocked(fetch);
+    expect(
+      fetchMock.mock.calls.filter((chamada) => String(chamada[0]).includes("/chegada")),
+    ).toHaveLength(0);
+  });
 });

@@ -156,11 +156,16 @@ export function TelaFila() {
                   )}
                 </td>
                 <td className="text-right">
-                  {chegadaAdmiteBotao(linha.status) ? (
-                    <Button type="button" onClick={() => void confirmarChegada(linha.id_reserva)}>
-                      Confirmar chegada
-                    </Button>
-                  ) : null}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Link to={`/ficha/${linha.id_reserva}`} className="text-sm underline">
+                      Ver ficha
+                    </Link>
+                    {chegadaAdmiteBotao(linha.status) ? (
+                      <Button type="button" onClick={() => void confirmarChegada(linha.id_reserva)}>
+                        Confirmar chegada
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}

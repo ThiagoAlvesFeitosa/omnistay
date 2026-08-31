@@ -28,6 +28,8 @@ TRANSICOES_RECUSADAS = [
 
 TRANSICOES_ACEITAS = [
     ("aguardando_cadastro", "ficha_recebida"),
+    ("ficha_parcial", "ficha_recebida"),
+    ("ficha_recebida", "ficha_parcial"),
     ("ficha_recebida", "hospedado"),
     ("ficha_parcial", "hospedado"),
     ("sem_cadastro_previo", "hospedado"),

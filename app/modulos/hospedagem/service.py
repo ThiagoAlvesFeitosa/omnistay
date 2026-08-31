@@ -5,10 +5,16 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Protocol
 
+from sqlalchemy.exc import IntegrityError
+
 from app.comum.log import obter_logger
 from app.comum.telefone import TelefoneInvalido, normalizar
 from app.modulos.atendimento import service as atendimento_service
 from app.modulos.conversa import service as conversa_service
+from app.modulos.conversa.validacao_ficha import (
+    classificar_desfecho,
+    validar_campos_extraidos,
+)
 from app.modulos.hospedagem import repository as repositorio_padrao
 from app.modulos.hospedagem.schema import (
     ChegadaResposta,
@@ -20,6 +26,7 @@ from app.modulos.hospedagem.schema import (
     ReservaResposta,
     SaidaResposta,
 )
+from app.portas.llm import CAMPOS_FICHA_CHAVE
 
 logger = obter_logger(__name__)
 
@@ -46,6 +53,15 @@ class SaidaNaoPermitida(Exception):
 
 class HospedeNaoEncontrado(Exception):
     pass
+
+
+class DocumentoEmUso(Exception):
+    pass
+
+
+STATUS_CICLO_FICHA = frozenset(
+    {"aguardando_cadastro", "ficha_parcial", "ficha_recebida"}
+)
 
 
 class RepositorioDeHospedagem(Protocol):
@@ -234,6 +250,97 @@ def consolidar_ficha_titular(
         titular["id_hospede"],
         novo_status,
         len(limpos),
+    )
+
+
+def _texto_campo(valor) -> str | None:
+    if valor is None:
+        return None
+    if isinstance(valor, date):
+        return valor.isoformat()
+    texto = str(valor).strip()
+    return texto or None
+
+
+def completar_ficha_titular(
+    conexao,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    campos: dict,
+    repositorio=repositorio_padrao,
+) -> FichaTitularResposta:
+    titular = repositorio.ler_titular_da_reserva(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    if titular is None:
+        raise ReservaNaoEncontrada
+
+    informados: dict[str, str] = {}
+    gravados: dict[str, str | None] = {}
+    for chave in CAMPOS_FICHA_CHAVE:
+        texto = _texto_campo(campos.get(chave))
+        if texto is None:
+            gravados[chave] = None
+            continue
+        informados[chave] = texto
+
+    if not informados.get("nome_completo"):
+        raise DadosInvalidos("Informe o nome.")
+    if not informados.get("telefone"):
+        raise DadosInvalidos("Informe o telefone.")
+
+    validos = validar_campos_extraidos(informados)
+    invalidos = [chave for chave in informados if chave not in validos]
+    if invalidos:
+        raise DadosInvalidos(f"Campo {invalidos[0]} invalido.")
+
+    for chave, valor in validos.items():
+        gravados[chave] = valor
+
+    desfecho = classificar_desfecho(validos)
+    completa = desfecho == "completa"
+    novo_status = "ficha_recebida" if completa else "ficha_parcial"
+
+    try:
+        repositorio.atualizar_hospede_titular(
+            conexao, id_hospede=titular["id_hospede"], campos=gravados
+        )
+    except IntegrityError as erro:
+        logger.info(
+            "ficha_alterada_recusada id_reserva=%s id_hospede=%s codigo=409",
+            id_reserva,
+            titular["id_hospede"],
+        )
+        if "uq_hospede_documento" in str(erro.orig or erro):
+            raise DocumentoEmUso from erro
+        raise
+
+    repositorio.marcar_ficha_completa(
+        conexao, id_reserva=id_reserva, completa=completa
+    )
+    status_final = titular["status"]
+    if titular["status"] in STATUS_CICLO_FICHA:
+        repositorio.atualizar_status_reserva(
+            conexao,
+            id_hotel=id_hotel,
+            id_reserva=id_reserva,
+            status=novo_status,
+        )
+        status_final = novo_status
+
+    logger.info(
+        "ficha_alterada_balcao id_reserva=%s id_hospede=%s status=%s campos=%s",
+        id_reserva,
+        titular["id_hospede"],
+        status_final,
+        len(validos),
+    )
+    return ler_ficha_titular(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        repositorio=repositorio,
     )
 
 

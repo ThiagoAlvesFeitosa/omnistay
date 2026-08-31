@@ -12,6 +12,7 @@ import {
 import type { SessaoAtual } from "./sessao";
 import { definirManipulador401, obterAtual, sair } from "./sessao";
 import { TelaEntrada } from "./TelaEntrada";
+import { TelaFicha } from "./TelaFicha";
 import { TelaFila } from "./TelaFila";
 import { TelaNomeada } from "./TelaNomeada";
 import { TelaNovaReserva } from "./TelaNovaReserva";
@@ -121,7 +122,11 @@ export function Casca() {
         {DESTINOS.map((destino) => (
           <Route
             key={destino.id}
-            path={caminhoRelativo(destino.caminho)}
+            path={
+              destino.id === "ficha"
+                ? "/ficha/:idReserva?"
+                : caminhoRelativo(destino.caminho)
+            }
             element={
               sessao && !destino.perfis.includes(sessao.perfil) ? (
                 <Navigate
@@ -134,6 +139,8 @@ export function Casca() {
                 <TelaFila />
               ) : destino.id === "reserva" ? (
                 <TelaNovaReserva />
+              ) : destino.id === "ficha" ? (
+                <TelaFicha />
               ) : (
                 <TelaNomeada titulo={destino.titulo} compacto={compacto} />
               )

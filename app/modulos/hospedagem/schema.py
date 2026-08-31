@@ -48,6 +48,18 @@ class ContagemChegadasResposta(BaseModel):
     quantidade: int
 
 
+class FichaTitularEntrada(BaseModel):
+    nome_completo: str = Field(min_length=1, max_length=160)
+    telefone: str = Field(min_length=1, max_length=40)
+    profissao: str | None = None
+    data_nascimento: date | None = None
+    tipo_documento: str | None = None
+    numero_documento: str | None = None
+    endereco: str | None = None
+    cep: str | None = None
+    cidade: str | None = None
+
+
 class FichaTitularResposta(BaseModel):
     id_reserva: int
     id_hospede: int

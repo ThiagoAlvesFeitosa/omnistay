@@ -7,9 +7,9 @@
 
 ## Onde paramos
 
-**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1–F7.3 feitas em 26–27/08/2026. **F8.1** (casca) e **F8.2** (fila do dia e cadastro de reserva) feitas em 31/08/2026.
+**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1–F7.3 feitas em 26–27/08/2026. **F8.1** (casca), **F8.2** (fila do dia e cadastro de reserva) e **F8.3** (ficha do hóspede e transcrição para o PMS) feitas em 31/08/2026.
 
-**Progresso:** 24 de 24 do backlog original; F7.1, F7.2, F7.3, **F8.1** e **F8.2** do plano de uma semana concluídas.
+**Progresso:** 24 de 24 do backlog original; F7.1, F7.2, F7.3, **F8.1**, **F8.2** e **F8.3** do plano de uma semana concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -42,6 +42,7 @@
 | F7.3 Linha de convite no recado | ✅ Concluída — quarto slot `boas_vindas_convite` na mesma rota GET/PUT `/propriedade/boas-vindas`; recado termina com o texto da casa; aviso da F7.1 imediatamente antes; tupla da porta com cinco variáveis; omissão na fila e recuperação pela janela já existente; semente no bootstrap e na revisão `0023_convite_boas_vindas`. Sem tela React (F8.6). Aprovação do template Meta de cinco parâmetros é passo humano |
 | F8.1 Casca do painel e login | ✅ Concluída — SPA em `/app` (Vite + React Router + Tailwind); cookie `omnistay_sessao` com `Secure` só em HTTPS; entrada única; casa por perfil (`/app/fila`, `/app/chamados`, `/app/indicadores`); menu filtrado; simulador como rota sem segundo login. Sem operação nova na matriz, sem migração, sem Playwright |
 | F8.2 Fila do dia e cadastro de reserva | ✅ Concluída — `TelaFila` lista o `GET /fila-do-dia`; resumo em partição (hoje · hospedados · vencidas); cadastro de três campos (`POST /reservas`, sem e-mail); **Confirmar chegada** só no botão da linha elegível; pendências com rótulos distintos; staff/gestão redirecionados sem disparar GET/POST. Sem Playwright, sem PMS, sem confirmar saída, sem migração |
+| F8.3 Ficha do hóspede e transcrição | ✅ Concluída — `TelaFicha` em `/app/ficha/:idReserva`; **Ver ficha** na fila; `PUT /reservas/{id}/ficha` (operação já existente); gatilho `ficha_parcial` ↔ `ficha_recebida` (revisão `0024`); **Copiar tudo** (uma variação, texto rotulado no cliente); consentimento vigente/revogar com `origem: painel`. Sem e-mail, sem foto, sem idade persistida, sem envio ao PMS. Ordem configurável e cópia campo a campo continuam fora |
 | Demais fatias | Nenhuma pendente no backlog original. Não há F2.3 nem F3.9 |
 
 ## A demonstração à banca — como funciona
@@ -100,16 +101,17 @@ de e-mail (F7.5) e telas de gestão/mercado/usuários/retenção (F8.7).
 
 ## O que falta para o sistema ser usável (31/08/2026)
 
-O backend está inteiro: 29 operações autorizadas, 23 revisões de esquema, worker, fila, webhook
+O backend está inteiro: 29 operações autorizadas, 24 revisões de esquema, worker, fila, webhook
 e cérebro real (F7.1) com tom configurável (F7.2) e convite editável no recado (F7.3). A **casca
-do painel** (F8.1) e a **fila do dia com cadastro e confirmação de chegada** (F8.2) existem.
-Chamados, catálogo, ficha, consumos e saída no React ainda são só título — F8.3 em diante.
+do painel** (F8.1), a **fila do dia com cadastro e confirmação de chegada** (F8.2) e a **ficha
+do hóspede com copiar tudo e consentimento** (F8.3) existem.
+Chamados, catálogo, consumos e saída no React ainda são só título — F8.4 em diante.
 
 ### 1. Telas operacionais ainda incompletas
 
 A casca (login, menu por perfil, Sair, simulador como rota) está em `/app`. A recepção já vê o
-turno, cadastra reserva e confirma chegada na lista. Ainda não abre ficha, chamado, catálogo
-nem saída pelo React: isso é F8.3–F8.6. O `/docs` do FastAPI continua sendo o caminho para
+turno, cadastra reserva, confirma chegada e abre a ficha do titular (completar no balcão, copiar
+tudo, consentimento). Ainda não abre chamado, catálogo nem saída pelo React: isso é F8.4–F8.6. O `/docs` do FastAPI continua sendo o caminho para
 exercitar a API além dessas telas.
 
 **Decisão (26/08/2026): construir do zero, em fatias novas.** O protótipo do Replit
@@ -174,7 +176,7 @@ commit.
 > O estado mora nos arquivos — spec, plano, tarefas, código e este documento —, nunca no
 > histórico da conversa.
 
-**Próximos passos, em ordem:** F8.3 (ficha do hóspede e transcrição para o PMS) → F8.4–F8.6 →
+**Próximos passos, em ordem:** F8.4 (chamados, pedidos e a tela da equipe) → F8.5–F8.6 →
 implantação em nuvem, que o ADR-008 deixou deliberadamente adiada para ser decidida contra um
 sistema funcionando.
 
@@ -379,7 +381,7 @@ visível, mas não a eliminam. Isso é assumido no documento.
 | Nomenclatura do extrato | **Nunca "extrato" nem "conta"** — o rótulo é "pedidos feitos pelo chat" |
 | Oferta de retorno | **Fora do MVP.** Consentimento coletado na pesquisa de checkout, com data |
 | Templates de boas-vindas | Boas-vindas e oferta comercial em templates **separados** |
-| Auxílios de transcrição | Copiar ficha e ordem configurável = evolução futura, após testar colagem no PMS |
+| Auxílios de transcrição | **Copiar tudo** (uma variação, nove linhas rotuladas no cliente) entrou na F8.3. A linha original “copiar ficha = evolução futura” ficou desatualizada: o que continua fora é ordem configurável e cópia campo a campo. Colar no sistema de gestão do hotel segue trabalho humano — o OmniStay não envia ao PMS | F8.3 |
 | Pedidos pelo chat | Duas naturezas: **serviço operacional** (toalha) e **consumo faturável** (bar, lavanderia). Só o faturável aparece no checkout |
 | Chamados e pedidos | Tabela única `solicitacao` com `tipo`; consumo faturável em tabela filha especializada |
 | Retenção de dados | Ficha cadastral 5 anos após checkout · conversas 12 meses · expurgo automático |
