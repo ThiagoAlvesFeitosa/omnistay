@@ -14,10 +14,12 @@ import { definirManipulador401, obterAtual, sair } from "./sessao";
 import { TelaAlertas } from "./TelaAlertas";
 import { TelaChamados } from "./TelaChamados";
 import { TelaEntrada } from "./TelaEntrada";
+import { TelaConsumos } from "./TelaConsumos";
 import { TelaFicha } from "./TelaFicha";
 import { TelaFila } from "./TelaFila";
 import { TelaNomeada } from "./TelaNomeada";
 import { TelaNovaReserva } from "./TelaNovaReserva";
+import { TelaSaida } from "./TelaSaida";
 
 export function Casca() {
   const [carregando, setCarregando] = useState(true);
@@ -127,7 +129,9 @@ export function Casca() {
             path={
               destino.id === "ficha"
                 ? "/ficha/:idReserva?"
-                : caminhoRelativo(destino.caminho)
+                : destino.id === "saida"
+                  ? "/saida/:idReserva?"
+                  : caminhoRelativo(destino.caminho)
             }
             element={
               sessao && !destino.perfis.includes(sessao.perfil) ? (
@@ -145,6 +149,10 @@ export function Casca() {
                 <TelaFicha />
               ) : destino.id === "alertas" ? (
                 <TelaAlertas />
+              ) : destino.id === "consumos" ? (
+                <TelaConsumos />
+              ) : destino.id === "saida" ? (
+                <TelaSaida />
               ) : destino.id === "chamados" ? (
                 <TelaChamados />
               ) : (

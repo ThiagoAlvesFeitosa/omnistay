@@ -89,6 +89,10 @@ export function destinoPorCaminho(pathname: string): Destino | undefined {
   if (ficha && (absoluto === ficha.caminho || absoluto.startsWith(`${ficha.caminho}/`))) {
     return ficha;
   }
+  const saida = DESTINOS.find((destino) => destino.id === "saida");
+  if (saida && (absoluto === saida.caminho || absoluto.startsWith(`${saida.caminho}/`))) {
+    return saida;
+  }
   return DESTINOS.find((destino) => destino.caminho === absoluto);
 }
 

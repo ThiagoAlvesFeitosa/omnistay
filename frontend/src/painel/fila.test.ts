@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { chegadaAdmiteBotao, resumirTurno, type ItemFila } from "./fila";
+import { chegadaAdmiteBotao, resumirTurno, saidaAdmiteCaminho, type ItemFila } from "./fila";
 
 function item(parcial: Partial<ItemFila> & { id_reserva: number }): ItemFila {
   return {
@@ -12,6 +12,7 @@ function item(parcial: Partial<ItemFila> & { id_reserva: number }): ItemFila {
     estado_cadastro: "aguardando",
     chegada_nao_confirmada: false,
     boas_vindas_nao_enviadas: false,
+    saida_nao_confirmada: false,
     ...parcial,
   };
 }
@@ -69,6 +70,34 @@ describe("resumirTurno", () => {
       }),
     ];
     expect(resumirTurno(lista)).toEqual({ hoje: 0, hospedados: 1, vencidas: 0 });
+  });
+});
+
+describe("saidaAdmiteCaminho", () => {
+  it("admite só em hospedado", () => {
+    expect(saidaAdmiteCaminho("hospedado")).toBe(true);
+  });
+
+  it.each(["ficha_recebida", "ficha_parcial", "aguardando_cadastro", "encerrado"] as const)(
+    "recusa em %s",
+    (status) => {
+      expect(saidaAdmiteCaminho(status)).toBe(false);
+    },
+  );
+});
+
+describe("resumirTurno não ganha quarta conta", () => {
+  it("hospedado com saída não confirmada continua só nas três partições", () => {
+    const lista = [
+      item({
+        id_reserva: 5,
+        status: "hospedado",
+        estado_cadastro: "completa",
+        saida_nao_confirmada: true,
+      }),
+    ];
+    expect(resumirTurno(lista)).toEqual({ hoje: 0, hospedados: 1, vencidas: 0 });
+    expect(Object.keys(resumirTurno(lista))).toEqual(["hoje", "hospedados", "vencidas"]);
   });
 });
 

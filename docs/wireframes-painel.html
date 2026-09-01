@@ -153,7 +153,7 @@ ul.enxuta li{margin-bottom:4px}
         <td>24/08</td><td>26/08 <span class="tag">hoje</span></td>
         <td><span class="tag verde">hospedado</span></td>
         <td><span class="tag verde">completa</span></td>
-        <td style="text-align:right"><span class="bt min sec">Confirmar saída</span></td>
+        <td style="text-align:right"><span class="bt min sec">Abrir saída</span></td>
       </tr>
       <tr>
         <td><strong>Júlia Manso</strong><br><span class="legenda">+55 11 96••••-7788</span></td>
@@ -171,6 +171,7 @@ ul.enxuta li{margin-bottom:4px}
       <li><span class="tag vermelha">não confirmada</span> — a data de entrada passou e ninguém clicou. É a detecção de divergência temporal do Artefato 2: o sistema não sabe que o hóspede chegou, mas sabe que ele deveria ter chegado.</li>
       <li><span class="tag vermelha">recado não enviado</span> — os três textos de boas-vindas estavam vazios na hora da chegada. Preencher e o worker recupera sozinho, dentro de 12 horas.</li>
       <li><span class="tag">parcial</span> — o hóspede respondeu só parte da lista. Completa-se no balcão, sem nova rodada de mensagens.</li>
+      <li><strong>Chegada confirma no clique; saída não.</strong> Chegada não tem o que conferir — o hóspede está no balcão. Saída tem a lista de pedidos pelo chat e o aviso de consumo pendente, e depois do checkout ninguém volta naquela conta. Por isso o controle da linha hospedada apenas <em>abre</em> a tela de saída.</li>
     </ul>
     Endpoints: <code>GET /fila-do-dia</code> · <code>POST /reservas/{id}/chegada</code> · <code>POST /reservas/{id}/saida</code>
   </div>
@@ -243,9 +244,9 @@ ul.enxuta li{margin-bottom:4px}
 
   <div class="quadro">
     <table>
-      <tr><th>Quando</th><th>Hóspede</th><th>O quê</th><th>Tipo</th><th>Canal</th><th>Atribuído</th><th style="text-align:right">Ação</th></tr>
+      <tr><th>Quando</th><th>Onde</th><th>O quê</th><th>Tipo</th><th>Canal</th><th>Atribuído</th><th style="text-align:right">Ação</th></tr>
       <tr class="destaque">
-        <td>14:32<br><span class="legenda">há 8 min</span></td><td>Júlia Manso<br><span class="legenda">quarto 304</span></td>
+        <td>14:32<br><span class="legenda">há 8 min</span></td><td><strong>Quarto 304</strong><br><span class="legenda">reserva #1087</span></td>
         <td>Ar-condicionado não está gelando</td>
         <td><span class="tag vermelha">reclamação</span></td>
         <td><span class="tag">WhatsApp</span></td>
@@ -253,21 +254,21 @@ ul.enxuta li{margin-bottom:4px}
         <td style="text-align:right"><span class="bt min">Abrir</span></td>
       </tr>
       <tr>
-        <td>14:20</td><td>Carlos Beltrão<br><span class="legenda">quarto 210</span></td>
+        <td>14:20</td><td><strong>Quarto 210</strong><br><span class="legenda">reserva #1042</span></td>
         <td>Toalha extra</td><td><span class="tag">serviço</span></td>
         <td><span class="tag">WhatsApp</span></td>
         <td><span class="tag">Governança</span></td>
         <td style="text-align:right"><span class="bt min">Abrir</span></td>
       </tr>
       <tr>
-        <td>13:58</td><td>Ana Prado<br><span class="legenda">quarto 512</span></td>
+        <td>13:58</td><td><strong>Quarto 512</strong><br><span class="legenda">reserva #1090</span></td>
         <td>2 caipirinhas · R$ 56,00</td><td><span class="tag">consumo</span></td>
         <td><span class="tag">WhatsApp</span></td>
         <td><span class="tag">Bar</span></td>
         <td style="text-align:right"><span class="bt min">Abrir</span></td>
       </tr>
       <tr>
-        <td>13:31</td><td>Rafael Nunes</td>
+        <td>13:31</td><td><strong>sem quarto</strong><br><span class="legenda">reserva #1091</span></td>
         <td>Pergunta fora do catálogo: "tem berço?"</td>
         <td><span class="tag">atender</span></td><td><span class="tag">E-mail</span></td><td>—</td>
         <td style="text-align:right"><span class="bt min">Responder</span></td>
@@ -275,7 +276,7 @@ ul.enxuta li{margin-bottom:4px}
     </table>
   </div>
 
-  <div class="rodape">Reclamação tem o recebimento confirmado ao hóspede <strong>imediatamente</strong>, antes de qualquer tramitação. A resposta sai sempre <strong>pelo canal em que o hóspede escreveu</strong>. Endpoints: <code>GET /solicitacoes</code> · <code>POST /solicitacoes/{id}/resolucao</code></div>
+  <div class="rodape"><strong>Sem nome do hóspede na lista.</strong> O mesmo endpoint serve a recepção, a equipe e a gestão, e "equipe não vê dado cadastral" é critério de aceite. Cada linha leva à reserva, e é por ali que a recepção chega ao nome — inclusive quando não há número de quarto, que é campo opcional.<br><br>Reclamação tem o recebimento confirmado ao hóspede <strong>imediatamente</strong>, antes de qualquer tramitação. A resposta sai sempre <strong>pelo canal em que o hóspede escreveu</strong>. Endpoints: <code>GET /solicitacoes</code> · <code>POST /solicitacoes/{id}/resolucao</code></div>
 </section>
 
 <!-- CONSUMOS -->
@@ -290,12 +291,12 @@ ul.enxuta li{margin-bottom:4px}
 
   <div class="quadro">
     <table>
-      <tr><th>Quando</th><th>Hóspede</th><th>Item</th><th>Valor</th><th style="text-align:right">Ação</th></tr>
-      <tr class="destaque"><td>24/08 21:10</td><td>Carlos Beltrão</td><td>Lavanderia — 1 camisa</td><td>R$ 32,00</td>
+      <tr><th>Quando</th><th>Onde</th><th>Item</th><th>Valor</th><th style="text-align:right">Ação</th></tr>
+      <tr class="destaque"><td>24/08 21:10</td><td>Quarto 210</td><td>Lavanderia — 1 camisa</td><td>R$ 32,00</td>
         <td style="text-align:right"><span class="bt min">Marcar lançado</span> <span class="bt min sec">Dispensar</span></td></tr>
-      <tr><td>26/08 13:58</td><td>Ana Prado</td><td>2 caipirinhas</td><td>R$ 56,00</td>
+      <tr><td>26/08 13:58</td><td>Quarto 512</td><td>2 caipirinhas</td><td>R$ 56,00</td>
         <td style="text-align:right"><span class="bt min">Marcar lançado</span> <span class="bt min sec">Dispensar</span></td></tr>
-      <tr><td>26/08 12:04</td><td>Júlia Manso</td><td>Impressão — 8 páginas</td><td>R$ 44,00</td>
+      <tr><td>26/08 12:04</td><td>Quarto 304</td><td>Impressão — 8 páginas</td><td>R$ 44,00</td>
         <td style="text-align:right"><span class="bt min">Marcar lançado</span> <span class="bt min sec">Dispensar</span></td></tr>
     </table>
   </div>

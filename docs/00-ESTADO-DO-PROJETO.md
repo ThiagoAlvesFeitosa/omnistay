@@ -7,9 +7,9 @@
 
 ## Onde paramos
 
-**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1–F7.3 feitas em 26–27/08/2026. **F8.1** (casca), **F8.2** (fila do dia e cadastro de reserva), **F8.3** (ficha do hóspede e transcrição para o PMS) e **F8.4** (chamados, pedidos e a tela da equipe) feitas em 31/08/2026.
+**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1–F7.3 feitas em 26–27/08/2026. **F8.1** (casca), **F8.2** (fila do dia e cadastro de reserva), **F8.3** (ficha do hóspede e transcrição para o PMS), **F8.4** (chamados, pedidos e a tela da equipe) e **F8.5** (consumos a lançar e saída do hóspede) feitas em 31/08/2026.
 
-**Progresso:** 24 de 24 do backlog original; F7.1, F7.2, F7.3, **F8.1**, **F8.2**, **F8.3** e **F8.4** do plano de uma semana concluídas.
+**Progresso:** 24 de 24 do backlog original; F7.1, F7.2, F7.3, **F8.1**, **F8.2**, **F8.3**, **F8.4** e **F8.5** do plano de uma semana concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -44,6 +44,7 @@
 | F8.2 Fila do dia e cadastro de reserva | ✅ Concluída — `TelaFila` lista o `GET /fila-do-dia`; resumo em partição (hoje · hospedados · vencidas); cadastro de três campos (`POST /reservas`, sem e-mail); **Confirmar chegada** só no botão da linha elegível; pendências com rótulos distintos; staff/gestão redirecionados sem disparar GET/POST. Sem Playwright, sem PMS, sem confirmar saída, sem migração |
 | F8.3 Ficha do hóspede e transcrição | ✅ Concluída — `TelaFicha` em `/app/ficha/:idReserva`; **Ver ficha** na fila; `PUT /reservas/{id}/ficha` (operação já existente); gatilho `ficha_parcial` ↔ `ficha_recebida` (revisão `0024`); **Copiar tudo** (uma variação, texto rotulado no cliente); consentimento vigente/revogar com `origem: painel`. Sem e-mail, sem foto, sem idade persistida, sem envio ao PMS. Ordem configurável e cópia campo a campo continuam fora |
 | F8.4 Chamados, pedidos e a tela da equipe | ✅ Concluída — `TelaAlertas` (`GET /solicitacoes`, **Ver ficha**, **Resolvido**) e `TelaChamados` compacta (três naturezas, sem ficha, **Resolvido**). POST `/solicitacoes/{id}/resolucao` sem diálogo; 409 visível. Sem nome na lista; perfil cruzado redirecionado sem GET alheio. Sem lançar consumo, sem Playwright, sem PMS, sem migração |
+| F8.5 Consumos a lançar e saída do hóspede | ✅ Concluída — `TelaConsumos` (`GET /consumos/pendentes`, **Marcar lançado**, **Dispensar**, **Ver ficha**, sem nome na linha) e `TelaSaida` (`/saida/:idReserva?`, **Pedidos feitos pelo chat**, aviso de pendência da casa, **Confirmar saída**). Fila do dia: link **Saída** no hospedado e destaque `saida_nao_confirmada`. Sem status por item na lista da saída (fica para depois da semana). Sem Playwright, sem PMS, sem migração, sem operação nova |
 | Demais fatias | Nenhuma pendente no backlog original. Não há F2.3 nem F3.9 |
 
 ## A demonstração à banca — como funciona
@@ -105,17 +106,17 @@ de e-mail (F7.5) e telas de gestão/mercado/usuários/retenção (F8.7).
 O backend está inteiro: 29 operações autorizadas, 24 revisões de esquema, worker, fila, webhook
 e cérebro real (F7.1) com tom configurável (F7.2) e convite editável no recado (F7.3). A **casca
 do painel** (F8.1), a **fila do dia com cadastro e confirmação de chegada** (F8.2), a **ficha
-do hóspede com copiar tudo e consentimento** (F8.3) e **Chamados e pedidos / Meus chamados**
-(F8.4) existem.
-Catálogo, consumos a lançar e saída no React ainda são só título — F8.5 em diante.
+do hóspede com copiar tudo e consentimento** (F8.3), **Chamados e pedidos / Meus chamados**
+(F8.4) e **consumos a lançar / saída do hóspede** (F8.5) existem.
+Catálogo, itens vendáveis e recado de boas-vindas no React ainda são só título — F8.6.
 
 ### 1. Telas operacionais ainda incompletas
 
 A casca (login, menu por perfil, Sair, simulador como rota) está em `/app`. A recepção já vê o
 turno, cadastra reserva, confirma chegada e abre a ficha do titular (completar no balcão, copiar
-tudo, consentimento) e resolve chamado/pedido no React (F8.4). Ainda não abre catálogo nem
-saída pelo React: isso é F8.5–F8.6. O `/docs` do FastAPI continua sendo o caminho para
-exercitar a API além dessas telas.
+tudo, consentimento) e resolve chamado/pedido no React (F8.4). Lança e dispensa consumo e
+confirma a saída pelo React (F8.5). Ainda não abre catálogo pelo React: isso é F8.6. O `/docs`
+do FastAPI continua sendo o caminho para exercitar a API além dessas telas.
 
 **Decisão (26/08/2026): construir do zero, em fatias novas.** O protótipo do Replit
 (`OmniStay Replit.zip`) tem cinco telas — painel, mercado, simulador, alertas e conversas —, todas
@@ -179,7 +180,7 @@ commit.
 > O estado mora nos arquivos — spec, plano, tarefas, código e este documento —, nunca no
 > histórico da conversa.
 
-**Próximos passos, em ordem:** F8.5 (catálogo, itens vendáveis e recado de boas-vindas) → F8.6 →
+**Próximos passos, em ordem:** F8.6 (catálogo, itens vendáveis e recado de boas-vindas) → F8.7 →
 implantação em nuvem, que o ADR-008 deixou deliberadamente adiada para ser decidida contra um
 sistema funcionando.
 
@@ -308,13 +309,14 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Tom da assistente | Chave `personalidade_assistente` (vazio = voz padrão). Só `responder_duvida` recebe `tom`; gestão grava, recepção lê; injeção = `nao_fiel` | F7.2 |
 | Convite no recado | Chave `boas_vindas_convite`; última linha do recado; PUT atômico dos quatro slots; omissão = fila `boas_vindas_nao_enviadas`; semente no bootstrap e na `0023` | F7.3 |
 | Tela `/simulador` | Cookie + `usar_simulador` (recepção e gestão). Modo `real` → `409` `modo_real`, não `403`. Outro hotel → `404`. Sem HMAC | F6.2 |
-| Frontend da banca | `frontend/` Vite+React+Router+Tailwind; SPA em `/app` se existir `frontend/dist`; `/demo` → `/app/simulador`. Casca e login na F8.1; fila/reserva/chegada na F8.2; ficha na F8.3; chamados da recepção e da equipe na F8.4; demais telas nomeadas só com título | F6.2 + F8.1 + F8.2 + F8.3 + F8.4 |
+| Frontend da banca | `frontend/` Vite+React+Router+Tailwind; SPA em `/app` se existir `frontend/dist`; `/demo` → `/app/simulador`. Casca e login na F8.1; fila/reserva/chegada na F8.2; ficha na F8.3; chamados da recepção e da equipe na F8.4; consumos e saída na F8.5; demais telas nomeadas só com título | F6.2 + F8.1 + F8.2 + F8.3 + F8.4 + F8.5 |
 | SPA em `/app`, não em `/` | `GET /fila-do-dia` já existe. Montar o React na raiz faria o primeiro clique na fila acertar JSON, não HTML. Casas: `/app/fila` (recepção), `/app/chamados` (staff), `/app/indicadores` (gestão) | F8.1 |
 | Cookie `Secure` condicional | F0.3 mandava `Secure` sempre. O `TestClient` usa `https://testserver`, então a suíte antiga ficou verde enquanto o Chrome em `http://127.0.0.1` descartava o cookie e o login “não entra”. `_definir_cookie` olha `pedido.url.scheme` | F8.1 |
 | Fallback da SPA | O plano previa `StaticFiles(html=True)`. Starlette devolve **404** em `/app/entrar` (procura o arquivo `entrar`, não cai no `index.html` da raiz). `criar_aplicacao` serve o arquivo real se existir; senão `index.html`. Dist ausente: as rotas `/app` nem registram — a API sobe igual. `/app` entra em `PREFIXOS_IGNORADOS` das rotas protegidas | F8.1 |
 | Sem operação nova na matriz | Login reusa `POST/GET/DELETE /sessoes`. Não existe `ver_painel`. Telas nomeadas não chamam fila, chamado nem KPI (F8.2+) | F8.1 |
-| Fila e reserva no React | Casa da recepção: `GET /fila-do-dia`; cadastro: `POST /reservas` (nome, telefone, datas); chegada: `POST /reservas/{id}/chegada` e GET de novo. Resumo é partição das linhas, não `GET /indicadores/chegadas-do-dia`. Staff/gestão redirecionados sem disparar esses pedidos. Sem e-mail no form, sem confirmar saída | F8.2 |
-| Chamados no React | Recepção: `TelaAlertas` lista `GET /solicitacoes`, **Ver ficha**, **Resolvido**. Equipe: `TelaChamados` compacta, três naturezas, sem ficha. POST resolução sem diálogo; 409 visível. Sem nome na lista; sem lançar consumo (F8.5) | F8.4 |
+| Fila e reserva no React | Casa da recepção: `GET /fila-do-dia`; cadastro: `POST /reservas` (nome, telefone, datas); chegada: `POST /reservas/{id}/chegada` e GET de novo. Resumo é partição das linhas, não `GET /indicadores/chegadas-do-dia`. Staff/gestão redirecionados sem disparar esses pedidos. Sem e-mail no form. F8.5 acrescenta o link **Saída** (navega; não posta) | F8.2 + F8.5 |
+| Chamados no React | Recepção: `TelaAlertas` lista `GET /solicitacoes`, **Ver ficha**, **Resolvido**. Equipe: `TelaChamados` compacta, três naturezas, sem ficha. POST resolução sem diálogo; 409 visível. Sem nome na lista | F8.4 |
+| Consumos e saída no React | `TelaConsumos`: GET pendentes, **Marcar lançado** / **Dispensar**, **Ver ficha**, sem nome. `TelaSaida`: quatro GET, lista **Pedidos feitos pelo chat**, aviso para `/consumos` da casa, **Confirmar saída** só se hospedado. Status por item na lista da saída **não** entra nesta fatia — a consulta cobrável não traz `status_lancamento`; fica para depois da semana. Sem PMS | F8.5 |
 
 ## Onde ficam os arquivos
 

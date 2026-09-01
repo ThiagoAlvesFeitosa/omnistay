@@ -42,6 +42,23 @@ function fetchPorPerfil(perfil: string, nome = "Funcionário") {
     if (url === "/solicitacoes" && metodo === "GET") {
       return json({ itens: [] });
     }
+    if (url === "/consumos/pendentes" && metodo === "GET") {
+      return json({ itens: [] });
+    }
+    if (metodo === "GET" && /\/reservas\/\d+\/ficha$/.test(url)) {
+      return json({
+        id_reserva: 1,
+        id_hospede: 1,
+        ficha_completa: true,
+        status_reserva: "encerrado",
+        estado_cadastro: "completa",
+        nome_completo: "",
+        telefone: "",
+      });
+    }
+    if (metodo === "GET" && String(url).includes("pedidos-feitos-pelo-chat")) {
+      return json({ itens: [], total: 0 });
+    }
     if (url === "/reservas" && metodo === "POST") {
       return json(
         {
@@ -310,6 +327,33 @@ describe("Casca", () => {
       );
       expect(operacionais).toHaveLength(0);
       reserva.unmount();
+    }
+  });
+
+  it("staff e gestão em consumos ou saída não vêem as telas nem disparam GET/POST", async () => {
+    for (const perfil of ["staff", "gestor"] as const) {
+      const casa = perfil === "staff" ? "Meus chamados" : "Painel";
+      for (const rota of ["/app/consumos", "/app/saida", "/app/saida/1"] as const) {
+        const fetchMock = fetchPorPerfil(perfil);
+        vi.stubGlobal("fetch", fetchMock);
+        const visao = renderCasca(rota);
+        expect(await screen.findByRole("heading", { name: casa })).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "Consumos a lançar" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "Saída do hóspede" })).not.toBeInTheDocument();
+        const alheios = fetchMock.mock.calls.filter((chamada) => {
+          const url = String(chamada[0]);
+          const metodo = (chamada[1]?.method ?? "GET").toUpperCase();
+          return (
+            url === "/consumos/pendentes" ||
+            url.includes("pedidos-feitos-pelo-chat") ||
+            /\/reservas\/\d+\/ficha$/.test(url) ||
+            (metodo === "POST" &&
+              (url.includes("/lancamento") || url.includes("/dispensa") || /\/reservas\/\d+\/saida$/.test(url)))
+          );
+        });
+        expect(alheios).toHaveLength(0);
+        visao.unmount();
+      }
     }
   });
 });

@@ -21,6 +21,7 @@ function item(parcial: Partial<ItemFila> & { id_reserva: number; nome: string })
     estado_cadastro: "aguardando",
     chegada_nao_confirmada: false,
     boas_vindas_nao_enviadas: false,
+    saida_nao_confirmada: false,
     ...parcial,
   };
 }
@@ -254,5 +255,56 @@ describe("TelaFila", () => {
     expect(
       fetchMock.mock.calls.filter((chamada) => String(chamada[0]).includes("/chegada")),
     ).toHaveLength(0);
+  });
+
+  it("hospedado tem caminho Saída e não confirma no mesmo gesto", async () => {
+    const fetchMock = fetchFila([
+      item({ id_reserva: 12, nome: "Já no hotel", status: "hospedado", estado_cadastro: "completa" }),
+      item({ id_reserva: 10, nome: "Elegível", status: "ficha_recebida", estado_cadastro: "completa" }),
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    renderFila();
+    const saida = await screen.findByRole("link", { name: "Saída" });
+    expect(saida).toHaveAttribute("href", expect.stringMatching(/\/saida\/12$/));
+    expect(screen.queryByRole("button", { name: "Confirmar saída" })).not.toBeInTheDocument();
+    expect(screen.getByText("Elegível").closest("tr")?.querySelector('a[href*="/saida/"]')).toBeNull();
+    fireEvent.click(saida);
+    expect(
+      fetchMock.mock.calls.filter((chamada) => String(chamada[0]).includes("/saida")),
+    ).toHaveLength(0);
+  });
+
+  it("saída não confirmada tem rótulo distinto da chegada vencida e o resumo segue em três contas", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchFila([
+        item({
+          id_reserva: 40,
+          nome: "Checkout atrasado",
+          status: "hospedado",
+          estado_cadastro: "completa",
+          saida_nao_confirmada: true,
+        }),
+        item({
+          id_reserva: 41,
+          nome: "Chegada vencida",
+          status: "ficha_recebida",
+          estado_cadastro: "completa",
+          chegada_nao_confirmada: true,
+        }),
+      ]),
+    );
+    renderFila();
+    expect(await screen.findByText("saída não confirmada")).toBeInTheDocument();
+    expect(screen.getByText("não confirmada")).toBeInTheDocument();
+    const atrasado = screen.getByText("Checkout atrasado").closest("tr");
+    expect(atrasado).toHaveTextContent("saída não confirmada");
+    expect(atrasado).not.toHaveTextContent("recado não enviado");
+    expect(screen.getByText("Chegada vencida").closest("tr")).toHaveTextContent("não confirmada");
+    expect(screen.getByText("Chegada vencida").closest("tr")).not.toHaveTextContent("saída não confirmada");
+    expect(screen.getByText(/0 hoje sem confirmar/)).toBeInTheDocument();
+    expect(screen.getByText(/1 hospedados/)).toBeInTheDocument();
+    expect(screen.getByText(/1 entrada vencida/)).toBeInTheDocument();
+    expect(screen.queryByText(/saída vencida/i)).not.toBeInTheDocument();
   });
 });

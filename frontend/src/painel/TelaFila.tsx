@@ -4,7 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { cn } from "../lib/utils";
 import { pedirAutenticado } from "./sessao";
-import { chegadaAdmiteBotao, resumirTurno, type ItemFila } from "./fila";
+import { chegadaAdmiteBotao, resumirTurno, saidaAdmiteCaminho, type ItemFila } from "./fila";
 
 type Estado = "carregando" | "ok" | "falha";
 
@@ -142,6 +142,11 @@ export function TelaFila() {
                       não confirmada
                     </span>
                   ) : null}
+                  {linha.saida_nao_confirmada ? (
+                    <span className="ml-2 rounded bg-orange-100 px-1.5 py-0.5 text-orange-900">
+                      saída não confirmada
+                    </span>
+                  ) : null}
                   {linha.boas_vindas_nao_enviadas ? (
                     <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-amber-900">
                       recado não enviado
@@ -160,6 +165,11 @@ export function TelaFila() {
                     <Link to={`/ficha/${linha.id_reserva}`} className="text-sm underline">
                       Ver ficha
                     </Link>
+                    {saidaAdmiteCaminho(linha.status) ? (
+                      <Link to={`/saida/${linha.id_reserva}`} className="text-sm underline">
+                        Saída
+                      </Link>
+                    ) : null}
                     {chegadaAdmiteBotao(linha.status) ? (
                       <Button type="button" onClick={() => void confirmarChegada(linha.id_reserva)}>
                         Confirmar chegada

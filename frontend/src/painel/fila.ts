@@ -8,6 +8,7 @@ export type ItemFila = {
   estado_cadastro: string | null;
   chegada_nao_confirmada: boolean;
   boas_vindas_nao_enviadas: boolean;
+  saida_nao_confirmada: boolean;
 };
 
 export type ResumoTurno = {
@@ -38,4 +39,8 @@ export function chegadaAdmiteBotao(status: string): boolean {
     status === "ficha_parcial" ||
     status === "sem_cadastro_previo"
   );
+}
+
+export function saidaAdmiteCaminho(status: string): boolean {
+  return status === "hospedado";
 }
