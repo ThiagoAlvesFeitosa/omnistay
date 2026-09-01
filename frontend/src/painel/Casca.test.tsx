@@ -45,6 +45,15 @@ function fetchPorPerfil(perfil: string, nome = "Funcionário") {
     if (url === "/consumos/pendentes" && metodo === "GET") {
       return json({ itens: [] });
     }
+    if (url === "/catalogo" && metodo === "GET") {
+      return json({ itens: [] });
+    }
+    if (url === "/itens-vendaveis" && metodo === "GET") {
+      return json({ itens: [] });
+    }
+    if (url === "/propriedade/boas-vindas" && metodo === "GET") {
+      return json({ cafe: "", wifi: "", checkout: "", convite: "" });
+    }
     if (metodo === "GET" && /\/reservas\/\d+\/ficha$/.test(url)) {
       return json({
         id_reserva: 1,
@@ -179,11 +188,14 @@ describe("Casca", () => {
     expect(screen.queryByRole("link", { name: "Painel" })).not.toBeInTheDocument();
   });
 
-  it("menu da gestão omite fila e meus chamados, inclui simulador", async () => {
+  it("menu da gestão omite fila e meus chamados, inclui simulador e as três telas da casa", async () => {
     vi.stubGlobal("fetch", fetchPorPerfil("gestor"));
     renderCasca("/app/indicadores");
     expect(await screen.findByRole("heading", { name: "Painel" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Simulador" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Catálogo" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Itens vendáveis" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Recado de boas-vindas" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Fila do dia" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Meus chamados" })).not.toBeInTheDocument();
   });
@@ -195,12 +207,12 @@ describe("Casca", () => {
     expect(screen.queryByRole("heading", { name: "Meus chamados" })).not.toBeInTheDocument();
   });
 
-  it("recepção em /catalogo vê só o título Catálogo", async () => {
+  it("recepção em /catalogo vê o catálogo de manutenção", async () => {
     vi.stubGlobal("fetch", fetchPorPerfil("recepcao"));
     renderCasca("/app/catalogo");
     expect(await screen.findByRole("heading", { name: "Catálogo" })).toBeInTheDocument();
-    expect(screen.queryByRole("list")).not.toBeInTheDocument();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Horários" })).toBeInTheDocument();
+    expect(screen.getByText("Não há item nesta categoria.")).toBeInTheDocument();
   });
 
   it("simulador autenticado como recepção não pede e-mail", async () => {
@@ -327,6 +339,51 @@ describe("Casca", () => {
       );
       expect(operacionais).toHaveLength(0);
       reserva.unmount();
+    }
+  });
+
+  it("gestão lê catálogo e recado sem novo, desativar nem salvar", async () => {
+    const fetchMock = fetchPorPerfil("gestor");
+    vi.stubGlobal("fetch", fetchMock);
+    const catalogo = renderCasca("/app/catalogo");
+    expect(await screen.findByRole("heading", { name: "Catálogo" })).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(
+        (chamada) => chamada[0] === "/catalogo" && (chamada[1]?.method ?? "GET") === "GET",
+      ),
+    ).toBe(true);
+    expect(screen.queryByRole("button", { name: "+ Novo item" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Desativar" })).not.toBeInTheDocument();
+    catalogo.unmount();
+
+    const recado = renderCasca("/app/boas-vindas");
+    expect(await screen.findByRole("heading", { name: "Recado de boas-vindas" })).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(
+        (chamada) =>
+          chamada[0] === "/propriedade/boas-vindas" && (chamada[1]?.method ?? "GET") === "GET",
+      ),
+    ).toBe(true);
+    expect(screen.queryByRole("button", { name: "Salvar" })).not.toBeInTheDocument();
+    recado.unmount();
+  });
+
+  it("staff em catálogo, vendáveis ou recado cai na casa sem buscar essas listas", async () => {
+    for (const rota of ["/app/catalogo", "/app/vendaveis", "/app/boas-vindas"] as const) {
+      const fetchMock = fetchPorPerfil("staff");
+      vi.stubGlobal("fetch", fetchMock);
+      const visao = renderCasca(rota);
+      expect(await screen.findByRole("heading", { name: "Meus chamados" })).toBeInTheDocument();
+      const alheios = fetchMock.mock.calls.filter((chamada) => {
+        const url = String(chamada[0]);
+        return (
+          url === "/catalogo" ||
+          url === "/itens-vendaveis" ||
+          url === "/propriedade/boas-vindas"
+        );
+      });
+      expect(alheios).toHaveLength(0);
+      visao.unmount();
     }
   });
 

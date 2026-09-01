@@ -41,3 +41,14 @@ describe("destinoPorCaminho da saída", () => {
     expect(perfilPode("gestor", "/saida/1")).toBe(false);
   });
 });
+
+describe("catálogo, vendáveis e recado por perfil", () => {
+  it.each(["/app/catalogo", "/app/vendaveis", "/app/boas-vindas"] as const)(
+    "recepção e gestão podem %s; staff não",
+    (caminho) => {
+      expect(perfilPode("recepcao", caminho)).toBe(true);
+      expect(perfilPode("gestor", caminho)).toBe(true);
+      expect(perfilPode("staff", caminho)).toBe(false);
+    },
+  );
+});

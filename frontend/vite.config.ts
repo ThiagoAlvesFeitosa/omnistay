@@ -18,6 +18,7 @@ export default defineConfig({
       "/fila-do-dia": api,
       "/solicitacoes": api,
       "/catalogo": api,
+      "/itens-vendaveis": api,
       "/indicadores": api,
       "/propriedade": api,
       "/consumos": api,

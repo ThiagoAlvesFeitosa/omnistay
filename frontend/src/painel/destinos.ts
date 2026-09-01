@@ -24,18 +24,18 @@ export const DESTINOS: readonly Destino[] = [
     perfis: ["recepcao"],
   },
   { id: "saida", titulo: "Saída do hóspede", caminho: "/app/saida", perfis: ["recepcao"] },
-  { id: "catalogo", titulo: "Catálogo", caminho: "/app/catalogo", perfis: ["recepcao"] },
+  { id: "catalogo", titulo: "Catálogo", caminho: "/app/catalogo", perfis: ["recepcao", "gestor"] },
   {
     id: "vendaveis",
     titulo: "Itens vendáveis",
     caminho: "/app/vendaveis",
-    perfis: ["recepcao"],
+    perfis: ["recepcao", "gestor"],
   },
   {
     id: "boas-vindas",
     titulo: "Recado de boas-vindas",
     caminho: "/app/boas-vindas",
-    perfis: ["recepcao"],
+    perfis: ["recepcao", "gestor"],
   },
   { id: "chamados", titulo: "Meus chamados", caminho: "/app/chamados", perfis: ["staff"] },
   {
