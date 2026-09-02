@@ -48,6 +48,13 @@ class ContagemChegadasResposta(BaseModel):
     quantidade: int
 
 
+class IndicadoresResposta(BaseModel):
+    chegadas_hoje: int
+    hospedados: int
+    chamados_abertos: int
+    consumo_a_lancar: Decimal
+
+
 class FichaTitularEntrada(BaseModel):
     nome_completo: str = Field(min_length=1, max_length=160)
     telefone: str = Field(min_length=1, max_length=40)

@@ -285,4 +285,11 @@ def listar_retencao(
     execucoes = catalogo.listar_execucoes_retencao(
         conexao, id_hotel=sessao.id_hotel
     )
-    return ListaRetencaoResposta(execucoes=execucoes)
+    meses, anos = catalogo.prazos_retencao_vigentes(
+        conexao, id_hotel=sessao.id_hotel
+    )
+    return ListaRetencaoResposta(
+        execucoes=execucoes,
+        meses_retencao_conteudo_livre=meses,
+        anos_retencao_ficha=anos,
+    )

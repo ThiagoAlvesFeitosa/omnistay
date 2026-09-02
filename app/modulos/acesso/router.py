@@ -9,6 +9,7 @@ from app.modulos.acesso import dependencias, service as acesso_service
 from app.modulos.acesso.dependencias import Conexao, Sessao
 from app.modulos.acesso.schema import (
     CredenciaisDeEntrada,
+    ListaUsuariosResposta,
     SessaoAtualResposta,
     SessaoCriada,
     SessaoListada,
@@ -150,6 +151,29 @@ def revogar_sessao(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Sessao nao encontrada.",
         ) from erro
+
+
+@roteador.get("/usuarios", response_model=ListaUsuariosResposta)
+def listar_usuarios(
+    conexao: Conexao,
+    sessao: Annotated[
+        acesso_service.SessaoAtual,
+        Depends(dependencias.exigir_operacao("administrar_usuario")),
+    ],
+) -> ListaUsuariosResposta:
+    linhas = acesso_service.listar_usuarios(conexao, id_hotel=sessao.id_hotel)
+    return ListaUsuariosResposta(
+        usuarios=[
+            UsuarioResposta(
+                id_usuario=item.id_usuario,
+                nome=item.nome,
+                email=item.email,
+                perfil=item.perfil,
+                ativo=item.ativo,
+            )
+            for item in linhas
+        ]
+    )
 
 
 @roteador.post(

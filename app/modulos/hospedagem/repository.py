@@ -90,6 +90,17 @@ def contar_chegadas_do_dia(conexao: Connection, *, id_hotel: int) -> int:
     ).scalar_one()
 
 
+def contar_hospedados(conexao: Connection, *, id_hotel: int) -> int:
+    return conexao.execute(
+        text(
+            "SELECT COUNT(*) FROM reserva"
+            " WHERE id_hotel = :id_hotel"
+            " AND status = 'hospedado'"
+        ),
+        {"id_hotel": id_hotel},
+    ).scalar_one()
+
+
 def ler_titular_da_reserva(
     conexao: Connection,
     *,

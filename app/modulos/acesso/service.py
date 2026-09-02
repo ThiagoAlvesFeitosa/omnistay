@@ -116,6 +116,27 @@ def criar_usuario(
     )
 
 
+def listar_usuarios(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    repositorio=acesso_repository,
+) -> list[UsuarioCriado]:
+    linhas = list(repositorio.listar_usuarios_do_hotel(conexao, id_hotel=id_hotel))
+    linhas.sort(key=lambda linha: (linha["nome"], linha["id_usuario"]))
+    _logger.info("usuarios id_hotel=%s acao=listar", id_hotel)
+    return [
+        UsuarioCriado(
+            id_usuario=int(linha["id_usuario"]),
+            nome=linha["nome"],
+            email=linha["email"],
+            perfil=linha["perfil"],
+            ativo=bool(linha["ativo"]),
+        )
+        for linha in linhas
+    ]
+
+
 def desativar_usuario(
     conexao: Connection,
     *,

@@ -23,6 +23,10 @@ import { TelaSaida } from "./TelaSaida";
 import { TelaCatalogo } from "./TelaCatalogo";
 import { TelaVendaveis } from "./TelaVendaveis";
 import { TelaBoasVindas } from "./TelaBoasVindas";
+import { TelaPainel } from "./TelaPainel";
+import { TelaMercado } from "./TelaMercado";
+import { TelaUsuarios } from "./TelaUsuarios";
+import { TelaRetencao } from "./TelaRetencao";
 
 export function Casca() {
   const [carregando, setCarregando] = useState(true);
@@ -164,6 +168,14 @@ export function Casca() {
                 <TelaVendaveis somenteLeitura={sessao?.perfil === "gestor"} />
               ) : destino.id === "boas-vindas" ? (
                 <TelaBoasVindas somenteLeitura={sessao?.perfil === "gestor"} />
+              ) : destino.id === "indicadores" ? (
+                <TelaPainel />
+              ) : destino.id === "mercado" ? (
+                <TelaMercado />
+              ) : destino.id === "usuarios" ? (
+                <TelaUsuarios idUsuarioSessao={sessao?.id_usuario ?? 0} />
+              ) : destino.id === "retencao" ? (
+                <TelaRetencao />
               ) : (
                 <TelaNomeada titulo={destino.titulo} compacto={compacto} />
               )

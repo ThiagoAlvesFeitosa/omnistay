@@ -1,15 +1,15 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 01/09/2026
+**Atualizado em:** 02/09/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
 
 ---
 
 ## Onde paramos
 
-**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1–F7.3 feitas em 26–27/08/2026. **F8.1** a **F8.5** feitas em 31/08/2026. **F8.6** (catálogo, itens vendáveis e recado de boas-vindas) feita em 01/09/2026.
+**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1–F7.3 feitas em 26–27/08/2026. **F8.1** a **F8.5** feitas em 31/08/2026. **F8.6** (catálogo, itens vendáveis e recado de boas-vindas) feita em 01/09/2026. **F8.7** (painel da gestão, mercado, usuários e retenção) feita em 02/09/2026.
 
-**Progresso:** 24 de 24 do backlog original; F7.1, F7.2, F7.3, **F8.1**, **F8.2**, **F8.3**, **F8.4**, **F8.5** e **F8.6** do plano de uma semana concluídas.
+**Progresso:** 24 de 24 do backlog original; F7.1, F7.2, F7.3, **F8.1**, **F8.2**, **F8.3**, **F8.4**, **F8.5**, **F8.6** e **F8.7** do plano de uma semana concluídas.
 
 | Fatia | Estado |
 | --- | --- |
@@ -46,7 +46,38 @@
 | F8.4 Chamados, pedidos e a tela da equipe | ✅ Concluída — `TelaAlertas` (`GET /solicitacoes`, **Ver ficha**, **Resolvido**) e `TelaChamados` compacta (três naturezas, sem ficha, **Resolvido**). POST `/solicitacoes/{id}/resolucao` sem diálogo; 409 visível. Sem nome na lista; perfil cruzado redirecionado sem GET alheio. Sem lançar consumo, sem Playwright, sem PMS, sem migração |
 | F8.5 Consumos a lançar e saída do hóspede | ✅ Concluída — `TelaConsumos` (`GET /consumos/pendentes`, **Marcar lançado**, **Dispensar**, **Ver ficha**, sem nome na linha) e `TelaSaida` (`/saida/:idReserva?`, **Pedidos feitos pelo chat**, aviso de pendência da casa, **Confirmar saída**). Fila do dia: link **Saída** no hospedado e destaque `saida_nao_confirmada`. Sem status por item na lista da saída (fica para depois da semana). Sem Playwright, sem PMS, sem migração, sem operação nova |
 | F8.6 Catálogo, itens vendáveis e recado | ✅ Concluída — `TelaCatalogo` (cinco abas, POST na categoria visível, PATCH sem `categoria`, desativar sem apagar), `TelaVendaveis` (nome e preço em campos próprios, sem descrição), `TelaBoasVindas` (quatro campos, PUT atômico, `422` da API). Gestão lê; staff redirecionado sem GET. Proxy `/itens-vendaveis`. Sem `GET /catalogo/ativo`, sem `DELETE`, sem migração, sem operação nova |
+| F8.7 Painel da gestão, mercado e administração | ✅ Concluída — `GET /indicadores` com quatro números (chegadas hoje, hospedados, chamados abertos, soma de consumo pendente); `GET /indicadores/chegadas-do-dia` intacto. Mercado só leitura (`GET /mercado` + histórico no clique). `GET /usuarios` lista ativos e desativados; POST/DELETE reusados; sem reativar; sem desativar a si. `GET /retencao` passa a incluir prazos (`null` se inválidos). Recepção/staff redirecionados sem esses GET. Sem PMS, sem gráfico, sem tarifa da casa, sem migração, sem operação nova |
 | Demais fatias | Nenhuma pendente no backlog original. Não há F2.3 nem F3.9 |
+
+## Banco em nuvem — feito em 02/09/2026
+
+Exigência explícita do enunciado da Fase 5. O ADR-008 havia adiado a implantação; a decisão foi
+tomada agora, contra um sistema funcionando, como o próprio ADR previa.
+
+**Provedor: Neon** — PostgreSQL gerenciado, camada gratuita, sem cartão. As 24 revisões do Alembic
+foram aplicadas sem alteração de código: o fluxo de migração montado na F0.2 provou-se portátil.
+
+**Duas armadilhas encontradas, para não repetir:**
+
+| Sintoma | Causa | Correção |
+| --- | --- | --- |
+| `unsupported startup parameter in options: statement_timeout` | O endpoint **com `-pooler`** do Neon (PgBouncer) recusa parâmetros de inicialização, e `app/database.py` define `statement_timeout` em `connect_args` desde a F0.1 | Usar o endpoint **sem `-pooler`** |
+| Comandos conectando no banco errado | `$env:DATABASE_URL` definido numa sessão anterior do PowerShell **sobrepõe o `.env`** | Abrir janela nova do terminal |
+
+**Formato da URL:** o Neon entrega `postgresql://`; o projeto usa `postgresql+psycopg2://`. É
+substituição, não prefixo. Também foi removido `&channel_binding=require` por precaução — a
+criptografia permanece pelo `sslmode=require`.
+
+**Separação de ambientes:** a nuvem é para rodar e demonstrar. **A suíte de testes continua no
+Docker local**, porque ela cria e destrói bancos descartáveis:
+
+```powershell
+$env:DATABASE_URL="postgresql+psycopg2://postgres:SENHA@localhost:5432/omnistay"; $env:EXIGIR_POSTGRES=1; uv run pytest
+```
+
+**Pendência de segurança:** a senha do Neon e a chave do Gemini circularam em conversa. Trocar as
+duas antes de gravar o vídeo — Neon em *Roles → Reset password*, Gemini apagando e gerando outra
+chave no AI Studio.
 
 ## A demonstração à banca — como funciona
 
@@ -96,30 +127,28 @@ O plano dia a dia está em `docs/backlog.md`, seção **"Plano de uma semana"**.
 | 7 | Documento acadêmico, slides, vídeo e ensaio da demonstração |
 
 **Cortado como escopo declarado, não como esquecimento:** módulos por propriedade (F7.4), canal
-de e-mail (F7.5) e telas de gestão/mercado/usuários/retenção (F8.7).
+de e-mail (F7.5). As telas de gestão/mercado/usuários/retenção (F8.7) foram feitas em 02/09/2026.
 
 **Aceleração adotada:** nas fatias de tela, os wireframes são a especificação. Ciclo reduzido a
 `specify` → `plan` → `tasks` → `implement`, sem `clarify` nem `analyze`. **TDD não se corta** —
 é o que permitiu onze mudanças de esquema sem regressão.
 
-## O que falta para o sistema ser usável (01/09/2026)
+## O que falta para o sistema ser usável (02/09/2026)
 
 O backend está inteiro: 29 operações autorizadas, 24 revisões de esquema, worker, fila, webhook
 e cérebro real (F7.1) com tom configurável (F7.2) e convite editável no recado (F7.3). A **casca
 do painel** (F8.1), a **fila do dia com cadastro e confirmação de chegada** (F8.2), a **ficha
 do hóspede com copiar tudo e consentimento** (F8.3), **Chamados e pedidos / Meus chamados**
-(F8.4), **consumos a lançar / saída do hóspede** (F8.5) e **catálogo, itens vendáveis e recado
-de boas-vindas** (F8.6) existem.
+(F8.4), **consumos a lançar / saída do hóspede** (F8.5), **catálogo, itens vendáveis e recado
+de boas-vindas** (F8.6) e o **painel da gestão, mercado, usuários e retenção** (F8.7) existem.
 
-### 1. Telas operacionais ainda incompletas
+### 1. Telas operacionais
 
-A casca (login, menu por perfil, Sair, simulador como rota) está em `/app`. A recepção já vê o
-turno, cadastra reserva, confirma chegada e abre a ficha do titular (completar no balcão, copiar
-tudo, consentimento) e resolve chamado/pedido no React (F8.4). Lança e dispensa consumo e
-confirma a saída pelo React (F8.5). Mantém o catálogo, os itens vendáveis e o recado de
-boas-vindas pelo React (F8.6). O `/docs` do FastAPI continua sendo o caminho para exercitar a
-API além dessas telas. A próxima fatia de tela é **F8.7** (painel da gestão, mercado, usuários
-e retenção), cortada como escopo da semana.
+A casca (login, menu por perfil, Sair, simulador como rota) está em `/app`. A recepção opera o
+turno; a equipe vê Meus chamados; a gestão vê Painel (quatro números), Mercado (só comparação),
+Usuários (criar/desativar, sem reativar) e Retenção (prazos + comprovante). O `/docs` do FastAPI
+continua sendo o caminho para exercitar a API além dessas telas. **Não há próxima fatia de tela
+no plano da semana.** O próximo passo de produto é a implantação em nuvem (ADR-008).
 
 **Decisão (26/08/2026): construir do zero, em fatias novas.** O protótipo do Replit
 (`OmniStay Replit.zip`) tem cinco telas — painel, mercado, simulador, alertas e conversas —, todas
@@ -183,9 +212,9 @@ commit.
 > O estado mora nos arquivos — spec, plano, tarefas, código e este documento —, nunca no
 > histórico da conversa.
 
-**Próximos passos, em ordem:** F8.7 (painel da gestão, mercado, usuários e retenção; cortada
-como escopo da semana) → implantação em nuvem, que o ADR-008 deixou deliberadamente adiada
-para ser decidida contra um sistema funcionando.
+**Próximos passos, em ordem:** implantação em nuvem, que o ADR-008 deixou deliberadamente adiada
+para ser decidida contra um sistema funcionando. F7.4 (módulos por propriedade) e F7.5 (e-mail)
+continuam fora do plano da semana.
 
 ## Decisões tomadas durante a implementação
 
@@ -312,7 +341,7 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Tom da assistente | Chave `personalidade_assistente` (vazio = voz padrão). Só `responder_duvida` recebe `tom`; gestão grava, recepção lê; injeção = `nao_fiel` | F7.2 |
 | Convite no recado | Chave `boas_vindas_convite`; última linha do recado; PUT atômico dos quatro slots; omissão = fila `boas_vindas_nao_enviadas`; semente no bootstrap e na `0023` | F7.3 |
 | Tela `/simulador` | Cookie + `usar_simulador` (recepção e gestão). Modo `real` → `409` `modo_real`, não `403`. Outro hotel → `404`. Sem HMAC | F6.2 |
-| Frontend da banca | `frontend/` Vite+React+Router+Tailwind; SPA em `/app` se existir `frontend/dist`; `/demo` → `/app/simulador`. Casca e login na F8.1; fila/reserva/chegada na F8.2; ficha na F8.3; chamados da recepção e da equipe na F8.4; consumos e saída na F8.5; catálogo, vendáveis e recado na F8.6; demais telas nomeadas só com título (F8.7) | F6.2 + F8.1–F8.6 |
+| Frontend da banca | `frontend/` Vite+React+Router+Tailwind; SPA em `/app` se existir `frontend/dist`; `/demo` → `/app/simulador`. Casca e login na F8.1; fila/reserva/chegada na F8.2; ficha na F8.3; chamados da recepção e da equipe na F8.4; consumos e saída na F8.5; catálogo, vendáveis e recado na F8.6; Painel/Mercado/Usuários/Retenção na F8.7 | F6.2 + F8.1–F8.7 |
 | SPA em `/app`, não em `/` | `GET /fila-do-dia` já existe. Montar o React na raiz faria o primeiro clique na fila acertar JSON, não HTML. Casas: `/app/fila` (recepção), `/app/chamados` (staff), `/app/indicadores` (gestão) | F8.1 |
 | Cookie `Secure` condicional | F0.3 mandava `Secure` sempre. O `TestClient` usa `https://testserver`, então a suíte antiga ficou verde enquanto o Chrome em `http://127.0.0.1` descartava o cookie e o login “não entra”. `_definir_cookie` olha `pedido.url.scheme` | F8.1 |
 | Fallback da SPA | O plano previa `StaticFiles(html=True)`. Starlette devolve **404** em `/app/entrar` (procura o arquivo `entrar`, não cai no `index.html` da raiz). `criar_aplicacao` serve o arquivo real se existir; senão `index.html`. Dist ausente: as rotas `/app` nem registram — a API sobe igual. `/app` entra em `PREFIXOS_IGNORADOS` das rotas protegidas | F8.1 |
@@ -321,6 +350,7 @@ Registradas aqui porque não constam dos seis artefatos originais.
 | Chamados no React | Recepção: `TelaAlertas` lista `GET /solicitacoes`, **Ver ficha**, **Resolvido**. Equipe: `TelaChamados` compacta, três naturezas, sem ficha. POST resolução sem diálogo; 409 visível. Sem nome na lista | F8.4 |
 | Consumos e saída no React | `TelaConsumos`: GET pendentes, **Marcar lançado** / **Dispensar**, **Ver ficha**, sem nome. `TelaSaida`: quatro GET, lista **Pedidos feitos pelo chat**, aviso para `/consumos` da casa, **Confirmar saída** só se hospedado. Status por item na lista da saída **não** entra nesta fatia — a consulta cobrável não traz `status_lancamento`; fica para depois da semana. Sem PMS | F8.5 |
 | Catálogo, vendáveis e recado no React | Três destinos reais. Catálogo: cinco abas, POST na categoria visível, PATCH sem `categoria`. Vendáveis: nome e preço em campos próprios; o mapa de telas com campo **descrição** **não** foi seguido (a API não tem esse campo). Recado: quatro campos, PUT atômico; formato recusado pela API (`422`), não duplicado no cliente. Gestão lê; staff redirecionado com zero GET. Desativar é PATCH `ativo`; zero `DELETE` e zero `GET /catalogo/ativo`. Proxy Vite `/itens-vendaveis` | F8.6 |
+| Painel da gestão no React | Quatro números via `GET /indicadores` (chegadas hoje, hospedados=`status='hospedado'`, chamados abertos sem `consumo`, soma de `valor_praticado` pendente). Zeros ≠ falha. Mercado só `GET /mercado` + histórico no clique; sem linha “você”, sem % 7 dias, sem CRUD de concorrente. Usuários: lista com desativados; sem Reativar; sem `GET /sessoes`; sem desativar a si. Retenção: prazos no envelope (`null` se a chave falta); sem expurgar agora. O mapa de telas com seis KPIs, gráfico, “você”, aba Concorrentes e Reativar **não** foi seguido. Recepção/staff redirecionados sem esses GET. `ler_indicadores` na API ainda admite recepção; a casca não dispara. Sem migração, sem operação nova | F8.7 |
 
 ## Onde ficam os arquivos
 
@@ -356,10 +386,65 @@ os `.docx` de entrega, `diagramas/`, `gerar_bmc_v2.py` e `implementacao/`.
 | `Entrega_de_Projeto_OmniStay_v2.docx` | Documento acadêmico principal |
 | `Business_Model_Canvas_OmniStay_v1.1.docx` | BMC com revisão pontual e registro de alterações |
 
+## Mudança de posicionamento — mentoria de 02/09/2026
+
+A mentoria levantou dois pontos. O primeiro é de apresentação; o segundo mexe na premissa
+fundadora e **muda o discurso do produto, não o escopo do MVP**.
+
+### 1. O relacionamento ao longo da estadia não estava evidente
+
+O produto já faz — seis toques, da pré-chegada à saída — mas a apresentação estava organizada por
+funcionalidade, e por isso o relacionamento não aparecia.
+
+**Correção:** reorganizar o pitch pela **linha do tempo do hóspede**.
+
+| Momento | Toque |
+| --- | --- |
+| Pré-chegada | Coleta da ficha |
+| Silêncio | Um único lembrete, e o sistema para de insistir |
+| Chegada | Boas-vindas e abertura do canal |
+| Estadia | Dúvidas, pedidos e reclamações |
+| 2º dia | Pulso — "como está sendo?" |
+| Saída | Pesquisa e lista de pedidos feitos pelo chat |
+
+É mudança de narrativa, não de código.
+
+### 2. Integração com PMS e a promessa "seu hotel sem fila"
+
+A mentoria afirmou que a integração com o PMS é necessária para sustentar a frase. **O argumento
+está correto:** sem integração a ficha chega pronta, mas alguém ainda digita no PMS — a fila
+diminui, não desaparece. O Artefato 2 já havia registrado esse custo (três transições dependem de
+clique manual e falham em silêncio).
+
+**A decisão de não integrar continua válida para o MVP**, e a razão é comercial, não técnica:
+integrar no Brasil significa integrar com **um** PMS por vez — Desbravador, HITS, CMNet, Omnibees
+—, cada um com API própria, algumas fechadas, todas com processo comercial. Um produto que só
+funciona depois de integrado não pode ser vendido a ninguém até integrar com o PMS daquele hotel.
+Para uma startup sem cliente, isso trava a entrada no mercado.
+
+**O que muda: o posicionamento passa a ser explicitamente faseado.**
+
+| Fase | Promessa | Como |
+| --- | --- | --- |
+| **MVP (atual)** | "Seu hóspede resolve tudo por WhatsApp, e a recepção recebe a ficha pronta" | Sem integração. Vendável para qualquer hotel imediatamente |
+| **Fase 2** | **"Seu hotel sem fila"** | `PMSGateway`, começando pelo PMS do primeiro cliente |
+
+**O argumento técnico que sustenta a promessa:** a arquitetura já tem o ponto de extensão. O
+monolito modular foi construído com portas trocáveis — `LLMProvider`, `MensageriaGateway`,
+`CatalogoRepository`, `FontePublica`. Um `PMSGateway` entra pelo mesmo mecanismo, sem tocar em
+regra de negócio. Não é promessa vaga: é lugar que já existe no código.
+
+**A fazer na apresentação:** nomear qual PMS seria integrado primeiro, e mostrar o diagrama de
+arquitetura apontando onde o `PMSGateway` pluga.
+
+**O que não muda:** o escopo do MVP, o prazo e a premissa registrada abaixo — que passa a ser lida
+como decisão de **fase**, não como decisão permanente.
+
 ## Premissa que governa tudo
 
-O OmniStay **não se integra ao PMS**. É sistema paralelo, e o recepcionista é a ponte
-humana. As transições entre fases são disparadas por cliques de funcionários no painel,
+O OmniStay **não se integra ao PMS no MVP**. É sistema paralelo, e o recepcionista é a ponte
+humana. *(Revisado em 02/09/2026 após a mentoria: passa a ser decisão de fase, não permanente —
+ver a seção de mudança de posicionamento acima.)* As transições entre fases são disparadas por cliques de funcionários no painel,
 não por integração. Isso é decisão deliberada e é o argumento comercial do produto.
 
 **O Artefato 2 detalhou o custo dessa premissa:** três transições dependem de um clique

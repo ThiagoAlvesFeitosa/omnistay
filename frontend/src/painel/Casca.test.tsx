@@ -54,6 +54,27 @@ function fetchPorPerfil(perfil: string, nome = "Funcionário") {
     if (url === "/propriedade/boas-vindas" && metodo === "GET") {
       return json({ cafe: "", wifi: "", checkout: "", convite: "" });
     }
+    if (url === "/indicadores" && metodo === "GET") {
+      return json({
+        chegadas_hoje: 0,
+        hospedados: 0,
+        chamados_abertos: 0,
+        consumo_a_lancar: 0,
+      });
+    }
+    if (url === "/mercado" && metodo === "GET") {
+      return json({ periodicidade_horas: 24, concorrentes: [] });
+    }
+    if (url === "/usuarios" && metodo === "GET") {
+      return json({ usuarios: [] });
+    }
+    if (url === "/retencao" && metodo === "GET") {
+      return json({
+        execucoes: [],
+        meses_retencao_conteudo_livre: null,
+        anos_retencao_ficha: null,
+      });
+    }
     if (metodo === "GET" && /\/reservas\/\d+\/ficha$/.test(url)) {
       return json({
         id_reserva: 1,
@@ -193,6 +214,10 @@ describe("Casca", () => {
     renderCasca("/app/indicadores");
     expect(await screen.findByRole("heading", { name: "Painel" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Simulador" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Painel" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Mercado" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Usuários" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Retenção de dados" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Catálogo" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Itens vendáveis" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Recado de boas-vindas" })).toBeInTheDocument();
@@ -406,6 +431,30 @@ describe("Casca", () => {
             /\/reservas\/\d+\/ficha$/.test(url) ||
             (metodo === "POST" &&
               (url.includes("/lancamento") || url.includes("/dispensa") || /\/reservas\/\d+\/saida$/.test(url)))
+          );
+        });
+        expect(alheios).toHaveLength(0);
+        visao.unmount();
+      }
+    }
+  });
+
+  it("recepção e staff nas telas da gestão caem na casa sem disparar os GET", async () => {
+    const rotas = ["/app/indicadores", "/app/mercado", "/app/usuarios", "/app/retencao"] as const;
+    for (const perfil of ["recepcao", "staff"] as const) {
+      const casa = perfil === "recepcao" ? "Fila do dia" : "Meus chamados";
+      for (const rota of rotas) {
+        const fetchMock = fetchPorPerfil(perfil);
+        vi.stubGlobal("fetch", fetchMock);
+        const visao = renderCasca(rota);
+        expect(await screen.findByRole("heading", { name: casa })).toBeInTheDocument();
+        const alheios = fetchMock.mock.calls.filter((chamada) => {
+          const url = String(chamada[0]);
+          return (
+            url === "/indicadores" ||
+            url === "/mercado" ||
+            url === "/usuarios" ||
+            url === "/retencao"
           );
         });
         expect(alheios).toHaveLength(0);

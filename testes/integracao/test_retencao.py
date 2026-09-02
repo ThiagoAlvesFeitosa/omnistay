@@ -323,6 +323,8 @@ def test_gestao_le_comprovante_e_outros_perfis_sao_recusados(app_sobre_ambiente)
     vazio = cliente.get("/retencao")
     assert vazio.status_code == 200
     assert vazio.json()["execucoes"] == []
+    assert "meses_retencao_conteudo_livre" in vazio.json()
+    assert "anos_retencao_ficha" in vazio.json()
 
     with ambiente.engine.begin() as conexao:
         gravar_estadia_encerrada(
@@ -369,3 +371,46 @@ def test_gestao_le_comprovante_e_outros_perfis_sao_recusados(app_sobre_ambiente)
     cliente.cookies.clear()
     sem_cookie = cliente.get("/retencao")
     assert sem_cookie.status_code == 401
+
+
+@pytest.mark.postgres
+def test_prazos_ausentes_ou_invalidos_voltam_null_sem_inventar_doze_nem_cinco(
+    app_sobre_ambiente,
+):
+    cliente, ambiente = app_sobre_ambiente
+    hotel = ambiente.propriedade_a.id_hotel
+    _login(cliente, ambiente.propriedade_a.usuarios["gestor"])
+
+    vigente = cliente.get("/retencao").json()
+    assert vigente["meses_retencao_conteudo_livre"] == 12
+    assert vigente["anos_retencao_ficha"] == 5
+
+    with ambiente.engine.begin() as conexao:
+        conexao.execute(
+            text(
+                "DELETE FROM parametro_hotel WHERE id_hotel = :hotel"
+                " AND chave IN ('meses_retencao_conteudo_livre',"
+                " 'anos_retencao_ficha')"
+            ),
+            {"hotel": hotel},
+        )
+
+    ausente = cliente.get("/retencao").json()
+    assert ausente["meses_retencao_conteudo_livre"] is None
+    assert ausente["anos_retencao_ficha"] is None
+    assert ausente["meses_retencao_conteudo_livre"] != 12
+    assert ausente["anos_retencao_ficha"] != 5
+
+    with ambiente.engine.begin() as conexao:
+        conexao.execute(
+            text(
+                "INSERT INTO parametro_hotel (id_hotel, chave, valor) VALUES"
+                " (:hotel, 'meses_retencao_conteudo_livre', 'abc'),"
+                " (:hotel, 'anos_retencao_ficha', '0')"
+            ),
+            {"hotel": hotel},
+        )
+
+    invalido = cliente.get("/retencao").json()
+    assert invalido["meses_retencao_conteudo_livre"] is None
+    assert invalido["anos_retencao_ficha"] is None

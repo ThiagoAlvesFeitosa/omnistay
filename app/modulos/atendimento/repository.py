@@ -268,6 +268,32 @@ def listar_pendentes(conexao: Connection, *, id_hotel: int) -> list[dict]:
     return [dict(linha) for linha in linhas]
 
 
+def contar_chamados_abertos(conexao: Connection, *, id_hotel: int) -> int:
+    return conexao.execute(
+        text(
+            "SELECT COUNT(*) FROM solicitacao s"
+            " JOIN reserva r ON r.id_reserva = s.id_reserva"
+            " WHERE r.id_hotel = :id_hotel"
+            " AND s.tipo IN ('reclamacao', 'servico')"
+            " AND s.status IN ('aberta', 'em_andamento')"
+        ),
+        {"id_hotel": id_hotel},
+    ).scalar_one()
+
+
+def somar_consumo_pendente(conexao: Connection, *, id_hotel: int):
+    return conexao.execute(
+        text(
+            "SELECT COALESCE(SUM(c.valor_praticado), 0) FROM consumo c"
+            " JOIN solicitacao s ON s.id_solicitacao = c.id_solicitacao"
+            " JOIN reserva r ON r.id_reserva = s.id_reserva"
+            " WHERE r.id_hotel = :id_hotel"
+            " AND c.status_lancamento = 'pendente'"
+        ),
+        {"id_hotel": id_hotel},
+    ).scalar_one()
+
+
 def listar_pedidos_feitos_pelo_chat(
     conexao: Connection, *, id_hotel: int, id_reserva: int
 ) -> list[dict]:

@@ -52,3 +52,14 @@ describe("catálogo, vendáveis e recado por perfil", () => {
     },
   );
 });
+
+describe("painel da gestão", () => {
+  it.each(["/app/indicadores", "/app/mercado", "/app/usuarios", "/app/retencao"] as const)(
+    "só a gestão pode %s",
+    (caminho) => {
+      expect(perfilPode("gestor", caminho)).toBe(true);
+      expect(perfilPode("recepcao", caminho)).toBe(false);
+      expect(perfilPode("staff", caminho)).toBe(false);
+    },
+  );
+});

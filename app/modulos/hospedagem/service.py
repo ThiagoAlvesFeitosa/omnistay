@@ -86,6 +86,8 @@ class RepositorioDeHospedagem(Protocol):
 
     def contar_chegadas_do_dia(self, conexao, *, id_hotel: int) -> int: ...
 
+    def contar_hospedados(self, conexao, *, id_hotel: int) -> int: ...
+
 
 @dataclass(frozen=True)
 class ReservaCriada:
@@ -205,6 +207,40 @@ def contar_chegadas_do_dia(
     repositorio: RepositorioDeHospedagem = repositorio_padrao,
 ) -> int:
     return repositorio.contar_chegadas_do_dia(conexao, id_hotel=id_hotel)
+
+
+def contar_hospedados(
+    conexao,
+    *,
+    id_hotel: int,
+    repositorio: RepositorioDeHospedagem = repositorio_padrao,
+) -> int:
+    return repositorio.contar_hospedados(conexao, id_hotel=id_hotel)
+
+
+def ler_indicadores(
+    conexao,
+    *,
+    id_hotel: int,
+    repositorio: RepositorioDeHospedagem = repositorio_padrao,
+    atendimento=atendimento_service,
+):
+    from app.modulos.hospedagem.schema import IndicadoresResposta
+
+    logger.info("indicadores id_hotel=%s acao=indicadores", id_hotel)
+    consumo = atendimento.somar_consumo_pendente(conexao, id_hotel=id_hotel)
+    return IndicadoresResposta(
+        chegadas_hoje=contar_chegadas_do_dia(
+            conexao, id_hotel=id_hotel, repositorio=repositorio
+        ),
+        hospedados=contar_hospedados(
+            conexao, id_hotel=id_hotel, repositorio=repositorio
+        ),
+        chamados_abertos=atendimento.contar_chamados_abertos(
+            conexao, id_hotel=id_hotel
+        ),
+        consumo_a_lancar=Decimal(str(consumo or 0)),
+    )
 
 
 def consolidar_ficha_titular(

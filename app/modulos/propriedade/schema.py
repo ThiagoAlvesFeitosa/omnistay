@@ -116,3 +116,5 @@ class ExecucaoRetencaoResposta(BaseModel):
 
 class ListaRetencaoResposta(BaseModel):
     execucoes: list[ExecucaoRetencaoResposta]
+    meses_retencao_conteudo_livre: int | None = None
+    anos_retencao_ficha: int | None = None

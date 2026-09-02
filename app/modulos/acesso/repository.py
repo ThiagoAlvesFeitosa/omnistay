@@ -51,6 +51,18 @@ def buscar_por_id(conexao: Connection, id_usuario: int) -> Row | None:
     ).one_or_none()
 
 
+def listar_usuarios_do_hotel(conexao: Connection, *, id_hotel: int) -> list[dict]:
+    linhas = conexao.execute(
+        text(
+            "SELECT id_usuario, nome, email, perfil, ativo "
+            "FROM usuario WHERE id_hotel = :id_hotel "
+            "ORDER BY nome ASC, id_usuario ASC"
+        ),
+        {"id_hotel": id_hotel},
+    ).mappings().all()
+    return [dict(linha) for linha in linhas]
+
+
 def desativar_usuario(conexao: Connection, id_usuario: int) -> None:
     conexao.execute(
         text("UPDATE usuario SET ativo = FALSE WHERE id_usuario = :id_usuario"),

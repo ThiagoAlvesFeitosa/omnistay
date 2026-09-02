@@ -61,6 +61,7 @@ def test_recepcao_e_staff_nao_administram_usuario(app_sobre_ambiente):
             == 403
         )
         assert cliente.delete("/usuarios/1").status_code == 403
+        assert cliente.get("/usuarios").status_code == 403
 
 
 @pytest.mark.postgres
@@ -148,3 +149,39 @@ def test_desativar_usuario_de_outro_hotel_responde_404(app_sobre_ambiente):
     _login(cliente, gestor_a)
 
     assert cliente.delete(f"/usuarios/{staff_b.id_usuario}").status_code == 404
+
+
+@pytest.mark.postgres
+def test_gestor_lista_ativos_e_desativados_sem_senha(app_sobre_ambiente):
+    cliente, ambiente = app_sobre_ambiente
+    gestor = ambiente.propriedade_a.usuarios["gestor"]
+    staff = ambiente.propriedade_a.usuarios["staff"]
+    _login(cliente, gestor)
+    assert cliente.delete(f"/usuarios/{staff.id_usuario}").status_code == 204
+
+    resposta = cliente.get("/usuarios")
+    assert resposta.status_code == 200
+    corpo = resposta.json()
+    assert "usuarios" in corpo
+    emails = {item["email"]: item for item in corpo["usuarios"]}
+    assert staff.email in emails
+    assert emails[staff.email]["ativo"] is False
+    assert gestor.email in emails
+    for item in corpo["usuarios"]:
+        assert set(item.keys()) == {
+            "id_usuario",
+            "nome",
+            "email",
+            "perfil",
+            "ativo",
+        }
+        assert "senha" not in item
+        assert "senha_hash" not in item
+    nomes = [item["nome"] for item in corpo["usuarios"]]
+    assert nomes == sorted(nomes)
+
+    cliente.cookies.clear()
+    _login(cliente, ambiente.propriedade_b.usuarios["gestor"])
+    alheio = cliente.get("/usuarios").json()["usuarios"]
+    assert staff.email not in {item["email"] for item in alheio}
+    assert gestor.email not in {item["email"] for item in alheio}

@@ -56,6 +56,62 @@ def test_desativacao_revoga_sessoes_na_mesma_operacao():
     assert repo.sessoes_revogadas == [(2, INSTANTE)]
 
 
+def test_lista_do_hotel_nao_traz_senha():
+    class Repo:
+        def listar_usuarios_do_hotel(self, conexao, *, id_hotel):
+            assert id_hotel == 10
+            return [
+                {
+                    "id_usuario": 2,
+                    "nome": "Bia",
+                    "email": "bia@hotel.example",
+                    "perfil": "staff",
+                    "ativo": False,
+                },
+                {
+                    "id_usuario": 1,
+                    "nome": "Ana",
+                    "email": "ana@hotel.example",
+                    "perfil": "gestor",
+                    "ativo": True,
+                },
+            ]
+
+    lista = acesso_service.listar_usuarios(object(), id_hotel=10, repositorio=Repo())
+    assert [item.nome for item in lista] == ["Ana", "Bia"]
+    for item in lista:
+        assert not hasattr(item, "senha")
+        assert not hasattr(item, "senha_hash")
+
+
+def test_log_da_lista_nao_traz_senha_nem_email(monkeypatch):
+    registros = []
+
+    def fake_info(msg, *args):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(acesso_service._logger, "info", fake_info)
+
+    class Repo:
+        def listar_usuarios_do_hotel(self, conexao, *, id_hotel):
+            return [
+                {
+                    "id_usuario": 1,
+                    "nome": "Ana",
+                    "email": "ana@hotel.example",
+                    "perfil": "gestor",
+                    "ativo": True,
+                }
+            ]
+
+    acesso_service.listar_usuarios(object(), id_hotel=10, repositorio=Repo())
+    texto = " ".join(registros)
+    assert "id_hotel=10" in texto
+    assert "listar" in texto
+    assert "senha" not in texto
+    assert "ana@hotel.example" not in texto
+
+
 def test_falha_na_revogacao_nao_deixa_desativacao_solta():
     """Com transacao real a atomicidade e do banco; aqui a ordem importa.
 

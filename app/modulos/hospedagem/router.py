@@ -16,6 +16,7 @@ from app.modulos.hospedagem.schema import (
     FichaTitularEntrada,
     FichaTitularResposta,
     FilaDoDiaResposta,
+    IndicadoresResposta,
     ListaPedidosFeitosPeloChat,
     ReservaEntrada,
     ReservaResposta,
@@ -59,6 +60,14 @@ def fila_do_dia(
 ) -> FilaDoDiaResposta:
     itens = hospedagem.listar_fila_do_dia(conexao, id_hotel=sessao.id_hotel)
     return FilaDoDiaResposta(itens=itens)
+
+
+@roteador.get("/indicadores", response_model=IndicadoresResposta)
+def ler_indicadores(
+    conexao: Conexao,
+    sessao: Annotated[SessaoAtual, Depends(exigir_operacao("ler_indicadores"))],
+) -> IndicadoresResposta:
+    return hospedagem.ler_indicadores(conexao, id_hotel=sessao.id_hotel)
 
 
 @roteador.get(

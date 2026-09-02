@@ -50,3 +50,7 @@ class UsuarioResposta(BaseModel):
     email: str
     perfil: str
     ativo: bool
+
+
+class ListaUsuariosResposta(BaseModel):
+    usuarios: list[UsuarioResposta]

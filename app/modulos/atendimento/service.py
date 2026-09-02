@@ -470,6 +470,27 @@ def dispensar(
     )
 
 
+def contar_chamados_abertos(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    repositorio=repositorio_padrao,
+) -> int:
+    return repositorio.contar_chamados_abertos(conexao, id_hotel=id_hotel)
+
+
+def somar_consumo_pendente(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    repositorio=repositorio_padrao,
+):
+    from decimal import Decimal
+
+    valor = repositorio.somar_consumo_pendente(conexao, id_hotel=id_hotel)
+    return Decimal(str(valor or 0))
+
+
 def anonimizar_descricoes_vencidas(
     conexao: Connection,
     *,

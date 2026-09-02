@@ -658,3 +658,32 @@ def listar_execucoes_retencao(
         )
         for linha in linhas
     ]
+
+
+def _prazo_inteiro(valor: str | None) -> int | None:
+    if valor is None:
+        return None
+    try:
+        numero = int(valor)
+    except (TypeError, ValueError):
+        return None
+    if numero < 1:
+        return None
+    return numero
+
+
+def prazos_retencao_vigentes(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    repositorio=propriedade_repository,
+) -> tuple[int | None, int | None]:
+    meses = _prazo_inteiro(
+        repositorio.ler_parametro(
+            conexao, id_hotel, "meses_retencao_conteudo_livre"
+        )
+    )
+    anos = _prazo_inteiro(
+        repositorio.ler_parametro(conexao, id_hotel, "anos_retencao_ficha")
+    )
+    return meses, anos
