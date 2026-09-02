@@ -1375,3 +1375,73 @@ def test_quantidade_negativa_de_retencao_e_recusada(conexao):
         )
 
     assert "ck_execucao_mensagens_nao_negativas" in str(erro.value)
+
+
+def _inserir_trabalho_resposta_recepcao(
+    conexao, id_hotel: int, id_reserva: int, id_mensagem: int
+) -> None:
+    conexao.execute(
+        text(
+            "INSERT INTO trabalho (id_hotel, tipo, payload, status) "
+            "VALUES (:id_hotel, 'enviar_resposta_recepcao',"
+            " CAST(:payload AS jsonb), 'pendente')"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "payload": (
+                '{"id_reserva": %s, "id_mensagem": %s}' % (id_reserva, id_mensagem)
+            ),
+        },
+    )
+
+
+@pytest.mark.postgres
+def test_tipo_enviar_resposta_recepcao_e_aceito_pelo_check(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    _inserir_trabalho_resposta_recepcao(conexao, id_hotel, id_reserva, id_mensagem=1)
+    tipo = conexao.execute(
+        text("SELECT tipo FROM trabalho WHERE tipo = 'enviar_resposta_recepcao'")
+    ).scalar_one()
+    assert tipo == "enviar_resposta_recepcao"
+
+
+@pytest.mark.postgres
+def test_segundo_trabalho_resposta_recepcao_da_mesma_mensagem_e_recusado(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    _inserir_trabalho_resposta_recepcao(conexao, id_hotel, id_reserva, id_mensagem=9)
+
+    with pytest.raises(DBAPIError) as erro:
+        _inserir_trabalho_resposta_recepcao(
+            conexao, id_hotel, id_reserva, id_mensagem=9
+        )
+
+    assert "uq_trabalho_enviar_resposta_recepcao_mensagem" in str(erro.value)
+
+
+@pytest.mark.postgres
+def test_duas_respostas_da_recepcao_na_mesma_reserva_sao_aceitas(conexao):
+    id_hotel = criar_hotel(conexao)
+    id_reserva = criar_reserva(conexao, id_hotel)
+    _inserir_trabalho_resposta_recepcao(conexao, id_hotel, id_reserva, id_mensagem=1)
+    _inserir_trabalho_resposta_recepcao(conexao, id_hotel, id_reserva, id_mensagem=2)
+    quantidade = conexao.execute(
+        text(
+            "SELECT COUNT(*) FROM trabalho WHERE tipo = 'enviar_resposta_recepcao'"
+        )
+    ).scalar_one()
+    assert quantidade == 2
+
+
+@pytest.mark.postgres
+def test_enviar_resposta_recepcao_nao_tem_unique_por_reserva(conexao):
+    nomes = conexao.execute(
+        text(
+            "SELECT indexname FROM pg_indexes "
+            "WHERE tablename = 'trabalho' AND indexdef ILIKE "
+            "'%enviar_resposta_recepcao%'"
+        )
+    ).scalars().all()
+    assert "uq_trabalho_enviar_resposta_recepcao_mensagem" in nomes
+    assert not any("reserva" in nome for nome in nomes)

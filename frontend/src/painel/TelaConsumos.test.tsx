@@ -71,7 +71,7 @@ describe("TelaConsumos", () => {
     vi.restoreAllMocks();
   });
 
-  it("lista item, valor, tempo, Ver ficha e resumo, sem nome nem palavra proibida", async () => {
+  it("lista item, valor, tempo, Estadia e resumo, sem nome nem palavra proibida", async () => {
     const itens = [
       item({
         id_solicitacao: 1,
@@ -115,7 +115,7 @@ describe("TelaConsumos", () => {
     expect(screen.getByText(/88/)).toBeInTheDocument();
     expect(screen.getByText(new RegExp(`o mais antigo ${tempoDecorrido(itens[0].aberta_em, agora)}`))).toBeInTheDocument();
 
-    const links = screen.getAllByRole("link", { name: "Ver ficha" });
+    const links = screen.getAllByRole("link", { name: "Estadia" });
     expect(links).toHaveLength(2);
     expect(links[0]).toHaveAttribute("href", expect.stringMatching(/\/ficha\/42$/));
     expect(links[1]).toHaveAttribute("href", expect.stringMatching(/\/ficha\/7$/));
@@ -145,7 +145,7 @@ describe("TelaConsumos", () => {
     expect(screen.queryByText(/não carregou/i)).not.toBeInTheDocument();
   });
 
-  it("Marcar lançado faz POST e some o item; Ver ficha e descrição não lançam", async () => {
+  it("Marcar lançado faz POST e some o item; Estadia e descrição não lançam", async () => {
     let abertos = [
       item({ id_solicitacao: 1, descricao_item: "Lavanderia", valor_praticado: "32.00" }),
       item({ id_solicitacao: 2, descricao_item: "Frigobar", valor_praticado: "56.00" }),
@@ -166,7 +166,7 @@ describe("TelaConsumos", () => {
     expect(await screen.findByText("Lavanderia")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Marcar lançado" })).toHaveLength(2);
     fireEvent.click(screen.getByText("Lavanderia"));
-    fireEvent.click(screen.getAllByRole("link", { name: "Ver ficha" })[0]);
+    fireEvent.click(screen.getAllByRole("link", { name: "Estadia" })[0]);
     expect(
       fetchMock.mock.calls.filter((chamada) => String(chamada[0]).includes("/lancamento")),
     ).toHaveLength(0);

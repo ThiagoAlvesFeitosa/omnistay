@@ -130,6 +130,10 @@ def processar_uma_passagem(
             mercado_service.processar_trabalho_coletar_mercado(
                 conexao, trabalho=trabalho, fonte=porta_fonte
             )
+        elif trabalho["tipo"] == "enviar_resposta_recepcao":
+            conversa_service.processar_trabalho_enviar_resposta_recepcao(
+                conexao, trabalho=trabalho, gateway=gateway
+            )
         else:
             fila_repository.marcar_falha(
                 conexao,

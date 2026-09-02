@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { destinoPorCaminho, perfilPode } from "./destinos";
+import { DESTINOS, destinoPorCaminho, perfilPode } from "./destinos";
 
 describe("destinoPorCaminho da ficha", () => {
   it.each(["/app/ficha", "/app/ficha/12", "/ficha/12"] as const)(
@@ -19,6 +19,12 @@ describe("destinoPorCaminho da ficha", () => {
   it("staff e gestão não podem a ficha com id", () => {
     expect(perfilPode("staff", "/app/ficha/12")).toBe(false);
     expect(perfilPode("gestor", "/ficha/1")).toBe(false);
+  });
+
+  it("destino ficha chama-se Estadia e o path permanece /app/ficha", () => {
+    const destino = DESTINOS.find((item) => item.id === "ficha");
+    expect(destino?.titulo).toBe("Estadia");
+    expect(destino?.caminho).toBe("/app/ficha");
   });
 });
 

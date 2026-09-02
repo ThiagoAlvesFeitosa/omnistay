@@ -886,10 +886,44 @@ telas nascem sem saber esconder módulo desligado e precisam ser refeitas.
 
 ---
 
+## F7.6 — A recepção responde ao hóspede
+
+**Objetivo:** fechar o ciclo do atendimento. Hoje ele não fecha.
+
+**O buraco que ela tapa.** Quando o atendimento automático não cobre a pergunta, o sistema avisa
+o hóspede que a recepção vai atender, abre o chamado e permite marcá-lo como resolvido. Mas
+**não existe forma de a recepção escrever a resposta**. O hóspede pergunta se tem berço, ouve que
+a recepção vai atender, e depois recebe "seu chamado foi resolvido" — sem nunca ter recebido a
+resposta. É falha de lógica do produto, não de acabamento.
+
+**Descrição para o `/specify`:**
+> A recepção responde ao hóspede pelo painel, com texto livre, quando o atendimento automático
+> encaminha uma pergunta ou quando ela precisa dizer algo sobre um chamado. A resposta chega ao
+> hóspede pelo mesmo canal em que ele escreveu e fica registrada no histórico da conversa, junto
+> das mensagens automáticas.
+
+**Critérios de aceite:**
+
+- A recepção escreve e o hóspede recebe pelo canal de origem da mensagem
+- A resposta fica no histórico da conversa, junto das automáticas
+- Só o perfil de recepção responde: a equipe operacional resolve chamado mas não escreve ao
+  hóspede, e a gestão não escreve
+- O envio passa pela fila e pelo worker, como todas as outras mensagens
+- Falha no envio não perde o texto escrito: fica marcada para nova tentativa e visível no painel
+- Responder **não** resolve o chamado automaticamente — são ações distintas
+- Conteúdo de mensagem continua fora do log
+
+**Depende de:** F3.1, F3.3, F8.4.
+
+> Não precisa de template aprovado: o hóspede escreveu há pouco, então a janela de 24 horas está
+> aberta e a resposta é texto livre. Custo zero até 01/10/2026.
+
+---
+
 ## Ordem recomendada da Fase 7
 
 ```
-F7.1 → F7.2 → F7.3 → F7.4 → F7.5
+F7.1 → F7.2 → F7.3 → F7.6 → F7.4 → F7.5
 ```
 
 F7.1 primeiro porque muda a demonstração inteira. F7.4 antes da Fase 8 porque as telas precisam

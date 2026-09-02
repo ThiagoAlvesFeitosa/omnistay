@@ -225,3 +225,87 @@ def test_hospedado_sem_classificacao_nao_pede_humano(app_sobre_ambiente):
         if i["id_reserva"] == id_reserva
     )
     assert item["precisa_atendimento_humano"] is False
+
+
+def _inserir_encaminhamento(conexao, id_reserva: int, *, enviada_em=None) -> int:
+    return conexao.execute(
+        text(
+            "INSERT INTO mensagem (id_reserva, direcao, conteudo, "
+            " classificacao_bruta, enviada_em) "
+            "VALUES (:r, 'recebida', 'tem berco?', CAST(:c AS jsonb),"
+            " COALESCE(:e, now())) RETURNING id_mensagem"
+        ),
+        {
+            "r": id_reserva,
+            "c": (
+                '{"tipo": "classificacao_intencao",'
+                ' "desfecho": "duvida_nao_coberta"}'
+            ),
+            "e": enviada_em,
+        },
+    ).scalar_one()
+
+
+def _inserir_resposta_recepcao(conexao, id_reserva: int, *, enviada_em=None) -> int:
+    return conexao.execute(
+        text(
+            "INSERT INTO mensagem (id_reserva, direcao, conteudo, status_envio,"
+            " classificacao_bruta, enviada_em) "
+            "VALUES (:r, 'enviada', 'Sim.', 'pendente', CAST(:c AS jsonb),"
+            " COALESCE(:e, now())) RETURNING id_mensagem"
+        ),
+        {
+            "r": id_reserva,
+            "c": '{"tipo": "resposta_recepcao"}',
+            "e": enviada_em,
+        },
+    ).scalar_one()
+
+
+@pytest.mark.postgres
+def test_resposta_da_recepcao_apaga_precisa_atendimento_das_ja_encaminhadas(
+    app_sobre_ambiente,
+):
+    from datetime import UTC, datetime, timedelta
+
+    from testes.integracao.test_confirmar_chegada import _tornar
+
+    cliente, ambiente = app_sobre_ambiente
+    _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
+    id_reserva = cliente.post("/reservas", json=_corpo_valido()).json()["id_reserva"]
+    _tornar(ambiente, id_reserva, "ficha_recebida")
+    _tornar(ambiente, id_reserva, "hospedado")
+    agora = datetime.now(UTC)
+    with ambiente.conexao() as conexao:
+        _inserir_encaminhamento(
+            conexao, id_reserva, enviada_em=agora - timedelta(minutes=10)
+        )
+        conexao.commit()
+    item = next(
+        i
+        for i in cliente.get("/fila-do-dia").json()["itens"]
+        if i["id_reserva"] == id_reserva
+    )
+    assert item["precisa_atendimento_humano"] is True
+
+    with ambiente.conexao() as conexao:
+        _inserir_resposta_recepcao(conexao, id_reserva, enviada_em=agora)
+        conexao.commit()
+    item = next(
+        i
+        for i in cliente.get("/fila-do-dia").json()["itens"]
+        if i["id_reserva"] == id_reserva
+    )
+    assert item["precisa_atendimento_humano"] is False
+
+    with ambiente.conexao() as conexao:
+        _inserir_encaminhamento(
+            conexao, id_reserva, enviada_em=agora + timedelta(minutes=1)
+        )
+        conexao.commit()
+    item = next(
+        i
+        for i in cliente.get("/fila-do-dia").json()["itens"]
+        if i["id_reserva"] == id_reserva
+    )
+    assert item["precisa_atendimento_humano"] is True

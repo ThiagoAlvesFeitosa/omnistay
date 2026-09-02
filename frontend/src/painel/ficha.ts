@@ -14,7 +14,7 @@ export type ChaveCampoFicha = (typeof CAMPOS_FICHA)[number]["chave"];
 
 export type CamposFicha = Partial<Record<ChaveCampoFicha, string | null>>;
 
-function utilizavel(valor: string | null | undefined): boolean {
+function utilizavel(valor: string | null | undefined): valor is string {
   return valor != null && valor.trim() !== "";
 }
 

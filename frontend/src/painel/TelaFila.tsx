@@ -152,6 +152,11 @@ export function TelaFila() {
                       recado não enviado
                     </span>
                   ) : null}
+                  {linha.precisa_atendimento_humano ? (
+                    <span className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 text-violet-900">
+                      precisa da recepção
+                    </span>
+                  ) : null}
                 </td>
                 <td>
                   {linha.estado_cadastro === "parcial" ? (
@@ -163,7 +168,7 @@ export function TelaFila() {
                 <td className="text-right">
                   <div className="flex flex-wrap justify-end gap-2">
                     <Link to={`/ficha/${linha.id_reserva}`} className="text-sm underline">
-                      Ver ficha
+                      Estadia
                     </Link>
                     {saidaAdmiteCaminho(linha.status) ? (
                       <Link to={`/saida/${linha.id_reserva}`} className="text-sm underline">

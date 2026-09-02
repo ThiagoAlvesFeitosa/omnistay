@@ -75,6 +75,13 @@ function fetchPorPerfil(perfil: string, nome = "Funcionário") {
         anos_retencao_ficha: null,
       });
     }
+    if (metodo === "GET" && /\/reservas\/\d+\/conversa$/.test(url)) {
+      return json({
+        id_reserva: 1,
+        janela: { aberta: true, motivo: null },
+        mensagens: [],
+      });
+    }
     if (metodo === "GET" && /\/reservas\/\d+\/ficha$/.test(url)) {
       return json({
         id_reserva: 1,
@@ -293,11 +300,13 @@ describe("Casca", () => {
         const visao = renderCasca(rota);
         expect(await screen.findByRole("heading", { name: casa })).toBeInTheDocument();
         expect(screen.queryByRole("heading", { name: "Ficha do hóspede" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "Estadia" })).not.toBeInTheDocument();
         expect(screen.queryByText("Marina Duarte")).not.toBeInTheDocument();
         const ficha = fetchMock.mock.calls.filter(
           (chamada) =>
             String(chamada[0]).includes("/ficha") ||
-            String(chamada[0]).includes("/consentimento"),
+            String(chamada[0]).includes("/consentimento") ||
+            String(chamada[0]).includes("/conversa"),
         );
         expect(ficha).toHaveLength(0);
         visao.unmount();

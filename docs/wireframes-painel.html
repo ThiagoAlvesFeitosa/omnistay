@@ -76,7 +76,7 @@ ul.enxuta li{margin-bottom:4px}
   <div class="grupo">Recepção</div>
   <a data-t="fila">Fila do dia</a>
   <a data-t="reserva">Nova reserva</a>
-  <a data-t="ficha">Ficha do hóspede</a>
+  <a data-t="ficha">Estadia</a>
   <a data-t="chamados">Chamados e pedidos</a>
   <a data-t="consumos">Consumos a lançar</a>
   <a data-t="saida">Saída do hóspede</a>
@@ -199,7 +199,7 @@ ul.enxuta li{margin-bottom:4px}
 
 <!-- FICHA -->
 <section class="tela" id="ficha">
-  <div class="cabeca"><h2>Ficha do hóspede</h2><div class="perfil">Recepção · dado pessoal, gestão não acessa</div></div>
+  <div class="cabeca"><h2>Estadia — os dados cadastrais</h2><div class="perfil">Recepção · dado pessoal, gestão não acessa · recolhido abaixo da conversa</div></div>
   <div class="nota">Existe para ser <strong>copiada para o PMS</strong>. O OmniStay não se integra ao PMS — o recepcionista é a ponte. Por isso o botão de copiar é o elemento principal da tela, não um detalhe.</div>
 
   <div class="barra">
@@ -277,6 +277,58 @@ ul.enxuta li{margin-bottom:4px}
   </div>
 
   <div class="rodape"><strong>Sem nome do hóspede na lista.</strong> O mesmo endpoint serve a recepção, a equipe e a gestão, e "equipe não vê dado cadastral" é critério de aceite. Cada linha leva à reserva, e é por ali que a recepção chega ao nome — inclusive quando não há número de quarto, que é campo opcional.<br><br>Reclamação tem o recebimento confirmado ao hóspede <strong>imediatamente</strong>, antes de qualquer tramitação. A resposta sai sempre <strong>pelo canal em que o hóspede escreveu</strong>. Endpoints: <code>GET /solicitacoes</code> · <code>POST /solicitacoes/{id}/resolucao</code></div>
+</section>
+
+<!-- CONVERSA -->
+<section class="tela" id="conversa">
+  <div class="cabeca"><h2>Estadia — a conversa</h2><div class="perfil">Recepção · fatia F7.6, a construir · é o topo da tela Estadia</div></div>
+
+  <div class="nota" style="background:#e9f0eb;border-left-color:var(--ok)"><strong>Decidido em 02/09/2026:</strong> isto não é tela separada. A antiga "Ficha do hóspede" virou <strong>Estadia</strong>, com a conversa no topo e os campos cadastrais recolhidos abaixo, atrás de "ver dados cadastrais". Quem chega vindo de um chamado veio responder, não ler documento — e o menu não ganha destino novo.</div>
+
+  <div class="nota"><strong>Fecha o ciclo que hoje não fecha.</strong> O sistema avisa o hóspede que a recepção vai atender, abre o chamado e permite marcar como resolvido — mas não há onde escrever a resposta. O hóspede recebe "resolvido" sem nunca ter recebido a resposta.</div>
+
+  <div class="barra">
+    <div><strong>Marina Duarte</strong> · quarto 304 · hospedada até 29/08 &nbsp; <span class="tag vermelha">1 dúvida não coberta</span></div>
+    <div><span class="bt sec">Ver ficha</span></div>
+  </div>
+
+  <div class="quadro">
+    <div class="chat" style="max-height:none">
+      <div class="bolha nossa">Olá, Marina! Sua chegada está confirmada.<br>Café da manhã: das 7h às 10h no salão térreo…
+        <div class="legenda" style="margin-top:4px">automática · 14:02</div></div>
+
+      <div class="bolha dele">que horas abre a piscina?
+        <div class="legenda" style="margin-top:4px">hóspede · 14:31</div></div>
+
+      <div class="bolha nossa">A nossa piscina está aberta das 8h às 22h.
+        <div class="legenda" style="margin-top:4px">automática · pelo catálogo · 14:31</div></div>
+
+      <div class="bolha dele">tem berço no quarto?
+        <div class="legenda" style="margin-top:4px">hóspede · 14:38</div></div>
+
+      <div class="bolha nossa">Recebemos sua pergunta. A recepção vai atender por aqui em seguida.
+        <div class="legenda" style="margin-top:4px">automática · <span class="tag vermelha">fora do catálogo</span> · 14:38</div></div>
+    </div>
+
+    <div style="border:1px solid var(--linha);border-top:none;padding:12px;background:#fff">
+      <div class="entrada" style="min-height:56px">Temos sim, Marina. Já pedimos para levarem ao seu quarto.</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+        <span class="legenda">Enter envia · Shift+Enter quebra linha</span>
+        <span class="bt">Enviar</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="rodape">
+    <strong>Três decisões que o desenho carrega:</strong>
+    <ul class="enxuta">
+      <li><strong>Cada mensagem diz quem falou</strong> — automática, pelo catálogo, ou escrita por uma pessoa. Sem isso a recepcionista repete o que o sistema já disse.</li>
+      <li><strong>A pergunta não coberta é destacada</strong> na própria conversa. É o que ela veio responder.</li>
+      <li><strong>Responder não resolve o chamado.</strong> São ações distintas: ela pode responder "vou verificar" sem fechar nada. O botão de resolver continua na tela de Chamados.</li>
+    </ul>
+    <strong>Onde se chega:</strong> pelo botão <em>Responder</em> no chamado, e pela reserva na fila do dia.<br>
+    <strong>Sem template:</strong> o hóspede escreveu há pouco, a janela de 24h está aberta, então é texto livre e sem custo.
+  </div>
 </section>
 
 <!-- CONSUMOS -->

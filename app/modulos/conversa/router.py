@@ -15,9 +15,12 @@ from app.modulos.acesso.dependencias import Conexao, exigir_operacao
 from app.modulos.acesso.service import SessaoAtual
 from app.modulos.conversa import service as conversa
 from app.modulos.conversa.schema import (
+    ConversaEstadiaResposta,
     EventoEntrada,
     FioConversaSimulador,
     ListaConversasSimulador,
+    RespostaRecepcaoCriada,
+    RespostaRecepcaoEntrada,
     TurnoHospedeEntrada,
     TurnoHospedeResposta,
 )
@@ -235,3 +238,75 @@ def enviar_turno_hospede_simulador(
         else status.HTTP_201_CREATED
     )
     return JSONResponse(status_code=codigo, content=resposta.model_dump())
+
+
+def _traduzir_estadia(erro: Exception) -> None:
+    if isinstance(erro, conversa.ReservaNaoEncontrada):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reserva nao encontrada.",
+        ) from erro
+    if isinstance(erro, conversa.TextoInvalido):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Texto invalido.",
+        ) from erro
+    if isinstance(erro, conversa.JanelaCanalFechada):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"codigo": erro.codigo},
+        ) from erro
+    if isinstance(erro, conversa.TextoRepetido):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"codigo": erro.codigo},
+        ) from erro
+    raise erro
+
+
+@roteador.get(
+    "/reservas/{id_reserva}/conversa",
+    response_model=ConversaEstadiaResposta,
+)
+def obter_conversa_da_estadia(
+    id_reserva: int,
+    conexao: Conexao,
+    sessao: Annotated[
+        SessaoAtual, Depends(exigir_operacao("ler_conversa_da_estadia"))
+    ],
+) -> ConversaEstadiaResposta:
+    try:
+        dados = conversa.ler_conversa_da_estadia(
+            conexao, id_hotel=sessao.id_hotel, id_reserva=id_reserva
+        )
+    except Exception as erro:
+        _traduzir_estadia(erro)
+        raise
+    return ConversaEstadiaResposta.model_validate(dados)
+
+
+@roteador.post(
+    "/reservas/{id_reserva}/respostas",
+    response_model=RespostaRecepcaoCriada,
+    status_code=status.HTTP_201_CREATED,
+)
+def criar_resposta_da_recepcao(
+    id_reserva: int,
+    corpo: RespostaRecepcaoEntrada,
+    conexao: Conexao,
+    sessao: Annotated[
+        SessaoAtual, Depends(exigir_operacao("enviar_resposta_recepcao"))
+    ],
+) -> RespostaRecepcaoCriada:
+    try:
+        dados = conversa.enviar_resposta_recepcao(
+            conexao,
+            id_hotel=sessao.id_hotel,
+            id_reserva=id_reserva,
+            texto=corpo.texto,
+        )
+    except Exception as erro:
+        _traduzir_estadia(erro)
+        raise
+    return RespostaRecepcaoCriada.model_validate(dados)
+

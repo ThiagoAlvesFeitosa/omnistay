@@ -15,7 +15,7 @@ import { TelaAlertas } from "./TelaAlertas";
 import { TelaChamados } from "./TelaChamados";
 import { TelaEntrada } from "./TelaEntrada";
 import { TelaConsumos } from "./TelaConsumos";
-import { TelaFicha } from "./TelaFicha";
+import { TelaEstadia } from "./TelaEstadia";
 import { TelaFila } from "./TelaFila";
 import { TelaNomeada } from "./TelaNomeada";
 import { TelaNovaReserva } from "./TelaNovaReserva";
@@ -153,7 +153,7 @@ export function Casca() {
               ) : destino.id === "reserva" ? (
                 <TelaNovaReserva />
               ) : destino.id === "ficha" ? (
-                <TelaFicha />
+                <TelaEstadia />
               ) : destino.id === "alertas" ? (
                 <TelaAlertas />
               ) : destino.id === "consumos" ? (

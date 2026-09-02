@@ -79,6 +79,39 @@ $env:DATABASE_URL="postgresql+psycopg2://postgres:SENHA@localhost:5432/omnistay"
 duas antes de gravar o vídeo — Neon em *Roles → Reset password*, Gemini apagando e gerando outra
 chave no AI Studio.
 
+## Camada de IA em funcionamento — verificada em 02/09/2026
+
+Provada de ponta a ponta contra o Gemini real, com `scripts/diagnosticar_resposta.py`:
+
+| Pergunta | Resultado |
+| --- | --- |
+| "que horas abre a piscina?" (coberta pelo catálogo) | Responde, e a verificação de fidelidade aceita |
+| "tem berço no quarto?" (fora do catálogo) | `coberta=False` — o modelo reconhece que não sabe, e nada chega ao hóspede |
+
+**Este par é a evidência central do produto**, e vale mostrar no vídeo: o sistema responde o que
+sabe e se cala sobre o que não sabe.
+
+### Três armadilhas encontradas no caminho, para não repetir
+
+| Sintoma | Causa | Correção |
+| --- | --- | --- |
+| `404` na chamada do modelo | `gemini-2.0-flash` foi aposentado. Nome de modelo fixo quebra sozinho quando o fornecedor descontinua | `LLM_MODELO` no `.env`. Considerar o apelido `gemini-flash-latest`, que não expira |
+| `llm_tempo_esgotado` | Limite de 15s era de conversa síncrona; o prompt com catálogo inteiro passa disso | `LLM_TIMEOUT_SECONDS=45`. A mensagem é assíncrona — o hóspede não espera olhando |
+| `resposta_nao_fiel` em resposta correta | **O prompt formatava `"Título: Conteúdo"` e a verificação montava `título + " " + conteúdo`.** O modelo copiava fielmente o que recebia; a checagem procurava noutro formato e concluía invenção | Função única `formatar_item_catalogo`, usada nos dois lados. O contrato da fatia 012 também trazia a fórmula duplicada — spec e código estavam errados juntos, e por isso o `/analyze` não pegou |
+
+**A lição da terceira:** duas partes do sistema formatando o mesmo dado é a mesma classe de
+problema que a F0.2 resolveu no esquema. Onde há duas fontes, elas divergem — a correção é uma
+fonte só, com teste que quebra se alguém alterar um lado sem o outro.
+
+### A refinar antes de gravar
+
+O texto que chega ao hóspede está robótico por causa da exigência de citação literal:
+
+> *"A piscina abre às 8h, conforme o trecho: 'Piscina: Aberta das 8h as 22h.'"*
+
+O "conforme o trecho" expõe o mecanismo interno. O prompt deve pedir que o trecho seja **tecido
+na frase**, sem metalinguagem do tipo "conforme os fatos" ou "segundo o trecho".
+
 ## A demonstração à banca — como funciona
 
 **Duas peças independentes, e a confusão entre elas é fácil de fazer:**
@@ -603,6 +636,31 @@ Lacunas encontradas no backlog (agosto/2026) — nenhuma tem fatia dedicada:
       amplifica a consequência
 
 Ainda abertas:
+
+- [ ] **A recepção não tem como responder ao hóspede.** Descoberto em 02/09/2026 testando o
+      fluxo. O sistema avisa que a recepção vai atender, abre chamado e permite resolver — mas
+      não existe endpoint nem tela para escrever a resposta. O hóspede recebe "resolvido" sem
+      nunca ter recebido a resposta. **Virou a F7.6 do backlog.** Não exige template: a janela de
+      24h está aberta, então é texto livre e sem custo
+- [ ] **Catálogo sem acentuação.** O povoador gravou em ASCII ("Cafe da manha"), e como o trecho
+      do catálogo entra literalmente na resposta ao hóspede, o texto chega sem acento e com
+      maiúscula no meio da frase. Reescrever os itens em minúscula, acentuados e já no formato de
+      frase — cinco minutos, e melhora a resposta da IA sem tocar em código
+
+- [ ] **Fonte de preço de mercado — pausado em 02/09/2026.** A ideia de coletar da Booking foi
+      descartada: os termos de uso proíbem coleta automatizada e o `robots.txt` bloqueia. E o
+      próprio coletor recusaria a visita, porque a F5.2 decidiu que "diretiva ausente não autoriza
+      visita". **Caminho recomendado:** segunda implementação da porta `FontePublica` com
+      **lançamento manual do preço observado** pelo hotel — é como o hoteleiro já trabalha. A API
+      oficial da Booking (Demand API) exige acordo de parceria e entra como adaptador quando
+      houver. Mesma resposta estrutural do PMS
+- [ ] **Foto de documento com leitura automática de campos.** Tecnicamente viável — o modelo é
+      multimodal e extrai campos de imagem. **Reabre decisão fechada** ("somente campos digitados,
+      sem foto"), tomada por causa da LGPD: imagem de documento de identidade é dado sensível, com
+      obrigações de guarda, acesso e descarte que o projeto não tratou. Exige revisão do artefato
+      de retenção antes de qualquer implementação
+- [ ] **Caixa de mensagem do simulador** — não envia com Enter e o visual destoa. Entra no
+      redesenho do painel
 
 - [x] ~~**Adaptador real de `LLMProvider`**~~ F7.1: `LLMGemini` + `construir_llm`; worker usa a
       fábrica; suíte sem rede. Aviso de assistente virtual no recado de boas-vindas

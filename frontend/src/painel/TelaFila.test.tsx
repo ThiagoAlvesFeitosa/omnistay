@@ -22,6 +22,7 @@ function item(parcial: Partial<ItemFila> & { id_reserva: number; nome: string })
     chegada_nao_confirmada: false,
     boas_vindas_nao_enviadas: false,
     saida_nao_confirmada: false,
+    precisa_atendimento_humano: false,
     ...parcial,
   };
 }
@@ -242,13 +243,43 @@ describe("TelaFila", () => {
     expect(screen.getByText("Em dia").closest("tr")).not.toHaveTextContent("não confirmada");
   });
 
-  it("Ver ficha na linha navega para a ficha da reserva", async () => {
+  it("distintivo de atendimento humano some depois da resposta da recepção", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchFila([
+        item({
+          id_reserva: 40,
+          nome: "Aguardando pessoa",
+          status: "hospedado",
+          estado_cadastro: "completa",
+          precisa_atendimento_humano: true,
+        }),
+        item({
+          id_reserva: 41,
+          nome: "Já respondida",
+          status: "hospedado",
+          estado_cadastro: "completa",
+          precisa_atendimento_humano: false,
+        }),
+      ]),
+    );
+    renderFila();
+    expect(await screen.findByText("precisa da recepção")).toBeInTheDocument();
+    expect(screen.getByText("Aguardando pessoa").closest("tr")).toHaveTextContent(
+      "precisa da recepção",
+    );
+    expect(screen.getByText("Já respondida").closest("tr")).not.toHaveTextContent(
+      "precisa da recepção",
+    );
+  });
+
+  it("Estadia na linha navega para a estadia da reserva", async () => {
     vi.stubGlobal(
       "fetch",
       fetchFila([item({ id_reserva: 10, nome: "Elegível", status: "ficha_recebida", estado_cadastro: "completa" })]),
     );
     renderFila();
-    const link = await screen.findByRole("link", { name: "Ver ficha" });
+    const link = await screen.findByRole("link", { name: "Estadia" });
     expect(link).toHaveAttribute("href", expect.stringMatching(/\/ficha\/10$/));
     fireEvent.click(screen.getByText("Elegível"));
     const fetchMock = vi.mocked(fetch);

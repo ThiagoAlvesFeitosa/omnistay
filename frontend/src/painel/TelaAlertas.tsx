@@ -123,7 +123,7 @@ export function TelaAlertas({ agora }: Props) {
               ) : null}
               <div className="mt-3 flex flex-wrap items-center gap-4">
                 <Link to={`/ficha/${linha.id_reserva}`} className="text-sm underline">
-                  Ver ficha
+                  Estadia
                 </Link>
                 <Button
                   type="button"

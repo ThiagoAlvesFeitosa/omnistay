@@ -55,3 +55,35 @@ class TurnoHospedeResposta(BaseModel):
     status: str
     id_mensagem: int | None = None
     id_reserva: int
+
+
+class JanelaCanal(BaseModel):
+    aberta: bool
+    motivo: str | None = None
+
+
+class ItemConversaEstadia(BaseModel):
+    id_mensagem: int
+    direcao: str
+    origem: str
+    conteudo: str
+    status_envio: str | None = None
+    entrega: str | None = None
+    nova_tentativa: bool | None = None
+    em: datetime | None = None
+
+
+class ConversaEstadiaResposta(BaseModel):
+    id_reserva: int
+    janela: JanelaCanal
+    mensagens: list[ItemConversaEstadia]
+
+
+class RespostaRecepcaoEntrada(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    texto: str
+
+
+class RespostaRecepcaoCriada(ItemConversaEstadia):
+    janela: JanelaCanal

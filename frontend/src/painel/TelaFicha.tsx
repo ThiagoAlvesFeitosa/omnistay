@@ -18,7 +18,7 @@ import { TelefoneInvalido, telefoneUtilizavel } from "./telefone";
 
 type Estado = "vazio" | "carregando" | "ok" | "falha";
 
-type FichaResposta = CamposFicha & {
+export type FichaResposta = CamposFicha & {
   id_reserva: number;
   id_hospede: number;
   ficha_completa: boolean;
@@ -79,7 +79,11 @@ function dataDoMomento(iso: string): string {
   return formatarDataVisivel(iso.slice(0, 10));
 }
 
-export function TelaFicha() {
+type Props = {
+  embutida?: boolean;
+};
+
+export function TelaFicha({ embutida = false }: Props) {
   const { idReserva } = useParams();
   const [estado, setEstado] = useState<Estado>(idReserva ? "carregando" : "vazio");
   const [ficha, setFicha] = useState<FichaResposta | null>(null);
@@ -220,13 +224,15 @@ export function TelaFicha() {
   }
 
   return (
-    <main className="p-8">
+    <main className={embutida ? "" : "p-8"}>
+      {embutida ? null : (
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-900 pb-2">
         <h1 className="text-2xl font-semibold">Ficha do hóspede</h1>
         <Link to="/fila" className="text-sm underline">
           Fila do dia
         </Link>
       </div>
+      )}
 
       {estado === "vazio" ? (
         <p>A ficha se abre pela fila do dia ou por Chamados e pedidos.</p>

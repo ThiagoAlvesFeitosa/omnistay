@@ -1,5 +1,6 @@
 """Acesso a mensagem — sem regra de negocio."""
 
+import json
 from datetime import UTC, datetime
 
 from sqlalchemy import text
@@ -663,3 +664,98 @@ def anonimizar_payloads_vencidos(
         },
     )
     return resultado.rowcount or 0
+
+
+def ler_reserva_do_hotel(
+    conexao: Connection, *, id_hotel: int, id_reserva: int
+) -> dict | None:
+    linha = conexao.execute(
+        text(
+            "SELECT id_reserva, id_hotel, status, telefone_contato"
+            " FROM reserva"
+            " WHERE id_reserva = :id_reserva AND id_hotel = :id_hotel"
+        ),
+        {"id_reserva": id_reserva, "id_hotel": id_hotel},
+    ).mappings().first()
+    return dict(linha) if linha else None
+
+
+def listar_conversa_da_estadia(
+    conexao: Connection, *, id_hotel: int, id_reserva: int
+) -> list[dict]:
+    linhas = conexao.execute(
+        text(
+            "SELECT m.id_mensagem, m.direcao, m.conteudo, m.status_envio,"
+            " m.enviada_em, m.classificacao_bruta,"
+            " t.status AS status_trabalho"
+            " FROM mensagem m"
+            " JOIN reserva r ON r.id_reserva = m.id_reserva"
+            " LEFT JOIN trabalho t ON t.tipo = 'enviar_resposta_recepcao'"
+            " AND (t.payload->>'id_mensagem')::bigint = m.id_mensagem"
+            " WHERE m.id_reserva = :id_reserva AND r.id_hotel = :id_hotel"
+            " ORDER BY m.enviada_em ASC, m.id_mensagem ASC"
+        ),
+        {"id_reserva": id_reserva, "id_hotel": id_hotel},
+    ).mappings().all()
+    return [dict(linha) for linha in linhas]
+
+
+def ler_ultima_recebida_em(
+    conexao: Connection, *, id_hotel: int, id_reserva: int
+):
+    return conexao.execute(
+        text(
+            "SELECT MAX(m.enviada_em) FROM mensagem m"
+            " JOIN reserva r ON r.id_reserva = m.id_reserva"
+            " WHERE m.id_reserva = :id_reserva AND r.id_hotel = :id_hotel"
+            " AND m.direcao = 'recebida'"
+        ),
+        {"id_reserva": id_reserva, "id_hotel": id_hotel},
+    ).scalar_one_or_none()
+
+
+def ler_ultima_resposta_recepcao(
+    conexao: Connection, *, id_hotel: int, id_reserva: int
+) -> dict | None:
+    linha = conexao.execute(
+        text(
+            "SELECT m.conteudo, m.enviada_em, m.classificacao_bruta"
+            " FROM mensagem m"
+            " JOIN reserva r ON r.id_reserva = m.id_reserva"
+            " WHERE m.id_reserva = :id_reserva AND r.id_hotel = :id_hotel"
+            " AND m.direcao = 'enviada'"
+            " AND m.classificacao_bruta->>'tipo' = 'resposta_recepcao'"
+            " ORDER BY m.enviada_em DESC, m.id_mensagem DESC"
+            " LIMIT 1"
+        ),
+        {"id_reserva": id_reserva, "id_hotel": id_hotel},
+    ).mappings().first()
+    return dict(linha) if linha else None
+
+
+def inserir_resposta_recepcao(
+    conexao: Connection,
+    *,
+    id_reserva: int,
+    conteudo: str,
+    agora=None,
+) -> dict:
+    linha = conexao.execute(
+        text(
+            "INSERT INTO mensagem (id_reserva, direcao, conteudo, status_envio,"
+            " classificacao_bruta, enviada_em)"
+            " VALUES (:id_reserva, 'enviada', :conteudo, 'pendente',"
+            " CAST(:classificacao AS jsonb), COALESCE(:agora, now()))"
+            " RETURNING id_mensagem, id_reserva, direcao, conteudo,"
+            " status_envio, enviada_em, classificacao_bruta"
+        ),
+        {
+            "id_reserva": id_reserva,
+            "conteudo": conteudo,
+            "classificacao": json.dumps({"tipo": "resposta_recepcao"}),
+            "agora": agora,
+        },
+    ).mappings().one()
+    item = dict(linha)
+    item["status_trabalho"] = "pendente"
+    return item

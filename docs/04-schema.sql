@@ -372,7 +372,8 @@ CREATE TABLE trabalho (
                  'abrir_chamado_reclamacao', 'enviar_confirmacao_resolucao',
                  'enviar_pulso', 'registrar_resposta_pulso',
                  'enviar_pesquisa_saida', 'interpretar_pesquisa_saida',
-                 'enviar_lista_pedidos_chat', 'coletar_mercado')
+                 'enviar_lista_pedidos_chat', 'coletar_mercado',
+                 'enviar_resposta_recepcao')
     ),
     CONSTRAINT ck_trabalho_status CHECK (
         status IN ('pendente', 'processando', 'concluido', 'falha')
@@ -443,6 +444,14 @@ CREATE UNIQUE INDEX uq_trabalho_coletar_mercado_concorrente_aberto
     ON trabalho ( ((payload->>'id_concorrente')::bigint) )
     WHERE tipo = 'coletar_mercado'
       AND status IN ('pendente', 'processando');
+
+CREATE UNIQUE INDEX uq_trabalho_enviar_resposta_recepcao_mensagem
+    ON trabalho ( ((payload->>'id_mensagem')::bigint) )
+    WHERE tipo = 'enviar_resposta_recepcao';
+
+COMMENT ON INDEX uq_trabalho_enviar_resposta_recepcao_mensagem IS
+    'Uma mensagem, um trabalho. Varias respostas por reserva sao legitimas: '
+    'nao ha UNIQUE por id_reserva neste tipo (diferente de enviar_boas_vindas).';
 
 CREATE INDEX ix_trabalho_claim
     ON trabalho (status, proxima_tentativa_em)
@@ -820,6 +829,13 @@ SELECT r.id_hotel,
                      IN ('encaminhado_humano', 'formato_invalido', 'indisponivel',
                          'duvida_nao_coberta', 'item_ambiguo',
                          'identificacao_indisponivel')
+                 AND mh.enviada_em > COALESCE(
+                       (SELECT MAX(mr.enviada_em)
+                          FROM mensagem mr
+                         WHERE mr.id_reserva = r.id_reserva
+                           AND mr.direcao = 'enviada'
+                           AND mr.classificacao_bruta->>'tipo' = 'resposta_recepcao'),
+                       '-infinity'::timestamptz)
             )) AS precisa_atendimento_humano,
        (r.status = 'hospedado'
         AND r.data_checkout_prevista < CURRENT_DATE) AS saida_nao_confirmada,
@@ -871,7 +887,8 @@ COMMENT ON VIEW vw_fila_do_dia IS
     'status_envio_coleta da mensagem de coleta, estado_cadastro (aguardando, '
     'completa, parcial, leitura_humana, sem_cadastro_previo), '
     'boas_vindas_nao_enviadas (hospedado sem recado), precisa_atendimento_humano '
-    '(hospedado com mensagem de estadia encaminhada a pessoa), saida_nao_confirmada '
+    '(hospedado com encaminhamento humano posterior a ultima resposta_recepcao), '
+    'saida_nao_confirmada '
     '(hospedado com checkout previsto anterior a hoje) e '
     'pesquisa_saida_leitura_humana (resposta da pesquisa irreconhecivel, '
     'indisponivel, formato invalido ou prazo ausente).';

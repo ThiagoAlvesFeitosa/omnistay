@@ -12,6 +12,7 @@ function item(parcial: Partial<ItemFila> & { id_reserva: number }): ItemFila {
     estado_cadastro: "aguardando",
     chegada_nao_confirmada: false,
     boas_vindas_nao_enviadas: false,
+    precisa_atendimento_humano: false,
     saida_nao_confirmada: false,
     ...parcial,
   };

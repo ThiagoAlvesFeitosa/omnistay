@@ -10,7 +10,7 @@ export type Destino = {
 export const DESTINOS: readonly Destino[] = [
   { id: "fila", titulo: "Fila do dia", caminho: "/app/fila", perfis: ["recepcao"] },
   { id: "reserva", titulo: "Nova reserva", caminho: "/app/reserva", perfis: ["recepcao"] },
-  { id: "ficha", titulo: "Ficha do hóspede", caminho: "/app/ficha", perfis: ["recepcao"] },
+  { id: "ficha", titulo: "Estadia", caminho: "/app/ficha", perfis: ["recepcao"] },
   {
     id: "alertas",
     titulo: "Chamados e pedidos",

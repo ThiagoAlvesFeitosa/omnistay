@@ -1,165 +1,132 @@
-# Roteiro de teste da jornada — e ensaio da demonstração
+# Roteiro da jornada — teste, capturas e ensaio da demonstração
 
-**Para que serve:** percorrer o sistema inteiro uma vez, como um hóspede real, e conferir que a
-IA responde de verdade. Leva uns 15 minutos.
+**Para que serve:** percorrer o sistema inteiro uma vez, como um hóspede real, conferir que a IA
+responde de verdade e capturar as telas para o documento e o vídeo. Leva uns 20 minutos.
 
-**Quando fazer:** depois da F7.1 (adaptador de IA). Antes dela, tudo responde "a recepção vai te
-atender" e o teste não diz nada.
-
-**Enquanto o painel não existe, o `/docs` é o painel.**
+**Atualizado em 02/09/2026:** agora contra o **banco em nuvem** e usando o **painel**, não o
+`/docs`. As 16 telas existem.
 
 ---
 
-## Antes de começar
+## Preparação do ambiente
 
-Três terminais abertos, na pasta `omnistay`:
+### 1. Refazer o build do painel
+
+O build atual pode estar anterior às últimas telas.
 
 ```powershell
-docker compose up -d
+cd frontend
+npm run build
+cd ..
 ```
+
+### 2. Subir a API
 
 ```powershell
 uv run uvicorn app.main:app --reload
 ```
 
+### 3. Subir o worker, em outro terminal
+
 ```powershell
 uv run python -m worker
 ```
 
-> **O worker precisa ficar rodando.** É ele que envia as mensagens. Sem ele, nada sai da fila e
-> você vai achar que está quebrado.
+> **O worker precisa ficar rodando.** É ele que envia as mensagens. Sem ele, nada sai da fila.
 
-Duas abas no navegador:
+### 4. Conferir que está na nuvem
+
+```powershell
+uv run python -c "from app.config import obter_configuracao; print(obter_configuracao().database_url.split('@')[-1].split('?')[0])"
+```
+
+Tem que aparecer o endereço do Neon. Se aparecer `localhost`, feche o terminal e abra outro — uma
+sessão anterior pode ter deixado a variável antiga na memória.
+
+### 5. Abrir as duas abas
 
 | Aba | Endereço | Quem você é |
 | --- | --- | --- |
-| **1** | `http://localhost:8000/docs` | A recepção |
-| **2** | `http://localhost:8000/demo/` | O hóspede |
-
-### Como usar o `/docs`
-
-1. Clique no nome do endpoint para abrir
-2. Clique em **Try it out** (canto direito)
-3. Edite o texto do corpo da requisição
-4. Clique em **Execute**
-5. A resposta aparece abaixo, em **Server response**. Código **200** ou **201** é sucesso
-
-O login guarda um cookie na aba. Depois dele, todos os outros endpoints funcionam sem repetir.
+| **1** | `http://localhost:8000/app` | O hotel — recepção e gestão |
+| **2** | `http://localhost:8000/app/simulador` | O hóspede |
 
 ---
 
-## Parte 1 — Preparação (uma vez só)
-
-Sem isto a IA não tem o que responder.
+## Parte 1 — Preparação dos dados (uma vez só)
 
 ### 1.1 Entrar como gestor
 
-**`POST /sessoes`**
-
-```json
-{
-  "email": "thiago@hotel.com.br",
-  "senha": "sua-senha-de-12-caracteres"
-}
-```
+Aba 1 → login com `thiago@hotel.com.br` e a senha do bootstrap.
 
 ### 1.2 Criar o usuário da recepção
 
-**`POST /usuarios`** — o gestor não pode cadastrar reserva; a recepção pode.
+Tela **Usuários** → novo usuário:
 
-```json
-{
-  "nome": "Cleber Rocha",
-  "email": "cleber@hotel.com.br",
-  "perfil": "recepcao",
-  "senha": "recepcao2026demo"
-}
-```
+- Nome: `Cleber Rocha`
+- E-mail: `cleber@hotel.com.br`
+- Perfil: `recepcao`
+- Senha: `recepcao2026demo`
+
+> O gestor não cadastra reserva — só a recepção. É decisão de projeto, e vale mencionar no vídeo:
+> autoridade e operação são papéis diferentes.
 
 ### 1.3 Entrar como recepção
 
-**`POST /sessoes`**
-
-```json
-{
-  "email": "cleber@hotel.com.br",
-  "senha": "recepcao2026demo"
-}
-```
-
-> Daqui em diante você é a recepção. Todo o resto do roteiro usa este login.
+Sair e entrar de novo, agora com `cleber@hotel.com.br`.
 
 ### 1.4 Cadastrar o catálogo
 
-**`POST /catalogo`** — quatro vezes, uma para cada item. É a **única** fonte que a IA pode usar.
+Tela **Catálogo** → quatro itens. É a única fonte que a IA pode usar.
 
-```json
-{ "categoria": "horario", "titulo": "Cafe da manha", "conteudo": "Servido das 7h as 10h no salao terreo. Aos domingos ate as 11h." }
-```
+| Categoria | Título | Conteúdo |
+| --- | --- | --- |
+| horário | Café da manhã | Servido das 7h às 10h no salão térreo. Aos domingos até as 11h. |
+| horário | Piscina | Aberta das 8h às 22h. Crianças devem estar acompanhadas. |
+| serviço | Lavanderia | Entrega em até 24 horas. Pedidos até as 18h saem no dia seguinte. |
+| regra | Animais | Não aceitamos animais de estimação. |
 
-```json
-{ "categoria": "horario", "titulo": "Piscina", "conteudo": "Aberta das 8h as 22h. Criancas devem estar acompanhadas." }
-```
-
-```json
-{ "categoria": "servico", "titulo": "Lavanderia", "conteudo": "Entrega em ate 24 horas. Pedidos ate as 18h saem no dia seguinte." }
-```
-
-```json
-{ "categoria": "regra", "titulo": "Animais", "conteudo": "Nao aceitamos animais de estimacao." }
-```
+📸 **Capture esta tela.**
 
 ### 1.5 Cadastrar um item vendável
 
-**`POST /itens-vendaveis`**
+Tela **Itens vendáveis** → `Caipirinha`, R$ 28,00.
 
-```json
-{ "nome": "Caipirinha", "preco_atual": 28.00 }
-```
+📸 **Capture esta tela** — é onde se explica que a IA identifica o item e o sistema busca o preço.
 
 ### 1.6 Preencher o recado de boas-vindas
 
-**`PUT /propriedade/boas-vindas`**
+Tela **Recado de boas-vindas** → os quatro campos:
 
-```json
-{
-  "cafe": "das 7h as 10h no salao terreo",
-  "wifi": "rede HotelExemplo, senha na recepcao",
-  "checkout": "12h"
-}
-```
+- Café: `das 7h às 10h no salão térreo`
+- Wi-fi: `rede HotelExemplo, senha na recepção`
+- Saída até: `12h`
+- Convite: `Quer saber dos nossos serviços, do cardápio ou dos horários? É só perguntar por aqui.`
 
 ---
 
 ## Parte 2 — A jornada
 
-### Passo 1 · A recepção cadastra a reserva
+### Passo 1 · Cadastrar a reserva
 
-**Aba 1 · `POST /reservas`**
+Aba 1 → **Fila do dia** → **Nova reserva**
 
-```json
-{
-  "nome": "Marina Duarte",
-  "telefone": "11987654321",
-  "data_checkin_prevista": "2026-08-27",
-  "data_checkout_prevista": "2026-08-29"
-}
-```
+- Nome: `Marina Duarte`
+- Telefone: `11987654321`
+- Entrada: hoje · Saída: daqui a dois dias
 
-Anote o `id_reserva` que voltar na resposta — você vai usar depois.
+📸 **Capture a fila do dia** com a reserva aparecendo.
 
 ### Passo 2 · A mensagem de coleta chega
 
-**Aba 2** — atualize a página. A reserva aparece na lista à esquerda. Clique nela.
+Aba 2 → atualize. A reserva aparece na lista; clique nela.
 
-> Se a mensagem não apareceu, espere alguns segundos e atualize de novo. O worker trabalha em
-> ciclos, não instantaneamente.
+✅ **Confira:** a mensagem avisa que o atendimento é feito por assistente virtual?
 
-**Confira:** a mensagem avisa que o atendimento é por assistente virtual? (a partir da F7.1)
+📸 **Capture.**
 
 ### Passo 3 · A hóspede responde a ficha
 
-**Aba 2** — escreva como se fosse a Marina, tudo numa mensagem só:
+Aba 2 → escreva como se fosse a Marina, numa mensagem só:
 
 ```
 Marina Duarte Fonseca, gerente de contas, nasci em 14/03/1992,
@@ -169,74 +136,122 @@ CEP 04567-000, Sao Paulo
 
 ### Passo 4 · Conferir a ficha extraída
 
-**Aba 1 · `GET /reservas/{id_reserva}/ficha`**
+Aba 1 → **Fila do dia** → abrir a reserva → **Ficha**
 
-**Confira:** os campos foram separados certo? Nome, profissão, nascimento, documento, endereço,
-CEP e cidade nos lugares corretos?
+✅ **Confira:** os campos foram separados certo?
 
-> Este passo é o que testa a extração pela IA. Se vier tudo vazio ou embaralhado, é problema de
-> prompt — anote e siga em frente.
+📸 **Capture.** Esta tela prova a extração pela IA.
 
 ### Passo 5 · Confirmar a chegada
 
-**Aba 1 · `POST /reservas/{id_reserva}/chegada`** — corpo vazio `{}`
+Aba 1 → **Fila do dia** → botão **Confirmar chegada**
 
 ### Passo 6 · O recado de boas-vindas
 
-**Aba 2** — atualize. Deve chegar a confirmação com café, wi-fi e horário de saída.
+Aba 2 → atualize. Chega a confirmação com café, wi-fi, horário de saída e o convite.
+
+📸 **Capture.**
 
 ### Passo 7 · A conversa — o teste principal
 
-**Aba 2** — pergunte uma de cada vez, esperando a resposta:
+Aba 2 → pergunte uma de cada vez:
 
 | Pergunta | Resposta esperada |
 | --- | --- |
 | *que horas abre a piscina?* | 8h às 22h |
 | *vocês aceitam cachorro?* | Não aceitamos animais |
-| *quanto tempo demora a lavanderia?* | Até 24 horas |
 | *que horas é o desjejum?* | 7h às 10h — **paráfrase**, o catálogo diz "café da manhã" |
 | **_tem berço no quarto?_** | **"a recepção vai te atender"** — e nada mais |
 
-> A última é a mais importante do roteiro. Berço **não está no catálogo**. Se a IA inventar uma
-> resposta, a regra de fidelidade falhou — e isso é problema sério, não detalhe. Anote e me avise.
+📸 **Capture as duas últimas.** São as mais fortes do vídeo: uma mostra que a IA entende
+paráfrase; a outra, que ela **não inventa**.
+
+> Se a IA inventar resposta sobre berço, a regra de fidelidade falhou. Anote e me avise.
+
+Aba 1 → fila do dia deve mostrar **precisa da recepção**. Abrir **Estadia** (não mais “Ver ficha”).
+A conversa vem no topo; os cadastrais ficam atrás de **ver dados cadastrais**.
+
+Escreva a resposta livre (`Sim, temos berço no quarto.`) e **Enviar**. O histórico mostra
+**enviando**, depois **enviada**. Se o canal falhar, aparece **falhou** com **nova tentativa
+marcada** — o texto não some. Clique duplo no Enviar não duplica a mensagem.
+
+✅ **Confira:** o campo permanece visível se a janela de 24h estiver fechada, com o motivo na tela.
+✅ **Confira:** responder **não** marca o chamado como resolvido.
+
+Aba 2 → o hóspede recebe o mesmo texto.
+
+📸 **Capture a Estadia com a conversa no topo.**
 
 ### Passo 8 · Um pedido de serviço
 
-**Aba 2:** `manda uma toalha extra por favor`
+Aba 2: `manda uma toalha extra por favor`
 
-**Aba 1 · `GET /solicitacoes`** — deve aparecer como tipo serviço.
+Aba 1 → **Chamados e pedidos**. 📸 **Capture.**
 
 ### Passo 9 · Um consumo faturável
 
-**Aba 2:** `quero uma caipirinha`
+Aba 2: `quero uma caipirinha`
 
-**Aba 1 · `GET /consumos/pendentes`** — deve aparecer com **R$ 28,00**.
+Aba 1 → **Consumos a lançar** — deve aparecer com **R$ 28,00**.
 
-> **Confira o valor.** Ele tem que vir do item cadastrado, não de um número que a IA escreveu.
-> Se o preço na conversa for diferente do preço aqui, é o problema que a decisão de "a IA nunca
-> escreve preço" existe para evitar.
+✅ **Confira:** o valor da conversa é igual ao da fila? Tem que ser — a IA identifica o item, o
+sistema busca o preço.
 
-### Passo 10 · A saída
+📸 **Capture.**
 
-**Aba 1 · `POST /reservas/{id_reserva}/saida`** — corpo vazio `{}`
+### Passo 10 · A tela da equipe, no celular
 
-**Aba 2** — devem chegar **duas** mensagens: a pesquisa de saída e a lista de pedidos feitos pelo
-chat.
+Abra `http://localhost:8000/app` no celular, ou reduza a janela do navegador, e entre com um
+usuário de perfil `staff`.
 
-> **Confira o vocabulário:** a lista não pode ser chamada de "extrato" nem de "conta" em lugar
-> nenhum.
+📸 **Capture** — mostra o Alert Center substituindo o app da equipe.
+
+### Passo 11 · A saída
+
+Aba 1 → **Fila do dia** → **Abrir saída** → conferir a lista de pedidos feitos pelo chat →
+**Confirmar saída**
+
+✅ **Confira:** aparece o aviso de consumo pendente antes de confirmar?
+✅ **Confira:** em nenhum lugar da tela aparece a palavra "extrato" ou "conta"?
+
+📸 **Capture.**
+
+Aba 2 → chegam a pesquisa de saída e a lista de pedidos.
+
+### Passo 12 · A visão da gestão
+
+Sair, entrar como gestor, abrir o **Painel**.
+
+✅ **Confira:** só números agregados, nenhum nome de hóspede.
+
+📸 **Capture** — é a prova de "números, não pessoas".
 
 ---
 
-## O que anotar enquanto percorre
+## Capturas necessárias, em resumo
 
-Nem tudo que parecer estranho é defeito de código. Separe em duas listas:
+| # | Tela | Onde entra |
+| --- | --- | --- |
+| 1 | Catálogo | Documento — o que alimenta a IA |
+| 2 | Itens vendáveis | Documento — a IA não escreve preço |
+| 3 | Fila do dia | Documento e slides — a tela principal |
+| 4 | Ficha extraída | Documento — a IA lendo texto livre |
+| 5 | Conversa com resposta pelo catálogo | **Slides e vídeo** |
+| 6 | Conversa com pergunta fora do catálogo | **Slides e vídeo** — não inventa |
+| 7 | Chamados e pedidos | Documento |
+| 8 | Consumos a lançar | Documento |
+| 9 | Tela da equipe no celular | Slides |
+| 10 | Saída com a lista de pedidos | Documento |
+| 11 | Painel da gestão | Documento |
 
-**Texto a ajustar** — mensagem longa demais, tom errado, palavra esquisita. É a maioria, e é
-barato de corrigir.
+---
 
-**Comportamento errado** — IA inventando resposta, preço divergente, mensagem que não chega,
-campo extraído no lugar errado. Estes viram tarefa.
+## O que anotar
+
+**Texto a ajustar** — mensagem longa, tom errado, palavra esquisita. É a maioria, e é barato.
+
+**Comportamento errado** — IA inventando, preço divergente, mensagem que não chega, campo no lugar
+errado. Estes viram tarefa.
 
 ---
 
@@ -245,8 +260,17 @@ campo extraído no lugar errado. Estes viram tarefa.
 | Sintoma | Causa mais provável |
 | --- | --- |
 | Nenhuma mensagem chega | O worker não está rodando |
-| "Nenhuma reserva nesta casa" | Não há reserva cadastrada, ou você está logado noutro hotel |
-| `403` ao cadastrar reserva | Você está logado como gestor, não como recepção |
-| `401` em tudo | A sessão caiu — refaça o `POST /sessoes` |
-| Tudo responde "a recepção vai te atender" | A F7.1 ainda não foi feita, ou `LLM_MODO` não está `real` |
-| Erro de autenticação do modelo | Chave do Gemini errada ou expirada |
+| Painel não abre em `/app` | Falta rodar `npm run build` no `frontend/` |
+| `403` ao cadastrar reserva | Logado como gestor, não como recepção |
+| `401` em tudo | Sessão caiu — entre de novo |
+| Tudo responde "a recepção vai te atender" | `LLM_MODO` não está `real`, ou a chave do Gemini falhou |
+| Conecta no banco errado | `$env:DATABASE_URL` de uma sessão anterior — abra terminal novo |
+
+---
+
+## Antes de gravar o vídeo
+
+- [ ] Trocar a senha do Neon (*Roles → Reset password*)
+- [ ] Trocar a chave do Gemini (apagar e gerar outra no AI Studio)
+- [ ] Fechar qualquer janela que mostre o `.env`
+- [ ] Conferir que o terminal visível não tem a string de conexão na tela

@@ -8,6 +8,7 @@ export type ItemFila = {
   estado_cadastro: string | null;
   chegada_nao_confirmada: boolean;
   boas_vindas_nao_enviadas: boolean;
+  precisa_atendimento_humano: boolean;
   saida_nao_confirmada: boolean;
 };
 

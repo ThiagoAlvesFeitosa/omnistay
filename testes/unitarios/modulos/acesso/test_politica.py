@@ -10,6 +10,8 @@ OPERACOES_ESPERADAS = {
     "administrar_usuario": {"gestor"},
     "ler_dado_cadastral_de_hospede": {"recepcao"},
     "ler_ficha_de_hospede": {"recepcao"},
+    "ler_conversa_da_estadia": {"recepcao"},
+    "enviar_resposta_recepcao": {"recepcao"},
     "alterar_ficha_de_hospede": {"recepcao"},
     "alterar_reserva": {"recepcao"},
     "confirmar_fase_da_reserva": {"recepcao"},

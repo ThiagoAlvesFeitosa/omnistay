@@ -2823,3 +2823,225 @@ def enviar_turno_hospede_simulador(
         resultado.get("status"),
     )
     return {**resultado, "id_reserva": id_reserva}
+
+
+class ReservaNaoEncontrada(Exception):
+    pass
+
+
+class TextoInvalido(Exception):
+    pass
+
+
+class JanelaCanalFechada(Exception):
+    codigo = "janela_fechada"
+
+
+class TextoRepetido(Exception):
+    codigo = "texto_repetido"
+
+
+def _item_publico(linha: dict) -> dict:
+    from app.modulos.conversa.origem_e_entrega import entrega, origem
+
+    orig = origem(
+        direcao=linha["direcao"],
+        classificacao_bruta=linha.get("classificacao_bruta"),
+    )
+    ent, nova = entrega(
+        status_envio=linha.get("status_envio"),
+        status_trabalho=linha.get("status_trabalho"),
+    )
+    return {
+        "id_mensagem": linha["id_mensagem"],
+        "direcao": linha["direcao"],
+        "origem": orig,
+        "conteudo": linha["conteudo"],
+        "status_envio": linha.get("status_envio"),
+        "entrega": ent,
+        "nova_tentativa": nova,
+        "em": linha.get("enviada_em"),
+    }
+
+
+def ler_conversa_da_estadia(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    repositorio=repositorio_padrao,
+    agora=None,
+) -> dict:
+    from app.comum.relogio import agora as agora_sistema
+    from app.modulos.conversa.janela import avaliar as avaliar_janela
+
+    reserva = repositorio.ler_reserva_do_hotel(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    if reserva is None:
+        raise ReservaNaoEncontrada()
+    mensagens = repositorio.listar_conversa_da_estadia(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    ultima = repositorio.ler_ultima_recebida_em(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    janela = avaliar_janela(ultima_recebida_em=ultima, agora=agora or agora_sistema())
+    logger.info(
+        "conversa_da_estadia_lida id_reserva=%s id_hotel=%s quantidade=%s",
+        id_reserva,
+        id_hotel,
+        len(mensagens),
+    )
+    return {
+        "id_reserva": id_reserva,
+        "janela": janela,
+        "mensagens": [_item_publico(m) for m in mensagens],
+    }
+
+
+def enviar_resposta_recepcao(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    id_reserva: int,
+    texto: str,
+    repositorio=repositorio_padrao,
+    enfileirar=fila_service.enfileirar_enviar_resposta_recepcao,
+    agora=None,
+) -> dict:
+    from app.comum.relogio import agora as agora_sistema
+    from app.modulos.conversa.anti_duplo import e_duplicata
+    from app.modulos.conversa.janela import (
+        TAMANHO_MAXIMO_TEXTO_CANAL,
+        avaliar as avaliar_janela,
+    )
+
+    instante = agora or agora_sistema()
+    reserva = repositorio.ler_reserva_do_hotel(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    if reserva is None:
+        raise ReservaNaoEncontrada()
+    limpo = (texto or "").strip()
+    if not limpo or len(limpo) > TAMANHO_MAXIMO_TEXTO_CANAL:
+        raise TextoInvalido()
+    ultima_recebida = repositorio.ler_ultima_recebida_em(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    janela = avaliar_janela(ultima_recebida_em=ultima_recebida, agora=instante)
+    if not janela["aberta"]:
+        raise JanelaCanalFechada()
+    ultima_humana = repositorio.ler_ultima_resposta_recepcao(
+        conexao, id_hotel=id_hotel, id_reserva=id_reserva
+    )
+    if e_duplicata(texto=limpo, ultima=ultima_humana, agora=instante):
+        raise TextoRepetido()
+    gravada = repositorio.inserir_resposta_recepcao(
+        conexao, id_reserva=id_reserva, conteudo=limpo, agora=instante
+    )
+    id_trabalho = enfileirar(
+        conexao,
+        id_hotel=id_hotel,
+        id_reserva=id_reserva,
+        id_mensagem=gravada["id_mensagem"],
+    )
+    logger.info(
+        "resposta_recepcao_enfileirada id_trabalho=%s id_mensagem=%s"
+        " id_reserva=%s id_hotel=%s",
+        id_trabalho,
+        gravada["id_mensagem"],
+        id_reserva,
+        id_hotel,
+    )
+    item = _item_publico(gravada)
+    item["janela"] = janela
+    return item
+
+
+def processar_trabalho_enviar_resposta_recepcao(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    gateway: MensageriaGateway,
+    repositorio=repositorio_padrao,
+    fila_repo=None,
+    fila_svc=None,
+) -> None:
+    from app.fila import repository as fila_repo_padrao
+    from app.fila import service as fila_svc_padrao
+
+    fila_repo = fila_repo or fila_repo_padrao
+    fila_svc = fila_svc or fila_svc_padrao
+    id_trabalho = trabalho["id_trabalho"]
+    id_hotel = trabalho["id_hotel"]
+    payload = trabalho["payload"]
+    id_mensagem = int(payload["id_mensagem"])
+    id_reserva = int(payload["id_reserva"])
+    mensagem = repositorio.ler_mensagem(conexao, id_mensagem=id_mensagem)
+    if mensagem is None:
+        fila_repo.marcar_falha(
+            conexao,
+            id_trabalho=id_trabalho,
+            tentativas=(trabalho.get("tentativas") or 0) + 1,
+            erro="mensagem_ausente",
+        )
+        return
+    if mensagem.get("status_envio") == "enviada":
+        fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+        return
+    telefone = repositorio.ler_telefone_da_reserva(conexao, id_reserva=id_reserva)
+    if not telefone:
+        fila_repo.marcar_falha(
+            conexao,
+            id_trabalho=id_trabalho,
+            tentativas=(trabalho.get("tentativas") or 0) + 1,
+            erro="telefone_ausente",
+        )
+        marcar_envio_falha(conexao, id_mensagem=id_mensagem, repositorio=repositorio)
+        return
+    try:
+        resultado = gateway.enviar_texto_sessao(
+            telefone_destino=telefone,
+            corpo=mensagem["conteudo"],
+            id_mensagem=id_mensagem,
+            id_reserva=id_reserva,
+        )
+    except FalhaDeEnvio as erro:
+        destino = fila_svc.registrar_falha_de_envio(
+            conexao,
+            id_trabalho=id_trabalho,
+            id_hotel=id_hotel,
+            tentativas_atuais=trabalho.get("tentativas") or 0,
+            codigo_erro=erro.codigo,
+        )
+        if destino == "falha":
+            marcar_envio_falha(
+                conexao, id_mensagem=id_mensagem, repositorio=repositorio
+            )
+        logger.info(
+            "resposta_recepcao_envio_falhou id_trabalho=%s id_mensagem=%s"
+            " id_reserva=%s destino=%s codigo=%s",
+            id_trabalho,
+            id_mensagem,
+            id_reserva,
+            destino,
+            erro.codigo,
+        )
+        return
+    marcar_envio_sucesso(
+        conexao,
+        id_mensagem=id_mensagem,
+        id_externo=resultado.id_externo,
+        repositorio=repositorio,
+    )
+    fila_repo.marcar_concluido(conexao, id_trabalho=id_trabalho)
+    logger.info(
+        "resposta_recepcao_enviada id_trabalho=%s id_mensagem=%s"
+        " id_reserva=%s id_hotel=%s",
+        id_trabalho,
+        id_mensagem,
+        id_reserva,
+        id_hotel,
+    )
+

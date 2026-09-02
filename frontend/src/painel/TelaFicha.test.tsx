@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { montarTextoCopia } from "./ficha";
-import { TelaFicha } from "./TelaFicha";
+import { TelaFicha, type FichaResposta } from "./TelaFicha";
 
 function json(corpo: unknown, status = 200): Response {
   return new Response(JSON.stringify(corpo), {
@@ -12,7 +12,7 @@ function json(corpo: unknown, status = 200): Response {
   });
 }
 
-const fichaParcial = {
+const fichaParcial: FichaResposta = {
   id_reserva: 1042,
   id_hospede: 7,
   ficha_completa: false,
@@ -29,7 +29,7 @@ const fichaParcial = {
   telefone: "5511987654321",
 };
 
-const fichaCompleta = {
+const fichaCompleta: FichaResposta = {
   ...fichaParcial,
   ficha_completa: true,
   status_reserva: "ficha_recebida",
@@ -54,7 +54,7 @@ const consentimentoNunca = {
 };
 
 function fetchDaFicha(
-  ficha: typeof fichaParcial,
+  ficha: FichaResposta,
   consentimento: Record<string, unknown> = consentimentoNunca,
   extras?: (url: string, init?: RequestInit) => Response | undefined,
 ) {

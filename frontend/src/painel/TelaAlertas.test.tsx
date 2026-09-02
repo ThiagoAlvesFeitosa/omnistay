@@ -67,7 +67,7 @@ describe("TelaAlertas", () => {
     vi.restoreAllMocks();
   });
 
-  it("busca a lista e mostra naturezas, tempo, Ver ficha e valor, sem dado cadastral", async () => {
+  it("busca a lista e mostra naturezas, tempo, Estadia e valor, sem dado cadastral", async () => {
     const itens = [
       item({
         id_solicitacao: 1,
@@ -107,7 +107,7 @@ describe("TelaAlertas", () => {
     expect(screen.getByText(/56/)).toBeInTheDocument();
     expect(screen.getByText(/sem quarto/i)).toBeInTheDocument();
 
-    const links = screen.getAllByRole("link", { name: "Ver ficha" });
+    const links = screen.getAllByRole("link", { name: "Estadia" });
     expect(links).toHaveLength(3);
     expect(links[0]).toHaveAttribute("href", expect.stringMatching(/\/ficha\/11$/));
     expect(links[2]).toHaveAttribute("href", expect.stringMatching(/\/ficha\/13$/));
@@ -140,7 +140,7 @@ describe("TelaAlertas", () => {
     expect(screen.queryByText(/não carregou/i)).not.toBeInTheDocument();
   });
 
-  it("Resolvido faz POST e some o item; Ver ficha e descrição não resolvem", async () => {
+  it("Resolvido faz POST e some o item; Estadia e descrição não resolvem", async () => {
     let abertos = [
       item({ id_solicitacao: 1, tipo: "reclamacao", descricao: "Ar-condicionado não gela" }),
     ];
@@ -159,7 +159,7 @@ describe("TelaAlertas", () => {
     renderAlertas();
     expect(await screen.findByText("Ar-condicionado não gela")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Ar-condicionado não gela"));
-    fireEvent.click(screen.getByRole("link", { name: "Ver ficha" }));
+    fireEvent.click(screen.getByRole("link", { name: "Estadia" }));
     expect(
       fetchMock.mock.calls.filter((c) => String(c[0]).includes("/resolucao")),
     ).toHaveLength(0);
