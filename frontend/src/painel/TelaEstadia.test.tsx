@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TelaEstadia } from "./TelaEstadia";
+import { conversaDeTeste, itemConversaDeTeste } from "./conversa.fixture";
 import { formatarHorarioBolha } from "./apresentacao";
 import type { FichaResposta } from "./TelaFicha";
 
@@ -30,42 +31,7 @@ const fichaParcial: FichaResposta = {
   telefone: "5511987654321",
 };
 
-const conversaAberta = {
-  id_reserva: 1042,
-  janela: { aberta: true, motivo: null },
-  mensagens: [
-    {
-      id_mensagem: 1,
-      direcao: "recebida",
-      origem: "hospede",
-      conteudo: "tem berco?",
-      status_envio: null,
-      entrega: null,
-      nova_tentativa: null,
-      em: "2026-09-02T18:00:00Z",
-    },
-    {
-      id_mensagem: 2,
-      direcao: "enviada",
-      origem: "automatico",
-      conteudo: "A recepção vai atender.",
-      status_envio: "enviada",
-      entrega: "enviada",
-      nova_tentativa: false,
-      em: "2026-09-02T18:01:00Z",
-    },
-    {
-      id_mensagem: 3,
-      direcao: "enviada",
-      origem: "recepcao",
-      conteudo: "Sim, temos berço.",
-      status_envio: "pendente",
-      entrega: "enviando",
-      nova_tentativa: false,
-      em: "2026-09-02T18:02:00Z",
-    },
-  ],
-};
+const conversaAberta = conversaDeTeste();
 
 function fetchEstadia(conversa = conversaAberta, ficha: FichaResposta = fichaParcial) {
   return vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
@@ -130,7 +96,7 @@ describe("TelaEstadia", () => {
     );
     expect(screen.getByText("Sim, temos berço.").closest("[data-lado]")).toHaveAttribute("data-lado", "hotel");
     expect(
-      screen.getByText(formatarHorarioBolha(conversaAberta.mensagens[0].em, new Date())),
+      screen.getByText(formatarHorarioBolha(conversaAberta.mensagens[0].em ?? "", new Date())),
     ).toBeInTheDocument();
     expect(screen.queryByText("Marina Duarte")).not.toBeInTheDocument();
     const ordem = fetchMock.mock.calls.map((chamada) => String(chamada[0]));
@@ -152,23 +118,24 @@ describe("TelaEstadia", () => {
   });
 
   it("mostra enviada, falhou e nova tentativa marcada", async () => {
-    const fetchMock = fetchEstadia({
-      ...conversaAberta,
-      mensagens: [
-        {
-          ...conversaAberta.mensagens[2],
-          entrega: "enviada",
-          status_envio: "enviada",
-        },
-        {
-          ...conversaAberta.mensagens[2],
-          id_mensagem: 4,
-          entrega: "falhou",
-          nova_tentativa: true,
-          conteudo: "Vamos levar toalha.",
-        },
-      ],
-    });
+    const fetchMock = fetchEstadia(
+      conversaDeTeste({
+        mensagens: [
+          itemConversaDeTeste({
+            ...conversaAberta.mensagens[2],
+            entrega: "enviada",
+            status_envio: "enviada",
+          }),
+          itemConversaDeTeste({
+            ...conversaAberta.mensagens[2],
+            id_mensagem: 4,
+            entrega: "falhou",
+            nova_tentativa: true,
+            conteudo: "Vamos levar toalha.",
+          }),
+        ],
+      }),
+    );
     renderEstadia("/app/ficha/1042", fetchMock);
     expect(await screen.findByText("enviada")).toBeInTheDocument();
     expect(screen.getByText("falhou · nova tentativa marcada")).toBeInTheDocument();
@@ -226,11 +193,12 @@ describe("TelaEstadia", () => {
   });
 
   it("janela fechada mantém o campo visível e o envio inerte", async () => {
-    const fetchMock = fetchEstadia({
-      id_reserva: 1042,
-      janela: { aberta: false, motivo: "nunca_escreveu" },
-      mensagens: [],
-    });
+    const fetchMock = fetchEstadia(
+      conversaDeTeste({
+        janela: { aberta: false, motivo: "nunca_escreveu" },
+        mensagens: [],
+      }),
+    );
     renderEstadia("/app/ficha/1042", fetchMock);
     expect(
       await screen.findByText(/hóspede ainda não escreveu/i),
@@ -240,11 +208,12 @@ describe("TelaEstadia", () => {
   });
 
   it("janela sem mensagem recente mostra o motivo e mantém o campo", async () => {
-    const fetchMock = fetchEstadia({
-      id_reserva: 1042,
-      janela: { aberta: false, motivo: "sem_mensagem_recente" },
-      mensagens: [],
-    });
+    const fetchMock = fetchEstadia(
+      conversaDeTeste({
+        janela: { aberta: false, motivo: "sem_mensagem_recente" },
+        mensagens: [],
+      }),
+    );
     renderEstadia("/app/ficha/1042", fetchMock);
     expect(
       await screen.findByText(/não escreveu nas últimas 24 horas/i),

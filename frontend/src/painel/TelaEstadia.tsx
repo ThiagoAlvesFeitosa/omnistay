@@ -8,12 +8,12 @@ import { BolhaConversa } from "./BolhaConversa";
 
 type EstadoConversa = "vazio" | "carregando" | "ok" | "falha";
 
-type JanelaCanal = {
+export type JanelaCanal = {
   aberta: boolean;
   motivo: string | null;
 };
 
-type ItemConversa = {
+export type ItemConversa = {
   id_mensagem: number;
   direcao: string;
   origem: string;
@@ -24,7 +24,7 @@ type ItemConversa = {
   em: string | null;
 };
 
-type ConversaResposta = {
+export type ConversaResposta = {
   id_reserva: number;
   janela: JanelaCanal;
   mensagens: ItemConversa[];
