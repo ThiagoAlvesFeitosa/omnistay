@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { formatarInstanteComDecorrido, formatarMoeda } from "./apresentacao";
 import type { ItemSolicitacao } from "./solicitacoes";
 import { TelaAlertas } from "./TelaAlertas";
 
@@ -102,9 +103,16 @@ describe("TelaAlertas", () => {
     expect(screen.getByText("reclamação")).toBeInTheDocument();
     expect(screen.getByText("serviço")).toBeInTheDocument();
     expect(screen.getByText("consumo")).toBeInTheDocument();
-    expect(screen.getByText(/há 3 h/i)).toBeInTheDocument();
+    const instanteMaisAntigo = formatarInstanteComDecorrido(itens[0].aberta_em, agora);
+    expect(instanteMaisAntigo).toMatch(/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} · /);
+    expect(instanteMaisAntigo).toMatch(/há 3 h/i);
+    expect(document.body.textContent).toContain(instanteMaisAntigo);
+    expect(document.body.textContent).toContain(
+      formatarInstanteComDecorrido(itens[2].aberta_em, agora),
+    );
     expect(screen.getByText("depois das 16h")).toBeInTheDocument();
-    expect(screen.getByText(/56/)).toBeInTheDocument();
+    expect(screen.getByText(formatarMoeda("56.00"))).toBeInTheDocument();
+    expect(screen.queryByText("R$ 56.00")).not.toBeInTheDocument();
     expect(screen.getByText(/sem quarto/i)).toBeInTheDocument();
 
     const links = screen.getAllByRole("link", { name: "Estadia" });

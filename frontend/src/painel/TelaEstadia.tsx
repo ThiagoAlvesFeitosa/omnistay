@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { pedirAutenticado } from "./sessao";
 import { TelaFicha } from "./TelaFicha";
+import { BolhaConversa } from "./BolhaConversa";
 
 type EstadoConversa = "vazio" | "carregando" | "ok" | "falha";
 
@@ -160,13 +161,15 @@ export function TelaEstadia() {
         <section className="mb-8 flex max-w-3xl flex-col gap-4">
           <ol className="flex flex-col gap-3">
             {conversa.mensagens.map((item) => (
-              <li key={item.id_mensagem} className="rounded border border-zinc-200 bg-white p-3">
-                <p className="text-xs text-zinc-500">{ROTULO_ORIGEM[item.origem] ?? item.origem}</p>
-                <p>{item.conteudo}</p>
-                {rotuloEntrega(item) ? (
-                  <p className="mt-1 text-xs text-zinc-600">{rotuloEntrega(item)}</p>
-                ) : null}
-              </li>
+              <BolhaConversa
+                key={item.id_mensagem}
+                lado={item.origem === "hospede" ? "hospede" : "hotel"}
+                quando={item.em}
+                rotulo={ROTULO_ORIGEM[item.origem] ?? item.origem}
+                entrega={rotuloEntrega(item)}
+              >
+                {item.conteudo}
+              </BolhaConversa>
             ))}
           </ol>
 

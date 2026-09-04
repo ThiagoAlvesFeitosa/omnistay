@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { Button } from "../components/ui/button";
+import { formatarMoeda } from "./apresentacao";
 import { pendentesDaEstadia, type ItemConsumoPendente } from "./consumos";
 import { pedirAutenticado } from "./sessao";
 
@@ -208,13 +209,13 @@ export function TelaSaida() {
                 {pedidos.map((linha, indice) => (
                   <li key={`${linha.descricao_item}-${indice}`}>
                     <span>{linha.descricao_item}</span>
-                    {" · R$ "}
-                    {linha.valor_praticado}
+                    {" · "}
+                    {formatarMoeda(linha.valor_praticado)}
                   </li>
                 ))}
               </ul>
             )}
-            <p className="mt-2 text-sm text-zinc-600">Total R$ {total}</p>
+            <p className="mt-2 text-sm text-zinc-600">Total {formatarMoeda(total)}</p>
           </section>
 
           {podeConfirmar ? (

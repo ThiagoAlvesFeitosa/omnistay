@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,6 +19,7 @@ const sessaoRecepcionista = {
   perfil: "recepcao",
   dispositivo: null,
   expira_em: "2026-09-01T00:00:00Z",
+  nome_hotel: "Hotel Alpha",
 };
 
 function fetchPorPerfil(perfil: string, nome = "Funcionário") {
@@ -28,7 +29,16 @@ function fetchPorPerfil(perfil: string, nome = "Funcionário") {
       return json({ ...sessaoRecepcionista, perfil, nome });
     }
     if (url === "/sessoes" && metodo === "POST") {
-      return json({ id_usuario: 1, nome, perfil, expira_em: sessaoRecepcionista.expira_em }, 201);
+      return json(
+        {
+          id_usuario: 1,
+          nome,
+          perfil,
+          expira_em: sessaoRecepcionista.expira_em,
+          nome_hotel: sessaoRecepcionista.nome_hotel,
+        },
+        201,
+      );
     }
     if (url === "/sessoes/atual" && metodo === "DELETE") {
       return new Response(null, { status: 204 });
@@ -114,6 +124,23 @@ function fetchPorPerfil(perfil: string, nome = "Funcionário") {
   });
 }
 
+function mockMatchMedia(larga: boolean) {
+  vi.stubGlobal(
+    "matchMedia",
+    (consulta: string) =>
+      ({
+        matches: consulta.includes("min-width: 768px") ? larga : !larga,
+        media: consulta,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }) as MediaQueryList,
+  );
+}
+
 function renderCasca(rota: string) {
   return render(
     <MemoryRouter basename="/app" initialEntries={[rota]}>
@@ -128,6 +155,7 @@ describe("Casca", () => {
     localStorage.clear();
     sessionStorage.clear();
     definirManipulador401(null);
+    mockMatchMedia(true);
   });
 
   it.each([
@@ -138,6 +166,22 @@ describe("Casca", () => {
     vi.stubGlobal("fetch", fetchPorPerfil(perfil));
     renderCasca("/app/entrar");
     expect(await screen.findByRole("heading", { name: titulo })).toBeInTheDocument();
+  });
+
+  it.each([
+    ["recepcao", "Recepção"],
+    ["staff", "Equipe"],
+    ["gestor", "Gestão"],
+  ] as const)("navegação de %s identifica a casa e o perfil %s", async (perfil, rotulo) => {
+    vi.stubGlobal("fetch", fetchPorPerfil(perfil, "Ana Silva"));
+    renderCasca("/app/entrar");
+    expect(await screen.findByText("Hotel Alpha")).toBeInTheDocument();
+    expect(screen.getByText("OmniStay")).toBeInTheDocument();
+    expect(screen.getByText("Ana Silva")).toBeInTheDocument();
+    expect(screen.getAllByText(rotulo).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Sair" })).toBeInTheDocument();
+    expect(screen.queryByText("staff")).not.toBeInTheDocument();
+    expect(screen.queryByText(/id_hotel/i)).not.toBeInTheDocument();
   });
 
   it("autenticado em /entrar não permanece na entrada", async () => {
@@ -205,6 +249,12 @@ describe("Casca", () => {
     expect(screen.getByRole("link", { name: "Simulador" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Meus chamados" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Painel" })).not.toBeInTheDocument();
+    expect(screen.getByText("Operação")).toBeInTheDocument();
+    expect(screen.getByText("Propriedade")).toBeInTheDocument();
+    expect(screen.queryByText("Gestão")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation")).queryByRole("link", { name: "Nova reserva" }),
+    ).not.toBeInTheDocument();
   });
 
   it("menu do staff não mostra simulador nem fila", async () => {
@@ -214,6 +264,43 @@ describe("Casca", () => {
     expect(screen.queryByRole("link", { name: "Simulador" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Fila do dia" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Painel" })).not.toBeInTheDocument();
+  });
+
+  it("tela estreita da equipe abre e fecha o menu sem mudar de destino", async () => {
+    mockMatchMedia(false);
+    vi.stubGlobal("fetch", fetchPorPerfil("staff"));
+    renderCasca("/app/chamados");
+    expect(await screen.findByRole("heading", { name: "Meus chamados" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }));
+    expect(screen.getByRole("navigation")).toBeInTheDocument();
+    expect(screen.getByText("Hotel Alpha")).toBeInTheDocument();
+    expect(screen.getByText("OmniStay")).toBeInTheDocument();
+    expect(screen.getByText("Equipe")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Meus chamados" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Fechar menu" }));
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Meus chamados" })).toBeInTheDocument();
+  });
+
+  it("tela estreita fecha o overlay ao tocar no fundo", async () => {
+    mockMatchMedia(false);
+    vi.stubGlobal("fetch", fetchPorPerfil("staff"));
+    renderCasca("/app/chamados");
+    expect(await screen.findByRole("heading", { name: "Meus chamados" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }));
+    fireEvent.click(screen.getByTestId("fundo-navegacao"));
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Meus chamados" })).toBeInTheDocument();
+  });
+
+  it("tela larga da recepção não mostra botão de menu", async () => {
+    mockMatchMedia(true);
+    vi.stubGlobal("fetch", fetchPorPerfil("recepcao"));
+    renderCasca("/app/fila");
+    expect(await screen.findByRole("heading", { name: "Fila do dia" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Abrir menu" })).not.toBeInTheDocument();
+    expect(screen.getByRole("navigation")).toBeInTheDocument();
   });
 
   it("menu da gestão omite fila e meus chamados, inclui simulador e as três telas da casa", async () => {
@@ -228,6 +315,9 @@ describe("Casca", () => {
     expect(screen.getByRole("link", { name: "Catálogo" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Itens vendáveis" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Recado de boas-vindas" })).toBeInTheDocument();
+    expect(screen.getByText("Propriedade")).toBeInTheDocument();
+    expect(screen.getAllByText("Gestão").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Operação")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Fila do dia" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Meus chamados" })).not.toBeInTheDocument();
   });
@@ -392,12 +482,14 @@ describe("Casca", () => {
 
     const recado = renderCasca("/app/boas-vindas");
     expect(await screen.findByRole("heading", { name: "Recado de boas-vindas" })).toBeInTheDocument();
-    expect(
-      fetchMock.mock.calls.some(
-        (chamada) =>
-          chamada[0] === "/propriedade/boas-vindas" && (chamada[1]?.method ?? "GET") === "GET",
-      ),
-    ).toBe(true);
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          (chamada) =>
+            chamada[0] === "/propriedade/boas-vindas" && (chamada[1]?.method ?? "GET") === "GET",
+        ),
+      ).toBe(true),
+    );
     expect(screen.queryByRole("button", { name: "Salvar" })).not.toBeInTheDocument();
     recado.unmount();
   });

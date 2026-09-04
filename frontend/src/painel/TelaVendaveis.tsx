@@ -4,7 +4,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { pedirAutenticado } from "./sessao";
-import { formatarPreco, type ItemVendavel } from "./vendaveis";
+import { formatarPreco, formatarPrecoDigitavel, type ItemVendavel } from "./vendaveis";
 
 type Estado = "carregando" | "ok" | "falha";
 
@@ -78,7 +78,7 @@ export function TelaVendaveis({ somenteLeitura = false }: Props) {
   function abrirEdicao(linha: ItemVendavel): void {
     setFormulario({ modo: "editar", item: linha });
     setNome(linha.nome);
-    setPreco(formatarPreco(linha.preco_atual));
+    setPreco(formatarPrecoDigitavel(linha.preco_atual));
     setAviso("");
   }
 

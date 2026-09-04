@@ -16,9 +16,9 @@ describe("ItemVendavel", () => {
 });
 
 describe("formatarPreco", () => {
-  it("aceita número ou string e mostra duas casas", () => {
-    expect(formatarPreco(9)).toBe("9.00");
-    expect(formatarPreco("32.5")).toBe("32.50");
-    expect(formatarPreco("28.00")).toBe("28.00");
+  it("na leitura delega a formatarMoeda", () => {
+    expect(formatarPreco(9)).toBe("R$ 9,00");
+    expect(formatarPreco("32.5")).toBe("R$ 32,50");
+    expect(formatarPreco("28.00")).toBe("R$ 28,00");
   });
 });

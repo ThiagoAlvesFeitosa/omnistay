@@ -90,7 +90,8 @@ describe("TelaFila", () => {
     expect(screen.getByText("Carlos Beltrão")).toBeInTheDocument();
     expect(screen.getByText("Ana Prado")).toBeInTheDocument();
     expect(screen.getAllByText("5511987654321").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("2026-08-31").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("31/08/2026").length).toBeGreaterThan(0);
+    expect(screen.queryByText("2026-08-31")).not.toBeInTheDocument();
     expect(screen.queryByText("Hóspede futuro")).not.toBeInTheDocument();
 
     expect(screen.getByText(/1 hoje sem confirmar/)).toBeInTheDocument();

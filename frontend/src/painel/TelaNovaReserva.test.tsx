@@ -51,8 +51,8 @@ describe("TelaNovaReserva", () => {
     renderCadastro();
     expect(screen.getByLabelText("Nome do hóspede")).toBeInTheDocument();
     expect(screen.getByLabelText("Telefone com DDD")).toBeInTheDocument();
-    expect(screen.getByLabelText("Entrada")).toBeInTheDocument();
-    expect(screen.getByLabelText("Saída")).toBeInTheDocument();
+    expect(screen.getByLabelText("Entrada")).toHaveAttribute("type", "date");
+    expect(screen.getByLabelText("Saída")).toHaveAttribute("type", "date");
     expect(screen.queryByLabelText(/e-mail/i)).not.toBeInTheDocument();
   });
 

@@ -41,6 +41,13 @@ def ler_parametro(conexao: Connection, id_hotel: int, chave: str) -> str | None:
     ).scalar_one_or_none()
 
 
+def ler_nome_hotel(conexao: Connection, id_hotel: int) -> str | None:
+    return conexao.execute(
+        text("SELECT nome FROM hotel WHERE id_hotel = :id_hotel"),
+        {"id_hotel": id_hotel},
+    ).scalar_one_or_none()
+
+
 def ler_parametros(
     conexao: Connection, id_hotel: int, chaves: list[str]
 ) -> dict[str, str]:

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "../components/ui/button";
+import { formatarInstanteComDecorrido, formatarMoeda } from "./apresentacao";
 import { pedirAutenticado } from "./sessao";
-import { rotuloNatureza, tempoDecorrido, type ItemSolicitacao } from "./solicitacoes";
+import { rotuloNatureza, type ItemSolicitacao } from "./solicitacoes";
 
 type Estado = "carregando" | "ok" | "falha";
 
@@ -106,7 +107,7 @@ export function TelaChamados({ agora }: Props) {
               <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
                 <span>{rotuloNatureza(linha.tipo)}</span>
                 {" · "}
-                {tempoDecorrido(linha.aberta_em, instante)}
+                {formatarInstanteComDecorrido(linha.aberta_em, instante)}
                 {linha.destaque_tempo_excedido ? " · tempo excessivo" : ""}
               </p>
               <p className="mt-1 text-lg font-semibold">
@@ -117,7 +118,7 @@ export function TelaChamados({ agora }: Props) {
                 <p className="text-sm text-zinc-600">{linha.janela_preferencia}</p>
               ) : null}
               {linha.tipo === "consumo" && linha.valor_praticado != null ? (
-                <p className="text-sm">R$ {linha.valor_praticado}</p>
+                <p className="text-sm">{formatarMoeda(linha.valor_praticado)}</p>
               ) : null}
               <Button
                 type="button"

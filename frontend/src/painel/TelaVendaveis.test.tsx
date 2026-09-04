@@ -96,7 +96,7 @@ describe("TelaVendaveis", () => {
       expect.objectContaining({ credentials: "include" }),
     );
     expect(screen.getByText("Caipirinha")).toBeInTheDocument();
-    expect(screen.getByText("28.00")).toBeInTheDocument();
+    expect(screen.getByText("R$ 28,00")).toBeInTheDocument();
     expect(screen.getByText("Cesta de frutas")).toBeInTheDocument();
     expect(screen.queryByText(/descri/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: /descri/i })).not.toBeInTheDocument();

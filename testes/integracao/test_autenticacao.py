@@ -115,6 +115,51 @@ def test_recurso_protegido_exige_sessao_valida(cliente_e_ambiente):
 
 
 @pytest.mark.postgres
+def test_sessao_inclui_nome_hotel_da_propriedade_da_pessoa(cliente_e_ambiente):
+    cliente, ambiente = cliente_e_ambiente
+    gestor_a = ambiente.propriedade_a.usuarios["gestor"]
+    gestor_b = ambiente.propriedade_b.usuarios["gestor"]
+
+    login_a = cliente.post(
+        "/sessoes",
+        json={"email": gestor_a.email, "senha": gestor_a.senha},
+    )
+    atual_a = cliente.get("/sessoes/atual")
+
+    assert login_a.status_code == 201
+    assert login_a.json()["nome_hotel"] == ambiente.propriedade_a.nome
+    assert "id_hotel" not in login_a.json()
+    assert atual_a.status_code == 200
+    assert atual_a.json()["nome_hotel"] == ambiente.propriedade_a.nome
+    assert "id_hotel" not in atual_a.json()
+
+    cliente.delete("/sessoes/atual")
+    login_b = cliente.post(
+        "/sessoes",
+        json={"email": gestor_b.email, "senha": gestor_b.senha},
+    )
+    atual_b = cliente.get("/sessoes/atual")
+
+    assert login_b.json()["nome_hotel"] == ambiente.propriedade_b.nome
+    assert atual_b.json()["nome_hotel"] == ambiente.propriedade_b.nome
+    assert login_b.json()["nome_hotel"] != ambiente.propriedade_a.nome
+
+
+@pytest.mark.postgres
+def test_recusa_de_credencial_nao_traz_nome_hotel(cliente_e_ambiente):
+    cliente, ambiente = cliente_e_ambiente
+    gestor = ambiente.propriedade_a.usuarios["gestor"]
+
+    recusa = cliente.post(
+        "/sessoes",
+        json={"email": gestor.email, "senha": "senha-errada-12345"},
+    )
+
+    assert recusa.status_code == 401
+    assert "nome_hotel" not in recusa.json()
+
+
+@pytest.mark.postgres
 def test_encerrar_sessao_invalida_o_cookie(cliente_e_ambiente):
     cliente, ambiente = cliente_e_ambiente
     gestor = ambiente.propriedade_a.usuarios["gestor"]

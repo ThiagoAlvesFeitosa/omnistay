@@ -24,6 +24,13 @@ MENSAGEM_CREDENCIAIS = "Credenciais invalidas."
 MENSAGEM_SESSAO = "Sessao ausente ou invalida."
 
 
+def _nome_hotel(conexao: Conexao, id_hotel: int) -> str:
+    from app.modulos.propriedade import service as propriedade_service
+
+    return propriedade_service.ler_nome_hotel(conexao, id_hotel=id_hotel)
+
+
+
 def _definir_cookie(
     resposta: Response, token: str, expira_em: datetime, pedido: Request
 ) -> None:
@@ -83,6 +90,7 @@ def criar_sessao(
         nome=autenticada.nome,
         perfil=autenticada.perfil,
         expira_em=autenticada.expira_em,
+        nome_hotel=_nome_hotel(conexao, autenticada.id_hotel),
     )
 
 
@@ -97,7 +105,7 @@ def encerrar_sessao_atual(
 
 
 @roteador.get("/sessoes/atual", response_model=SessaoAtualResposta)
-def obter_sessao_atual(sessao: Sessao) -> SessaoAtualResposta:
+def obter_sessao_atual(sessao: Sessao, conexao: Conexao) -> SessaoAtualResposta:
     return SessaoAtualResposta(
         id_sessao=sessao.id_sessao,
         id_usuario=sessao.id_usuario,
@@ -105,6 +113,7 @@ def obter_sessao_atual(sessao: Sessao) -> SessaoAtualResposta:
         perfil=sessao.perfil,
         dispositivo=sessao.dispositivo,
         expira_em=sessao.expira_em,
+        nome_hotel=_nome_hotel(conexao, sessao.id_hotel),
     )
 
 

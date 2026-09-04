@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { formatarInstante } from "./apresentacao";
 import { TelaRetencao } from "./TelaRetencao";
 
 function json(corpo: unknown, status = 200): Response {
@@ -71,7 +72,8 @@ describe("TelaRetencao", () => {
     );
     expect(screen.getByText("12")).toBeInTheDocument();
     expect(screen.getByText("5")).toBeInTheDocument();
-    expect(screen.getByText(/2026-09-01/)).toBeInTheDocument();
+    expect(screen.getByText(formatarInstante("2026-09-01T12:00:00Z"))).toBeInTheDocument();
+    expect(screen.queryByText(/2026-09-01/)).not.toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /expurgar/i })).not.toBeInTheDocument();
     expect(screen.queryByText("Marina")).not.toBeInTheDocument();

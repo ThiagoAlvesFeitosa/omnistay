@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TelaEstadia } from "./TelaEstadia";
+import { formatarHorarioBolha } from "./apresentacao";
 import type { FichaResposta } from "./TelaFicha";
 
 function json(corpo: unknown, status = 200): Response {
@@ -122,6 +123,15 @@ describe("TelaEstadia", () => {
     expect(screen.getByText("Automático")).toBeInTheDocument();
     expect(screen.getByText("Recepção")).toBeInTheDocument();
     expect(screen.getByText("enviando")).toBeInTheDocument();
+    expect(screen.getByText("tem berco?").closest("[data-lado]")).toHaveAttribute("data-lado", "hospede");
+    expect(screen.getByText("A recepção vai atender.").closest("[data-lado]")).toHaveAttribute(
+      "data-lado",
+      "hotel",
+    );
+    expect(screen.getByText("Sim, temos berço.").closest("[data-lado]")).toHaveAttribute("data-lado", "hotel");
+    expect(
+      screen.getByText(formatarHorarioBolha(conversaAberta.mensagens[0].em, new Date())),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Marina Duarte")).not.toBeInTheDocument();
     const ordem = fetchMock.mock.calls.map((chamada) => String(chamada[0]));
     const iConversa = ordem.findIndex((url) => url.includes("/conversa"));

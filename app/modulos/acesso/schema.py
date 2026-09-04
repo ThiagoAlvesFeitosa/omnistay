@@ -16,6 +16,7 @@ class SessaoCriada(BaseModel):
     nome: str
     perfil: str
     expira_em: datetime
+    nome_hotel: str
 
 
 class SessaoAtualResposta(BaseModel):
@@ -25,6 +26,7 @@ class SessaoAtualResposta(BaseModel):
     perfil: str
     dispositivo: str | None
     expira_em: datetime
+    nome_hotel: str
 
 
 class SessaoListada(BaseModel):

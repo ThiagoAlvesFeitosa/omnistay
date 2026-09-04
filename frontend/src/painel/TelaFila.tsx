@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 
 import { Button } from "../components/ui/button";
 import { cn } from "../lib/utils";
+import { formatarDataCalendario } from "./apresentacao";
 import { pedirAutenticado } from "./sessao";
 import { chegadaAdmiteBotao, resumirTurno, saidaAdmiteCaminho, type ItemFila } from "./fila";
 
@@ -133,8 +134,8 @@ export function TelaFila() {
                   <br />
                   <span className="text-zinc-500">{linha.telefone_contato}</span>
                 </td>
-                <td>{linha.data_checkin_prevista}</td>
-                <td>{linha.data_checkout_prevista}</td>
+                <td>{formatarDataCalendario(linha.data_checkin_prevista)}</td>
+                <td>{formatarDataCalendario(linha.data_checkout_prevista)}</td>
                 <td>
                   {rotuloSituacao(linha.status)}
                   {linha.chegada_nao_confirmada ? (

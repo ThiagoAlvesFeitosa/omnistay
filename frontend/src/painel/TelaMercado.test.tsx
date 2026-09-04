@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { formatarInstante, formatarMoeda } from "./apresentacao";
 import { TelaMercado } from "./TelaMercado";
 
 function json(corpo: unknown, status = 200): Response {
@@ -138,14 +139,16 @@ describe("TelaMercado", () => {
       expect.objectContaining({ credentials: "include" }),
     );
     expect(screen.getByText("Hotel Atlântico")).toBeInTheDocument();
-    expect(screen.getByText("180.00")).toBeInTheDocument();
-    expect(screen.getAllByText(/2026-09-01/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(formatarMoeda(180))).toBeInTheDocument();
+    expect(document.body.textContent).toContain(formatarInstante("2026-09-01T10:00:00Z"));
+    expect(document.body.textContent).not.toMatch(/2026-09-01/);
     expect(screen.getByText("Pousada Mar")).toBeInTheDocument();
-    expect(screen.getByText("150.00")).toBeInTheDocument();
-    expect(screen.getByText(/2026-08-20/)).toBeInTheDocument();
+    expect(screen.getByText(formatarMoeda(150))).toBeInTheDocument();
+    expect(document.body.textContent).toContain(formatarInstante("2026-08-20T10:00:00Z"));
+    expect(document.body.textContent).not.toMatch(/2026-08-20/);
     expect(screen.getAllByText(/Coleta falhou/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Ainda sem coleta")).toBeInTheDocument();
-    expect(screen.getByText("0.00")).toBeInTheDocument();
+    expect(screen.getByText(formatarMoeda(0))).toBeInTheDocument();
     expect(screen.queryByText(/^você$/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/tarifa da casa/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /novo concorrente/i })).not.toBeInTheDocument();
@@ -167,9 +170,10 @@ describe("TelaMercado", () => {
     expect(await screen.findByText("Hotel Atlântico")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Histórico de Hotel Atlântico" }));
-    expect(await screen.findByText("170.00")).toBeInTheDocument();
-    expect(screen.getByText(/2026-08-31/)).toBeInTheDocument();
-    const zerosDoHistorico = screen.queryAllByText("0.00");
+    expect(await screen.findByText(formatarMoeda(170))).toBeInTheDocument();
+    expect(document.body.textContent).toContain(formatarInstante("2026-08-31T10:00:00Z"));
+    expect(document.body.textContent).not.toMatch(/2026-08-31/);
+    const zerosDoHistorico = screen.queryAllByText(formatarMoeda(0));
     expect(zerosDoHistorico).toHaveLength(1);
 
     const historico = fetchMock.mock.calls.filter(
@@ -186,6 +190,6 @@ describe("TelaMercado", () => {
     fireEvent.click(screen.getByRole("button", { name: "Histórico de Hotel Atlântico" }));
     expect(await screen.findByText(/não carreg/i)).toBeInTheDocument();
     expect(screen.getByText("Hotel Atlântico")).toBeInTheDocument();
-    expect(screen.getByText("180.00")).toBeInTheDocument();
+    expect(screen.getByText(formatarMoeda(180))).toBeInTheDocument();
   });
 });

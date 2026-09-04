@@ -157,6 +157,18 @@ def criar_instalacao_inicial(
     return InstalacaoCriada(id_hotel=id_hotel, email_gestor=email_gestor)
 
 
+def ler_nome_hotel(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    repositorio=propriedade_repository,
+) -> str:
+    nome = repositorio.ler_nome_hotel(conexao, id_hotel)
+    if nome is None:
+        return ""
+    return str(nome)
+
+
 def duracao_da_sessao_em_horas(
     conexao: Connection,
     *,

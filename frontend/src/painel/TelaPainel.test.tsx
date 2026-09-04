@@ -65,7 +65,7 @@ describe("TelaPainel", () => {
     expect(screen.getByText("4")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("5")).toBeInTheDocument();
-    expect(screen.getByText("132.00")).toBeInTheDocument();
+    expect(screen.getByText("R$ 132,00")).toBeInTheDocument();
 
     const urls = fetchMock.mock.calls.map((chamada) => String(chamada[0]));
     expect(urls).not.toContain("/fila-do-dia");
@@ -88,7 +88,7 @@ describe("TelaPainel", () => {
     );
     renderPainel();
     expect(await screen.findByText("Chegadas hoje")).toBeInTheDocument();
-    expect(screen.getByText("0.00")).toBeInTheDocument();
+    expect(screen.getByText("R$ 0,00")).toBeInTheDocument();
     expect(screen.queryByText(/não carreg/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Tentar de novo" })).not.toBeInTheDocument();
   });
@@ -101,10 +101,10 @@ describe("TelaPainel", () => {
     expect(await screen.findByText(/não carreg/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeInTheDocument();
     expect(screen.queryByText("Chegadas hoje")).not.toBeInTheDocument();
-    expect(screen.queryByText("0.00")).not.toBeInTheDocument();
+    expect(screen.queryByText("R$ 0,00")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
     expect(await screen.findByText("Chegadas hoje")).toBeInTheDocument();
-    expect(screen.getByText("0.00")).toBeInTheDocument();
+    expect(screen.getByText("R$ 0,00")).toBeInTheDocument();
   });
 });

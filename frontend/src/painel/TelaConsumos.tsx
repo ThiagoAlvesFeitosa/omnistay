@@ -2,13 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Button } from "../components/ui/button";
-import {
-  tempoDoMaisAntigo,
-  totalPendente,
-  type ItemConsumoPendente,
-} from "./consumos";
+import { formatarInstanteComDecorrido, formatarMoeda } from "./apresentacao";
+import { totalPendente, type ItemConsumoPendente } from "./consumos";
 import { pedirAutenticado } from "./sessao";
-import { tempoDecorrido } from "./solicitacoes";
 
 type Estado = "carregando" | "ok" | "falha";
 
@@ -84,7 +80,9 @@ export function TelaConsumos({ agora }: Props) {
   const instante = agora ?? new Date();
   const vazia = estado === "ok" && itens.length === 0;
   const total = totalPendente(itens);
-  const maisAntigo = tempoDoMaisAntigo(itens, instante);
+  const maisAntigo = itens[0]
+    ? formatarInstanteComDecorrido(itens[0].aberta_em, instante)
+    : "";
 
   return (
     <main className="p-8">
@@ -113,7 +111,7 @@ export function TelaConsumos({ agora }: Props) {
 
       {estado === "ok" ? (
         <p className="mb-4 text-sm text-zinc-600">
-          {itens.length} pendentes · R$ {total}
+          {itens.length} pendentes · {formatarMoeda(total)}
           {maisAntigo ? ` · o mais antigo ${maisAntigo}` : ""}
         </p>
       ) : null}
@@ -128,9 +126,9 @@ export function TelaConsumos({ agora }: Props) {
               <p className="text-sm text-zinc-600">
                 {linha.numero_quarto ? `Quarto ${linha.numero_quarto}` : "Sem quarto"}
                 {" · "}
-                {tempoDecorrido(linha.aberta_em, instante)}
+                {formatarInstanteComDecorrido(linha.aberta_em, instante)}
               </p>
-              <p className="text-sm">R$ {linha.valor_praticado}</p>
+              <p className="text-sm">{formatarMoeda(linha.valor_praticado)}</p>
               <div className="mt-3 flex flex-wrap items-center gap-4">
                 <Link to={`/ficha/${linha.id_reserva}`} className="text-sm underline">
                   Estadia

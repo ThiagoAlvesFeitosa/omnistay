@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { formatarInstanteComDecorrido, formatarMoeda } from "./apresentacao";
 import type { ItemConsumoPendente } from "./consumos";
-import { tempoDecorrido } from "./solicitacoes";
 import { TelaConsumos } from "./TelaConsumos";
 
 const agora = new Date("2026-08-31T15:00:00.000Z");
@@ -102,18 +102,24 @@ describe("TelaConsumos", () => {
     expect(screen.getByText("Frigobar")).toBeInTheDocument();
     expect(screen.getByText(/Quarto 210/)).toBeInTheDocument();
     expect(screen.getByText(/sem quarto/i)).toBeInTheDocument();
-    expect(screen.getByText(/32/)).toBeInTheDocument();
-    expect(screen.getByText(/56/)).toBeInTheDocument();
+    expect(screen.getByText(formatarMoeda("32.00"))).toBeInTheDocument();
+    expect(screen.getByText(formatarMoeda(56))).toBeInTheDocument();
+    expect(screen.queryByText("R$ 32.00")).not.toBeInTheDocument();
 
     const linhas = screen.getAllByRole("listitem");
     expect(within(linhas[0]).getByText("Lavanderia")).toBeInTheDocument();
     expect(within(linhas[1]).getByText("Frigobar")).toBeInTheDocument();
-    expect(within(linhas[0]).getByText(new RegExp(tempoDecorrido(itens[0].aberta_em, agora)))).toBeInTheDocument();
-    expect(within(linhas[1]).getByText(new RegExp(tempoDecorrido(itens[1].aberta_em, agora)))).toBeInTheDocument();
+    const instantePrimeiro = formatarInstanteComDecorrido(itens[0].aberta_em, agora);
+    const instanteSegundo = formatarInstanteComDecorrido(itens[1].aberta_em, agora);
+    expect(instantePrimeiro).toMatch(/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} · /);
+    expect(within(linhas[0]).getByText(instantePrimeiro, { exact: false })).toBeInTheDocument();
+    expect(within(linhas[1]).getByText(instanteSegundo, { exact: false })).toBeInTheDocument();
 
     expect(screen.getByText(/2 pendentes/)).toBeInTheDocument();
-    expect(screen.getByText(/88/)).toBeInTheDocument();
-    expect(screen.getByText(new RegExp(`o mais antigo ${tempoDecorrido(itens[0].aberta_em, agora)}`))).toBeInTheDocument();
+    expect(screen.getByText(formatarMoeda(88), { exact: false })).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(`o mais antigo ${instantePrimeiro.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`)),
+    ).toBeInTheDocument();
 
     const links = screen.getAllByRole("link", { name: "Estadia" });
     expect(links).toHaveLength(2);

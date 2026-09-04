@@ -8,6 +8,7 @@ import {
   type ItemMercado,
   type VisaoMercado,
 } from "./mercado";
+import { formatarInstante } from "./apresentacao";
 import { pedirAutenticado } from "./sessao";
 import { formatarPreco } from "./vendaveis";
 
@@ -20,10 +21,6 @@ type PontoColeta = {
   nota_media: number | string | null;
   coletado_em: string;
 };
-
-function dataVisivel(valor: string): string {
-  return valor.slice(0, 10);
-}
 
 function marcaLinha(item: ItemMercado): string | null {
   if (semColeta(item)) {
@@ -127,7 +124,7 @@ export function TelaMercado() {
                   <p className="text-sm text-zinc-700">
                     <span>{formatarPreco(item.ultimo_sucesso.preco ?? 0)}</span>
                     {" · "}
-                    {dataVisivel(item.ultimo_sucesso.coletado_em)}
+                    {formatarInstante(item.ultimo_sucesso.coletado_em)}
                     {item.ultimo_sucesso.nota_media != null
                       ? ` · nota ${item.ultimo_sucesso.nota_media}`
                       : ""}
@@ -136,7 +133,7 @@ export function TelaMercado() {
                 {marca ? <p className="text-sm text-amber-800">{marca}</p> : null}
                 {item.ultima_falha && item.situacao !== "so_falha" ? (
                   <p className="text-xs text-zinc-500">
-                    Falha em {dataVisivel(item.ultima_falha.coletado_em)}
+                    Falha em {formatarInstante(item.ultima_falha.coletado_em)}
                   </p>
                 ) : null}
                 <Button
@@ -160,7 +157,7 @@ export function TelaMercado() {
           {pontos
             ? pontos.map((ponto) => (
                 <p key={ponto.id_coleta} className="text-sm text-zinc-700">
-                  {dataVisivel(ponto.coletado_em)}
+                  {formatarInstante(ponto.coletado_em)}
                   {ponto.sucesso ? (
                     <>
                       {" · "}

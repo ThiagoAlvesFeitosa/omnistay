@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DESTINOS, destinoPorCaminho, perfilPode } from "./destinos";
+import { DESTINOS, destinoPorCaminho, itensMenu, menuAgrupado, perfilPode } from "./destinos";
 
 describe("destinoPorCaminho da ficha", () => {
   it.each(["/app/ficha", "/app/ficha/12", "/ficha/12"] as const)(
@@ -68,4 +68,42 @@ describe("painel da gestão", () => {
       expect(perfilPode("staff", caminho)).toBe(false);
     },
   );
+});
+
+describe("menu por área", () => {
+  it("recepção não vê Nova reserva no menu e a rota continua no mapa", () => {
+    expect(itensMenu("recepcao").some((item) => item.id === "reserva")).toBe(false);
+    expect(DESTINOS.some((item) => item.id === "reserva")).toBe(true);
+  });
+
+  it("recepção agrupa Operação, Propriedade e Simulador no fim", () => {
+    const grupos = menuAgrupado("recepcao");
+    expect(grupos.map((grupo) => grupo.rotulo)).toEqual(["Operação", "Propriedade"]);
+    expect(grupos[0].itens.map((item) => item.id)).toEqual([
+      "fila",
+      "ficha",
+      "alertas",
+      "consumos",
+      "saida",
+    ]);
+    expect(grupos[1].itens.map((item) => item.id)).toEqual([
+      "catalogo",
+      "vendaveis",
+      "boas-vindas",
+    ]);
+    expect(itensMenu("recepcao").at(-1)?.id).toBe("simulador");
+  });
+
+  it("gestão não tem grupo Operação", () => {
+    const grupos = menuAgrupado("gestor");
+    expect(grupos.map((grupo) => grupo.rotulo)).toEqual(["Propriedade", "Gestão"]);
+    expect(grupos.some((grupo) => grupo.rotulo === "Operação")).toBe(false);
+  });
+
+  it("equipe só tem Operação com meus chamados", () => {
+    const grupos = menuAgrupado("staff");
+    expect(grupos).toHaveLength(1);
+    expect(grupos[0].rotulo).toBe("Operação");
+    expect(grupos[0].itens.map((item) => item.id)).toEqual(["chamados"]);
+  });
 });

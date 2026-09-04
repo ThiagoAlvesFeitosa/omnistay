@@ -24,6 +24,7 @@ describe("sessao", () => {
           nome: "Cleber",
           perfil: "recepcao",
           expira_em: "2026-09-01T00:00:00Z",
+          nome_hotel: "Hotel Alpha",
         },
         201,
       ),
@@ -57,18 +58,20 @@ describe("sessao", () => {
           perfil: "recepcao",
           dispositivo: null,
           expira_em: "2026-09-01T00:00:00Z",
+          nome_hotel: "Hotel Alpha",
         },
         200,
       ),
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await obterAtual();
+    const atual = await obterAtual();
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/sessoes/atual",
       expect.objectContaining({ credentials: "include" }),
     );
+    expect(atual?.nome_hotel).toBe("Hotel Alpha");
   });
 
   it("sair faz DELETE /sessoes/atual", async () => {

@@ -5,6 +5,7 @@ export type SessaoCriada = {
   nome: string;
   perfil: Perfil;
   expira_em: string;
+  nome_hotel: string;
 };
 
 export type SessaoAtual = {
@@ -14,6 +15,7 @@ export type SessaoAtual = {
   perfil: Perfil;
   dispositivo: string | null;
   expira_em: string;
+  nome_hotel: string;
 };
 
 type Manipulador401 = () => void;

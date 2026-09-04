@@ -1,6 +1,8 @@
-import { FormEvent, useEffect, useRef, useState, type CSSProperties } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import { pedirAutenticado } from "./painel/sessao";
+import { BolhaConversa } from "./painel/BolhaConversa";
+import { Button } from "./components/ui/button";
 
 type ItemConversa = {
   id_reserva: number;
@@ -157,28 +159,39 @@ export function TelaSimulacao() {
     await carregarFio(escolhida);
   }
 
+  function aoTecla(evento: KeyboardEvent<HTMLTextAreaElement>): void {
+    if (evento.key !== "Enter" || evento.shiftKey) {
+      return;
+    }
+    evento.preventDefault();
+    void enviar();
+  }
+
   return (
-    <div style={estilos.pagina}>
-      <header style={estilos.cabecalho}>
-        <strong>OmniStay — simulador de conversa</strong>
-        <span style={estilos.sub}>Sem WhatsApp. Sem telefone. Mesmas regras.</span>
+    <div className="p-8">
+      <header className="mb-6">
+        <h1 className="text-2xl font-semibold">OmniStay — simulador de conversa</h1>
+        <p className="text-sm text-zinc-500">Sem WhatsApp. Sem telefone. Mesmas regras.</p>
       </header>
-      {aviso ? <p style={estilos.aviso}>{aviso}</p> : null}
-      <div style={estilos.grade}>
-        <aside style={estilos.lista}>
-          <h2>Reservas</h2>
+      {aviso ? (
+        <p className="mb-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm">{aviso}</p>
+      ) : null}
+      <div className="grid gap-6 md:grid-cols-[240px_1fr]">
+        <aside>
+          <h2 className="mb-3 text-sm font-medium">Reservas</h2>
           {conversas.length === 0 ? (
             <p>Nenhuma reserva nesta casa.</p>
           ) : (
-            <ul style={estilos.ul}>
+            <ul className="flex flex-col gap-2">
               {conversas.map((item) => (
                 <li key={item.id_reserva}>
                   <button
                     type="button"
-                    style={{
-                      ...estilos.item,
-                      fontWeight: escolhida === item.id_reserva ? 700 : 400,
-                    }}
+                    className={
+                      escolhida === item.id_reserva
+                        ? "w-full rounded border border-zinc-900 bg-white p-3 text-left font-medium"
+                        : "w-full rounded border border-zinc-200 bg-white p-3 text-left"
+                    }
                     onClick={() => setEscolhida(item.id_reserva)}
                   >
                     {item.nome_titular} · {item.status}
@@ -188,46 +201,44 @@ export function TelaSimulacao() {
             </ul>
           )}
         </aside>
-        <section style={estilos.fio}>
+        <section>
           {!escolhida || !fio ? (
             <p>Escolha uma reserva para ver a conversa.</p>
           ) : (
             <>
-              <h2>
+              <h2 className="mb-4 text-lg font-semibold">
                 {fio.nome_titular} · {fio.status}
               </h2>
-              <ol style={estilos.ul}>
+              <ol className="flex flex-col gap-2">
                 {fio.mensagens.map((msg) => (
-                  <li
+                  <BolhaConversa
                     key={msg.id_mensagem}
-                    style={{
-                      ...estilos.balao,
-                      marginLeft: msg.direcao === "enviada" ? 0 : "20%",
-                      marginRight: msg.direcao === "enviada" ? "20%" : 0,
-                      background: msg.direcao === "enviada" ? "#e8f1ff" : "#f3f3f3",
-                    }}
+                    lado={msg.direcao === "recebida" ? "hospede" : "hotel"}
+                    quando={msg.enviada_em}
+                    rotulo={rotuloEnvio(msg.status_envio, msg.direcao)}
                   >
-                    <small>{rotuloEnvio(msg.status_envio, msg.direcao)}</small>
-                    <p style={estilos.corpo}>{msg.conteudo}</p>
-                  </li>
+                    {msg.conteudo}
+                  </BolhaConversa>
                 ))}
               </ol>
               <form
+                className="mt-4 flex flex-col gap-2"
                 onSubmit={(evento: FormEvent) => {
                   evento.preventDefault();
                   void enviar();
                 }}
-                style={estilos.composer}
               >
                 <textarea
+                  className="min-h-24 w-full rounded-md border border-zinc-300 bg-white p-2 text-sm"
                   value={texto}
                   onChange={(evento) => setTexto(evento.target.value)}
+                  onKeyDown={aoTecla}
                   placeholder="Falar como o hóspede"
                   rows={3}
                 />
-                <button type="submit" disabled={!texto.trim() || enviando}>
+                <Button type="submit" disabled={!texto.trim() || enviando}>
                   Enviar
-                </button>
+                </Button>
               </form>
             </>
           )}
@@ -236,33 +247,3 @@ export function TelaSimulacao() {
     </div>
   );
 }
-
-const estilos: Record<string, CSSProperties> = {
-  pagina: {
-    fontFamily: "Georgia, serif",
-    maxWidth: 960,
-    margin: "0 auto",
-    padding: 16,
-    color: "#1c1c1c",
-  },
-  cabecalho: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 },
-  sub: { color: "#555", fontSize: 14 },
-  aviso: {
-    background: "#fff4e5",
-    border: "1px solid #e0a100",
-    padding: 8,
-  },
-  grade: { display: "grid", gridTemplateColumns: "240px 1fr", gap: 16 },
-  lista: { borderRight: "1px solid #ddd", paddingRight: 12 },
-  ul: { listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 },
-  item: {
-    width: "100%",
-    textAlign: "left",
-    padding: 8,
-    cursor: "pointer",
-  },
-  fio: { minHeight: 400 },
-  balao: { padding: 8, borderRadius: 8 },
-  corpo: { whiteSpace: "pre-wrap", margin: "4px 0 0" },
-  composer: { display: "flex", flexDirection: "column", gap: 8, marginTop: 16 },
-};

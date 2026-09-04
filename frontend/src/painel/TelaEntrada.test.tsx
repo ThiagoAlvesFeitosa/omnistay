@@ -43,7 +43,13 @@ describe("TelaEntrada", () => {
   it("submit válido chama POST /sessoes", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       respostaJson(
-        { id_usuario: 1, nome: "Cleber", perfil: "recepcao", expira_em: "2026-09-01T00:00:00Z" },
+        {
+          id_usuario: 1,
+          nome: "Cleber",
+          perfil: "recepcao",
+          expira_em: "2026-09-01T00:00:00Z",
+          nome_hotel: "Hotel Alpha",
+        },
         201,
       ),
     );

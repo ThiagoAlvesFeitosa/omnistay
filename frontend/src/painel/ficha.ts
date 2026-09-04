@@ -1,3 +1,5 @@
+import { formatarDataCalendario } from "./apresentacao";
+
 export const CAMPOS_FICHA = [
   { chave: "nome_completo", rotulo: "Nome completo" },
   { chave: "profissao", rotulo: "Profissão" },
@@ -45,11 +47,7 @@ export function idadeDerivada(
 }
 
 export function formatarDataVisivel(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  if (!ano || !mes || !dia) {
-    return iso;
-  }
-  return `${dia}/${mes}/${ano}`;
+  return formatarDataCalendario(iso);
 }
 
 export function montarTextoCopia(ficha: CamposFicha): string {

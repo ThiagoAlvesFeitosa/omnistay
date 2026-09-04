@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "../components/ui/button";
+import { formatarMoeda } from "./apresentacao";
 import { CAMPOS_INDICADORES, type IndicadoresOperacao } from "./indicadores";
 import { pedirAutenticado } from "./sessao";
-import { formatarPreco } from "./vendaveis";
 
 type Estado = "carregando" | "ok" | "falha";
 
@@ -79,7 +79,7 @@ export function TelaPainel() {
               <dt className="text-sm text-zinc-600">{ROTULOS[campo]}</dt>
               <dd className="mt-1 text-2xl font-semibold">
                 {campo === "consumo_a_lancar"
-                  ? formatarPreco(numeros[campo])
+                  ? formatarMoeda(numeros[campo])
                   : numeros[campo]}
               </dd>
             </div>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "../components/ui/button";
+import { formatarInstante } from "./apresentacao";
 import { prazoVisivel } from "./retencao";
 import { pedirAutenticado } from "./sessao";
 
@@ -21,10 +22,6 @@ type PainelRetencao = {
   anos_retencao_ficha: number | null;
   execucoes: Execucao[];
 };
-
-function dataVisivel(valor: string): string {
-  return valor.slice(0, 10);
-}
 
 export function TelaRetencao() {
   const [estado, setEstado] = useState<Estado>("carregando");
@@ -97,7 +94,7 @@ export function TelaRetencao() {
             <ul className="space-y-3">
               {painel.execucoes.map((item) => (
                 <li key={item.id_execucao} className="rounded border border-zinc-200 bg-white p-4">
-                  <p className="font-medium">{dataVisivel(item.executado_em)}</p>
+                  <p className="font-medium">{formatarInstante(item.executado_em)}</p>
                   <p className="text-sm text-zinc-600">
                     Mensagens <span>{item.mensagens_anonimizadas}</span> · Comentários{" "}
                     {item.comentarios_anonimizados} · Payloads {item.payloads_anonimizados} ·
