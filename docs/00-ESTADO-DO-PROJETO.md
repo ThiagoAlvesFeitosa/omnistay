@@ -1,7 +1,51 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 02/09/2026
+**Atualizado em:** 09/09/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
+
+---
+
+## Situação em 09/09/2026 — a Fase 5 foi entregue
+
+A entrega da Fase 5 está **fechada**. Vídeo gravado e publicado, documento e slides em PDF,
+ZIP montado.
+
+| Item | Onde |
+| --- | --- |
+| Repositório | <https://github.com/ThiagoAlvesFeitosa/omnistay> |
+| Vídeo (YouTube, não listado) | <https://youtu.be/QXgb0tpWDq8> |
+| Documento, slides, planilha e ZIP | na pasta do projeto, fora do repositório |
+
+### ⚠️ Pendência: o push
+
+Havia mudanças locais **sem commit** quando a entrega foi montada — entre elas a correção da
+verificação de fidelidade (`app/modulos/conversa/fidelidade.py`), a pasta `scripts/`, a spec
+`033-acesso-painel-perfis` e o `README.md` novo. Confira antes de qualquer outra coisa:
+
+```bash
+git status
+```
+
+Se houver arquivo modificado ou não rastreado, commite e envie. O repositório é o link da entrega;
+o que está lá precisa ser o código que o vídeo demonstra.
+
+### A pasta ao redor do repositório foi reorganizada
+
+A pasta que contém este repositório passou a ser organizada **por tipo de arquivo**:
+`documentos/`, `slides/`, `planilhas/`, `pacotes/`, `capturas/`, `diagramas/`, `fontes/` e
+`acervo/`. O mapa completo está no `LEIA-ME.md`, um nível acima de `omnistay/`.
+
+**Duas regras dessa pasta:**
+
+1. **Nada é apagado.** O `acervo/` guarda as versões antigas (protótipo Replit, BMC v1.1, o
+   rascunho da constituição, o backlog original) porque serão usadas no TCC. O valor está no par
+   antigo/atual, não em cada peça sozinha.
+2. `omnistay/` não é tocado de fora. É repositório git.
+
+### Próximos passos do sistema, quando voltar ao código
+
+Estão detalhados mais abaixo, em **Pendências abertas**. Em resumo: integração com PMS, canal de
+e-mail, módulos ligáveis por propriedade, e áudio/foto do hóspede.
 
 ---
 
@@ -654,11 +698,17 @@ Ainda abertas:
       **lançamento manual do preço observado** pelo hotel — é como o hoteleiro já trabalha. A API
       oficial da Booking (Demand API) exige acordo de parceria e entra como adaptador quando
       houver. Mesma resposta estrutural do PMS
-- [ ] **Foto de documento com leitura automática de campos.** Tecnicamente viável — o modelo é
-      multimodal e extrai campos de imagem. **Reabre decisão fechada** ("somente campos digitados,
-      sem foto"), tomada por causa da LGPD: imagem de documento de identidade é dado sensível, com
-      obrigações de guarda, acesso e descarte que o projeto não tratou. Exige revisão do artefato
-      de retenção antes de qualquer implementação
+- [ ] **Hóspede enviando foto e áudio.** O modelo é multimodal e lê os dois. São dois casos com
+      pesos diferentes:
+      **Áudio** — hóspede mandando mensagem de voz em vez de texto. Não reabre decisão nenhuma:
+      transcrever e seguir pelo mesmo caminho da mensagem escrita. Fatia pequena; o miolo já é
+      agnóstico de formato. Vale a atenção com retenção do arquivo de áudio, que é dado pessoal.
+      **Foto de documento** — extrair campos da imagem do RG ou CPF. **Reabre decisão fechada**
+      ("somente campos digitados, sem foto"), tomada por causa da LGPD: imagem de documento de
+      identidade é dado sensível, com obrigações de guarda, acesso e descarte que o projeto não
+      tratou. Exige revisão do artefato de retenção antes de implementar.
+      **Foto genérica** — hóspede fotografando um problema no quarto para abrir chamado. Mais leve
+      que documento e resolve caso real: "o chuveiro está assim". Vale antes da foto de documento
 - [ ] **Caixa de mensagem do simulador** — não envia com Enter e o visual destoa. Entra no
       redesenho do painel
 
