@@ -17,7 +17,18 @@ from worker.agendador import verificar_coletas_mercado
 from worker.consumidor import processar_uma_passagem
 
 AGORA = datetime(2026, 8, 21, 12, 0, tzinfo=UTC)
+DEPOIS = AGORA + timedelta(hours=24)
+MEIO = AGORA + timedelta(hours=13)
 URL_B = "https://www.outro-exemplo.com/hotel"
+
+
+def _processar(conexao, *, agora=AGORA, fonte=None):
+    return processar_uma_passagem(
+        conexao,
+        gateway=MensageriaFalsa(),
+        fonte=fonte or FonteFalsa(),
+        agora=agora,
+    )
 
 
 def _inserir_concorrente(conexao, id_hotel, *, url=URL_FONTE, ativo=True):
@@ -55,9 +66,7 @@ def test_fonte_ativa_devida_gera_coleta_de_sucesso(ambiente):
         id_concorrente = _inserir_concorrente(conexao, id_hotel)
         n = verificar_coletas_mercado(conexao, agora=AGORA)
         assert n == 1
-        processados = processar_uma_passagem(
-            conexao, gateway=MensageriaFalsa(), fonte=FonteFalsa()
-        )
+        processados = _processar(conexao)
         assert processados == 1
         linhas = _coletas(conexao, id_concorrente)
         assert len(linhas) == 1
@@ -73,18 +82,13 @@ def test_segundo_ciclo_insere_linha_nova_sem_alterar_a_primeira(ambiente):
     with ambiente.engine.begin() as conexao:
         id_concorrente = _inserir_concorrente(conexao, id_hotel)
         verificar_coletas_mercado(conexao, agora=AGORA)
-        processar_uma_passagem(
-            conexao, gateway=MensageriaFalsa(), fonte=FonteFalsa()
-        )
+        _processar(conexao)
         primeira = dict(_coletas(conexao, id_concorrente)[0])
-        depois = primeira["coletado_em"] + timedelta(hours=24)
 
     with ambiente.engine.begin() as conexao:
-        n = verificar_coletas_mercado(conexao, agora=depois)
+        n = verificar_coletas_mercado(conexao, agora=DEPOIS)
         assert n == 1
-        processar_uma_passagem(
-            conexao, gateway=MensageriaFalsa(), fonte=FonteFalsa()
-        )
+        _processar(conexao, agora=DEPOIS)
         linhas = _coletas(conexao, id_concorrente)
         assert len(linhas) == 2
         assert linhas[0]["id_coleta"] == primeira["id_coleta"]
@@ -109,23 +113,18 @@ def test_falha_nao_reescreve_coleta_anterior(ambiente):
     with ambiente.engine.begin() as conexao:
         id_concorrente = _inserir_concorrente(conexao, id_hotel)
         verificar_coletas_mercado(conexao, agora=AGORA)
-        processar_uma_passagem(
-            conexao, gateway=MensageriaFalsa(), fonte=FonteFalsa()
-        )
+        _processar(conexao)
         primeira = dict(_coletas(conexao, id_concorrente)[0])
-        depois = primeira["coletado_em"] + timedelta(hours=24)
 
     with ambiente.engine.begin() as conexao:
-        verificar_coletas_mercado(conexao, agora=depois)
+        verificar_coletas_mercado(conexao, agora=DEPOIS)
         fonte = FonteFalsa()
         from app.portas.fonte_publica import DESFECHO_SEM_DADO, ResultadoPublico
 
         fonte.configurar(
             URL_FONTE, resultado=ResultadoPublico(desfecho=DESFECHO_SEM_DADO)
         )
-        processar_uma_passagem(
-            conexao, gateway=MensageriaFalsa(), fonte=fonte
-        )
+        _processar(conexao, agora=DEPOIS, fonte=fonte)
         linhas = _coletas(conexao, id_concorrente)
         assert len(linhas) == 2
         assert linhas[0]["sucesso"] is True
@@ -157,18 +156,12 @@ def test_isolamento_entre_hoteis(ambiente):
         id_a = _inserir_concorrente(conexao, hotel_a)
         id_b = _inserir_concorrente(conexao, hotel_b, url=URL_B)
         verificar_coletas_mercado(conexao, agora=AGORA)
-        processar_uma_passagem(
-            conexao, gateway=MensageriaFalsa(), fonte=FonteFalsa()
-        )
-        primeira_a = dict(_coletas(conexao, id_a)[0])
-        meio = primeira_a["coletado_em"] + timedelta(hours=13)
+        _processar(conexao)
 
     with ambiente.engine.begin() as conexao:
-        n = verificar_coletas_mercado(conexao, agora=meio)
+        n = verificar_coletas_mercado(conexao, agora=MEIO)
         assert n == 1
-        processar_uma_passagem(
-            conexao, gateway=MensageriaFalsa(), fonte=FonteFalsa()
-        )
+        _processar(conexao, agora=MEIO)
         assert len(_coletas(conexao, id_a)) == 2
         assert len(_coletas(conexao, id_b)) == 1
 
@@ -182,9 +175,7 @@ def test_processador_nao_altera_item_vendavel(ambiente):
         ).scalar_one()
         _inserir_concorrente(conexao, id_hotel)
         verificar_coletas_mercado(conexao, agora=AGORA)
-        processar_uma_passagem(
-            conexao, gateway=MensageriaFalsa(), fonte=FonteFalsa()
-        )
+        _processar(conexao)
         depois = conexao.execute(
             text("SELECT COUNT(*) FROM item_vendavel")
         ).scalar_one()

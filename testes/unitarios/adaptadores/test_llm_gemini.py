@@ -138,6 +138,81 @@ def test_responder_duvida_inclui_itens_no_corpo_e_devolve_resultado():
     prompt = corpo["contents"][0]["parts"][0]["text"]
     assert "Cafe da manha" in prompt
     assert "7h as 10h" in prompt
+    assert "texto DEVE conter os trechos citados literalmente" in prompt
+
+
+def test_prompt_de_duvida_tece_o_trecho_sem_metalinguagem():
+    pedidos = []
+
+    def handler(pedido: httpx.Request) -> httpx.Response:
+        pedidos.append(pedido)
+        return httpx.Response(
+            200,
+            json=_envelope(
+                {
+                    "coberta": True,
+                    "texto": "7h as 10h",
+                    "trechos_citados": ["7h as 10h"],
+                }
+            ),
+        )
+
+    itens = (
+        ItemCatalogo(
+            id_catalogo_item=1,
+            categoria="horario",
+            titulo="Cafe da manha",
+            conteudo="7h as 10h",
+        ),
+    )
+    _porta(handler).responder_duvida("que horas e o cafe", itens)
+    prompt = json.loads(pedidos[0].content)["contents"][0]["parts"][0]["text"]
+    assert "texto DEVE conter os trechos citados literalmente" in prompt
+    assert "tecidos na frase" in prompt
+    assert "recepcionista" in prompt
+    assert "conforme o trecho" in prompt
+    assert "segundo os fatos" in prompt
+    assert "conforme consta" in prompt
+    assert "Proibido" in prompt or "proibido" in prompt
+
+
+def test_prompt_e_verificacao_usam_a_mesma_formatacao_do_item():
+    import inspect
+
+    from app.adaptadores.llm_gemini import LLMGemini
+    from app.modulos.conversa import fidelidade
+
+    assert "formatar_item_catalogo" in inspect.getsource(LLMGemini.responder_duvida)
+    assert "formatar_item_catalogo" in inspect.getsource(
+        fidelidade.resposta_fiel_ao_catalogo
+    )
+
+    pedidos = []
+
+    def handler(pedido: httpx.Request) -> httpx.Response:
+        pedidos.append(pedido)
+        return httpx.Response(
+            200,
+            json=_envelope(
+                {
+                    "coberta": True,
+                    "texto": "ok",
+                    "trechos_citados": ["ok"],
+                }
+            ),
+        )
+
+    item = ItemCatalogo(
+        id_catalogo_item=2,
+        categoria="horario",
+        titulo="Piscina",
+        conteudo="Aberta das 8h as 22h",
+    )
+    _porta(handler).responder_duvida("horario da piscina", (item,))
+    prompt = json.loads(pedidos[0].content)["contents"][0]["parts"][0]["text"]
+    fato = fidelidade.formatar_item_catalogo(item)
+    assert fato in prompt
+    assert fidelidade.resposta_fiel_ao_catalogo(f"{fato}.", (fato,), (item,))
 
 
 def test_tom_aparece_antes_da_regra_final_e_classificar_nao_o_interpola():

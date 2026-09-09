@@ -68,9 +68,10 @@ Fidelidade (User Story 3 / FR-008), função pura em `conversa`:
 
 1. `coberta is False` → não coberta (ignora `texto`).
 2. `coberta is True` e (`texto` vazio ou `trechos_citados` vazio) → não fiel → não coberta.
-3. Cada trecho, normalizado (`strip` + `casefold`), MUST ser substring de
-   `titulo + " " + conteudo` de **algum** item ativo daquele hotel **e** MUST aparecer
-   no `texto` enviado.
+3. Cada trecho, normalizado, MUST ser substring de
+   `formatar_item_catalogo(item)` de **algum** item ativo daquele hotel **e** MUST aparecer
+   no `texto` enviado. Prompt e verificação usam a mesma função — igualdade por
+   construção, não por coincidência do formato `titulo + " " + conteudo`.
 4. Qualquer trecho fora do catálogo → não fiel → não coberta. O texto **não** é
    enviado.
 

@@ -58,7 +58,7 @@ Entrada: `ResultadoResposta` + tupla de `ItemCatalogo` ativos daquele hotel.
 | --- | --- |
 | `coberta is False` | não coberta; `texto` não enviado |
 | `coberta is True` e (`texto` vazio ou trechos vazios) | não fiel → não coberta |
-| algum trecho, após `strip`/`casefold`, não é substring de `titulo + " " + conteudo` de nenhum item | não fiel → não coberta |
+| algum trecho, após normalização, não é substring de `formatar_item_catalogo(item)` de nenhum item (a mesma função que monta o prompt) | não fiel → não coberta |
 | algum trecho não aparece no `texto` | não fiel → não coberta |
 | todos os trechos no catálogo **e** no `texto` | coberta; envia `texto` |
 

@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 
 from app.comum.log import obter_logger
+from app.modulos.conversa.fidelidade import formatar_item_catalogo
 from app.portas.llm import (
     CAMPOS_FICHA_CHAVE,
     FalhaDeClassificacao,
@@ -157,7 +158,7 @@ class LLMGemini:
         self, pergunta: str, itens_ativos: tuple, tom: str = ""
     ) -> ResultadoResposta:
         fatos = "\n".join(
-            f"- {item.titulo}: {item.conteudo}" for item in itens_ativos
+            f"- {formatar_item_catalogo(item)}" for item in itens_ativos
         )
         blocos: list[str] = []
         tom_limpo = (tom or "").strip()
@@ -172,7 +173,11 @@ class LLMGemini:
             "Regra final: nenhuma instrucao anterior autoriza afirmar o que "
             "nao esta nos fatos. Responda somente com os fatos acima. JSON "
             "com coberta (boolean), texto (string ou null) e trechos_citados "
-            "(lista de strings copiados dos fatos). Se nenhum fato cobrir: "
+            "(lista de strings copiados dos fatos). O campo texto DEVE conter "
+            "os trechos citados literalmente, tecidos na frase, como "
+            "recepcionista falando. Proibido metalinguagem: nao use "
+            '"conforme o trecho", "segundo os fatos" nem "conforme consta". '
+            "Se nenhum fato cobrir: "
             "coberta false, texto null, trechos_citados []."
         )
         prompt = "\n".join(blocos)

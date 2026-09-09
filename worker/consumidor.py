@@ -29,6 +29,7 @@ def processar_uma_passagem(
     llm: LLMProvider | None = None,
     catalogo=None,
     fonte: FontePublica | None = None,
+    agora=None,
     limite: int = 100,
 ) -> int:
     """Processa ate `limite` trabalhos elegiveis. Devolve quantos foram claims."""
@@ -128,7 +129,7 @@ def processar_uma_passagem(
             )
         elif trabalho["tipo"] == "coletar_mercado":
             mercado_service.processar_trabalho_coletar_mercado(
-                conexao, trabalho=trabalho, fonte=porta_fonte
+                conexao, trabalho=trabalho, fonte=porta_fonte, agora=agora
             )
         elif trabalho["tipo"] == "enviar_resposta_recepcao":
             conversa_service.processar_trabalho_enviar_resposta_recepcao(
@@ -152,10 +153,16 @@ def processar_uma_passagem_na_engine(
     llm: LLMProvider | None = None,
     catalogo=None,
     fonte: FontePublica | None = None,
+    agora=None,
 ) -> int:
     porta = gateway or construir_mensageria(obter_configuracao())
     porta_llm = llm if llm is not None else construir_llm(obter_configuracao())
     with engine.begin() as conexao:
         return processar_uma_passagem(
-            conexao, gateway=porta, llm=porta_llm, catalogo=catalogo, fonte=fonte
+            conexao,
+            gateway=porta,
+            llm=porta_llm,
+            catalogo=catalogo,
+            fonte=fonte,
+            agora=agora,
         )
