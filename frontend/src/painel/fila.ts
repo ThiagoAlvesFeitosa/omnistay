@@ -1,3 +1,9 @@
+export type OmissaoFila = {
+  chave: string;
+  texto: string;
+  contagem: number;
+};
+
 export type ItemFila = {
   id_reserva: number;
   nome: string | null;
@@ -10,6 +16,7 @@ export type ItemFila = {
   boas_vindas_nao_enviadas: boolean;
   precisa_atendimento_humano: boolean;
   saida_nao_confirmada: boolean;
+  omissoes?: OmissaoFila[];
 };
 
 export type ResumoTurno = {

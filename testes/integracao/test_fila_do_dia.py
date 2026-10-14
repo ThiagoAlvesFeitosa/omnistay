@@ -309,3 +309,57 @@ def test_resposta_da_recepcao_apaga_precisa_atendimento_das_ja_encaminhadas(
         if i["id_reserva"] == id_reserva
     )
     assert item["precisa_atendimento_humano"] is True
+
+
+@pytest.mark.postgres
+def test_trabalho_em_falha_aparece_como_omissao_na_fila(app_sobre_ambiente):
+    cliente, ambiente = app_sobre_ambiente
+    _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
+    id_reserva = cliente.post("/reservas", json=_corpo_valido()).json()["id_reserva"]
+    with ambiente.conexao() as conexao:
+        conexao.execute(
+            text(
+                "INSERT INTO trabalho (id_hotel, tipo, payload, status, tentativas) "
+                "VALUES (:h, 'interpretar_ficha', CAST(:p AS jsonb), 'falha', 5)"
+            ),
+            {
+                "h": ambiente.propriedade_a.id_hotel,
+                "p": '{"id_reserva": %s, "id_mensagem": 1}' % id_reserva,
+            },
+        )
+        conexao.commit()
+    item = next(
+        i
+        for i in cliente.get("/fila-do-dia").json()["itens"]
+        if i["id_reserva"] == id_reserva
+    )
+    assert item["omissoes"] == [
+        {
+            "chave": "ficha_nao_processada",
+            "texto": "Ficha não processada",
+            "contagem": 1,
+        }
+    ]
+    assert item["chegada_nao_confirmada"] is False
+
+
+@pytest.mark.postgres
+def test_coleta_de_mercado_em_falha_nao_altera_linha_da_fila(app_sobre_ambiente):
+    cliente, ambiente = app_sobre_ambiente
+    _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
+    id_reserva = cliente.post("/reservas", json=_corpo_valido()).json()["id_reserva"]
+    with ambiente.conexao() as conexao:
+        conexao.execute(
+            text(
+                "INSERT INTO trabalho (id_hotel, tipo, payload, status, tentativas) "
+                "VALUES (:h, 'coletar_mercado', CAST(:p AS jsonb), 'falha', 5)"
+            ),
+            {"h": ambiente.propriedade_a.id_hotel, "p": '{"id_concorrente": 1}'},
+        )
+        conexao.commit()
+    item = next(
+        i
+        for i in cliente.get("/fila-do-dia").json()["itens"]
+        if i["id_reserva"] == id_reserva
+    )
+    assert item["omissoes"] == []

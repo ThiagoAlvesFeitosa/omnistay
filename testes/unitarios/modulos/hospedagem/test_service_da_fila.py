@@ -60,3 +60,50 @@ def test_fila_consulta_apenas_hotel_da_sessao_e_preserva_ordem():
 
     assert repo.chamadas == [10]
     assert [i.nome for i in itens] == ["Antes", "Depois"]
+
+
+def test_fila_traduz_trabalho_em_falha_em_omissao():
+    repo = Repositorio(
+        [
+            {
+                "id_hotel": 10,
+                "id_reserva": 1,
+                "nome_completo": "Marina",
+                "telefone_contato": "5511888888888",
+                "data_checkin_prevista": date(2026, 8, 20),
+                "data_checkout_prevista": date(2026, 8, 21),
+                "status": "aguardando_cadastro",
+                "ficha_completa": False,
+                "chegada_nao_confirmada": False,
+                "omissoes_brutas": [{"tipo": "interpretar_ficha", "n": 1}],
+            }
+        ]
+    )
+    itens = hospedagem.listar_fila_do_dia(
+        conexao=object(), id_hotel=10, repositorio=repo
+    )
+    assert itens[0].omissoes[0].texto == "Ficha não processada"
+    assert itens[0].omissoes[0].chave == "ficha_nao_processada"
+
+
+def test_reserva_encerrada_nao_carrega_omissao_mesmo_com_brutas():
+    repo = Repositorio(
+        [
+            {
+                "id_hotel": 10,
+                "id_reserva": 1,
+                "nome_completo": "Saida",
+                "telefone_contato": "5511888888888",
+                "data_checkin_prevista": date(2026, 8, 20),
+                "data_checkout_prevista": date(2026, 8, 21),
+                "status": "encerrado",
+                "ficha_completa": True,
+                "chegada_nao_confirmada": False,
+                "omissoes_brutas": [],
+            }
+        ]
+    )
+    itens = hospedagem.listar_fila_do_dia(
+        conexao=object(), id_hotel=10, repositorio=repo
+    )
+    assert itens[0].omissoes == []

@@ -158,6 +158,14 @@ export function TelaFila() {
                       precisa da recepção
                     </span>
                   ) : null}
+                  {(linha.omissoes ?? []).map((omissao) => (
+                    <span
+                      key={omissao.chave}
+                      className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-sky-900"
+                    >
+                      {omissao.texto}
+                    </span>
+                  ))}
                 </td>
                 <td>
                   {linha.estado_cadastro === "parcial" ? (

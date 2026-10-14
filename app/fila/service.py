@@ -282,7 +282,10 @@ def tentativas_maximas(
     )
     if valor is None:
         return TENTATIVAS_MAX_PADRAO
-    return int(valor)
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return TENTATIVAS_MAX_PADRAO
 
 
 def backoff_apos(tentativas: int) -> datetime:

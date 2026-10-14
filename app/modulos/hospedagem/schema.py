@@ -23,6 +23,12 @@ class ReservaResposta(BaseModel):
     status: str
 
 
+class OmissaoFila(BaseModel):
+    chave: str
+    texto: str
+    contagem: int
+
+
 class ItemFilaDoDia(BaseModel):
     id_reserva: int
     nome: str | None
@@ -38,6 +44,7 @@ class ItemFilaDoDia(BaseModel):
     pesquisa_saida_leitura_humana: bool = False
     status_envio_coleta: str | None = None
     estado_cadastro: str | None = None
+    omissoes: list[OmissaoFila] = Field(default_factory=list)
 
 
 class FilaDoDiaResposta(BaseModel):

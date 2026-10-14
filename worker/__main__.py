@@ -4,11 +4,10 @@ import argparse
 import time
 from datetime import timedelta
 
-from sqlalchemy import create_engine
-
 from app.adaptadores.fabrica_llm import construir_llm
 from app.adaptadores.fabrica_mensageria import construir_mensageria
 from app.config import obter_configuracao
+from app.database import obter_engine
 from app.comum import relogio
 from app.comum.log import configurar_log, obter_logger
 from worker.agendador import (
@@ -60,6 +59,35 @@ def _rodar_verificacao_retencao(engine) -> int:
     return n
 
 
+def _etapa_isolada(nome: str, acao) -> None:
+    try:
+        acao()
+    except Exception as exc:
+        logger.info(
+            "ciclo_etapa_falha etapa=%s excecao=%s",
+            nome,
+            type(exc).__name__,
+        )
+
+
+def executar_ciclo(engine, *, gateway, llm, incluir_agendadas: bool = True) -> None:
+    _etapa_isolada(
+        "passagem",
+        lambda: processar_uma_passagem_na_engine(
+            engine, gateway=gateway, llm=llm
+        ),
+    )
+    if not incluir_agendadas:
+        return
+    _etapa_isolada("cadastros", lambda: _rodar_verificacao(engine))
+    _etapa_isolada(
+        "boas_vindas", lambda: _rodar_verificacao_boas_vindas(engine)
+    )
+    _etapa_isolada("pulsos", lambda: _rodar_verificacao_pulsos(engine))
+    _etapa_isolada("mercado", lambda: _rodar_verificacao_mercado(engine))
+    _etapa_isolada("retencao", lambda: _rodar_verificacao_retencao(engine))
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Worker OmniStay")
     parser.add_argument(
@@ -101,7 +129,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     configurar_log()
     configuracao = obter_configuracao()
-    engine = create_engine(configuracao.database_url)
+    engine = obter_engine()
     gateway = construir_mensageria(configuracao)
     llm = construir_llm(configuracao)
     if args.uma_passagem:
@@ -126,17 +154,18 @@ def main(argv: list[str] | None = None) -> None:
     logger.info("worker_iniciado")
     ultima_verificacao = None
     while True:
-        processar_uma_passagem_na_engine(engine, gateway=gateway, llm=llm)
         agora = relogio.agora()
-        if (
+        incluir_agendadas = (
             ultima_verificacao is None
             or agora - ultima_verificacao >= INTERVALO_VERIFICACAO
-        ):
-            _rodar_verificacao(engine)
-            _rodar_verificacao_boas_vindas(engine)
-            _rodar_verificacao_pulsos(engine)
-            _rodar_verificacao_mercado(engine)
-            _rodar_verificacao_retencao(engine)
+        )
+        executar_ciclo(
+            engine,
+            gateway=gateway,
+            llm=llm,
+            incluir_agendadas=incluir_agendadas,
+        )
+        if incluir_agendadas:
             ultima_verificacao = agora
         time.sleep(args.intervalo_segundos)
 

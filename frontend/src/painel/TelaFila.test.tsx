@@ -23,6 +23,7 @@ function item(parcial: Partial<ItemFila> & { id_reserva: number; nome: string })
     boas_vindas_nao_enviadas: false,
     saida_nao_confirmada: false,
     precisa_atendimento_humano: false,
+    omissoes: [],
     ...parcial,
   };
 }
@@ -338,5 +339,58 @@ describe("TelaFila", () => {
     expect(screen.getByText(/1 hospedados/)).toBeInTheDocument();
     expect(screen.getByText(/1 entrada vencida/)).toBeInTheDocument();
     expect(screen.queryByText(/saída vencida/i)).not.toBeInTheDocument();
+  });
+
+  it("mostra omissão de trabalho em falha com rótulo sky próprio", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchFila([
+        item({
+          id_reserva: 50,
+          nome: "Ficha parada",
+          status: "aguardando_cadastro",
+          omissoes: [
+            {
+              chave: "ficha_nao_processada",
+              texto: "Ficha não processada",
+              contagem: 1,
+            },
+          ],
+        }),
+      ]),
+    );
+    renderFila();
+    const rotulo = await screen.findByText("Ficha não processada");
+    expect(rotulo).toHaveClass("bg-sky-100");
+    expect(rotulo).toHaveClass("text-sky-900");
+    expect(screen.queryByRole("button", { name: /ciente/i })).not.toBeInTheDocument();
+  });
+
+  it("agrupa omissões distintas e mostra a contagem do mesmo tipo", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchFila([
+        item({
+          id_reserva: 51,
+          nome: "Duas falhas",
+          status: "hospedado",
+          omissoes: [
+            {
+              chave: "ficha_nao_processada",
+              texto: "Ficha não processada",
+              contagem: 1,
+            },
+            {
+              chave: "mensagem_hospede_sem_resposta",
+              texto: "2 mensagens do hóspede sem resposta",
+              contagem: 2,
+            },
+          ],
+        }),
+      ]),
+    );
+    renderFila();
+    expect(await screen.findByText("Ficha não processada")).toBeInTheDocument();
+    expect(screen.getByText("2 mensagens do hóspede sem resposta")).toBeInTheDocument();
   });
 });

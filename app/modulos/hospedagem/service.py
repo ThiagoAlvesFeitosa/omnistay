@@ -1,5 +1,6 @@
 """Regras de hospedagem: reserva, fila e contagem. Sem HTTP e sem SQL."""
 
+import json
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -21,6 +22,7 @@ from app.modulos.hospedagem.schema import (
     ConsentimentoResposta,
     FichaTitularResposta,
     ItemFilaDoDia,
+    OmissaoFila,
     ItemPedidoFeitoPeloChat,
     ListaPedidosFeitosPeloChat,
     ReservaResposta,
@@ -29,6 +31,101 @@ from app.modulos.hospedagem.schema import (
 from app.portas.llm import CAMPOS_FICHA_CHAVE
 
 logger = obter_logger(__name__)
+
+_CATALOGO_OMISSOES: tuple[tuple[str, frozenset[str], str, str], ...] = (
+    (
+        "ficha_nao_processada",
+        frozenset({"interpretar_ficha"}),
+        "Ficha não processada",
+        "fichas não processadas",
+    ),
+    (
+        "mensagem_hospede_sem_resposta",
+        frozenset(
+            {
+                "classificar_mensagem",
+                "responder_duvida",
+                "registrar_pedido_servico",
+                "abrir_chamado_reclamacao",
+                "registrar_resposta_pulso",
+                "interpretar_pesquisa_saida",
+            }
+        ),
+        "Mensagem do hóspede sem resposta",
+        "mensagens do hóspede sem resposta",
+    ),
+    (
+        "coleta_nao_enviada",
+        frozenset({"enviar_coleta"}),
+        "Coleta não enviada",
+        "coletas não enviadas",
+    ),
+    (
+        "lembrete_nao_enviado",
+        frozenset({"enviar_lembrete"}),
+        "Lembrete não enviado",
+        "lembretes não enviados",
+    ),
+    (
+        "recado_boas_vindas_nao_enviado",
+        frozenset({"enviar_boas_vindas"}),
+        "Recado de boas-vindas não saiu",
+        "recados de boas-vindas não saíram",
+    ),
+    (
+        "confirmacao_resolucao_nao_enviada",
+        frozenset({"enviar_confirmacao_resolucao"}),
+        "Confirmação de resolução não enviada",
+        "confirmações de resolução não enviadas",
+    ),
+    (
+        "pulso_nao_enviado",
+        frozenset({"enviar_pulso"}),
+        "Pulso não enviado",
+        "pulsos não enviados",
+    ),
+    (
+        "pesquisa_saida_nao_enviada",
+        frozenset({"enviar_pesquisa_saida"}),
+        "Pesquisa de saída não enviada",
+        "pesquisas de saída não enviadas",
+    ),
+    (
+        "lista_pedidos_nao_enviada",
+        frozenset({"enviar_lista_pedidos_chat"}),
+        "Lista de pedidos não enviada",
+        "listas de pedidos não enviadas",
+    ),
+    (
+        "resposta_recepcao_nao_enviada",
+        frozenset({"enviar_resposta_recepcao"}),
+        "Resposta da recepção não enviada",
+        "respostas da recepção não enviadas",
+    ),
+)
+
+_TIPO_PARA_CHAVE = {
+    tipo: chave
+    for chave, tipos, _singular, _plural in _CATALOGO_OMISSOES
+    for tipo in tipos
+}
+
+
+def montar_omissoes(brutas: list[dict] | None) -> list[dict]:
+    totais: dict[str, int] = {}
+    for item in brutas or []:
+        chave = _TIPO_PARA_CHAVE.get(str(item.get("tipo") or ""))
+        if chave is None:
+            continue
+        totais[chave] = totais.get(chave, 0) + int(item.get("n") or 0)
+    resultado = []
+    for chave, _tipos, singular, plural in _CATALOGO_OMISSOES:
+        contagem = totais.get(chave, 0)
+        if contagem < 1:
+            continue
+        texto = singular if contagem == 1 else f"{contagem} {plural}"
+        resultado.append({"chave": chave, "texto": texto, "contagem": contagem})
+    return resultado
 
 
 class DadosInvalidos(ValueError):
@@ -168,6 +265,17 @@ def criar_reserva(
     )
 
 
+def _brutas_de_omissao(linha: dict) -> list[dict]:
+    brutas = linha.get("omissoes_brutas")
+    if brutas is None:
+        return []
+    if isinstance(brutas, str):
+        brutas = json.loads(brutas)
+    if not isinstance(brutas, list):
+        return []
+    return [item for item in brutas if isinstance(item, dict)]
+
+
 def listar_fila_do_dia(
     conexao,
     *,
@@ -195,6 +303,10 @@ def listar_fila_do_dia(
             ),
             status_envio_coleta=linha.get("status_envio_coleta"),
             estado_cadastro=linha.get("estado_cadastro"),
+            omissoes=[
+                OmissaoFila(**item)
+                for item in montar_omissoes(_brutas_de_omissao(linha))
+            ],
         )
         for linha in linhas
     ]

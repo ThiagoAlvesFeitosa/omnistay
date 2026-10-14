@@ -29,10 +29,18 @@ class RepoFila:
 
 @dataclass
 class RepoParam:
-    valor: str = "3"
+    valor: str | None = "3"
 
     def ler_parametro(self, conexao, id_hotel, chave):
         return self.valor
+
+
+@dataclass
+class RepoParamPorHotel:
+    valores: dict
+
+    def ler_parametro(self, conexao, id_hotel, chave):
+        return self.valores.get(id_hotel)
 
 
 def test_falha_abaixo_do_teto_reagenda():
@@ -75,3 +83,46 @@ def test_backoff_cresce_com_tentativas():
     assert b > a
     assert a > datetime.now(UTC)
     assert isinstance(b - a, timedelta)
+
+
+def test_teto_ausente_usa_padrao_cinco():
+    teto = fila_service.tentativas_maximas(
+        object(),
+        id_hotel=10,
+        repositorio_propriedade=RepoParam(None),
+    )
+    assert teto == 5
+
+
+def test_teto_ilegivel_usa_padrao_cinco():
+    teto = fila_service.tentativas_maximas(
+        object(),
+        id_hotel=10,
+        repositorio_propriedade=RepoParam("abc"),
+    )
+    assert teto == 5
+
+
+def test_teto_numerico_da_propriedade_e_respeitado():
+    teto = fila_service.tentativas_maximas(
+        object(),
+        id_hotel=10,
+        repositorio_propriedade=RepoParam("7"),
+    )
+    assert teto == 7
+
+
+def test_teto_e_o_da_propriedade_do_trabalho():
+    repo = RepoParamPorHotel({10: "3", 20: "9"})
+    assert (
+        fila_service.tentativas_maximas(
+            object(), id_hotel=10, repositorio_propriedade=repo
+        )
+        == 3
+    )
+    assert (
+        fila_service.tentativas_maximas(
+            object(), id_hotel=20, repositorio_propriedade=repo
+        )
+        == 9
+    )

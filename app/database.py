@@ -14,6 +14,7 @@ def obter_engine() -> Engine:
     return create_engine(
         configuracao.database_url,
         pool_pre_ping=False,
+        hide_parameters=True,
         connect_args={
             "connect_timeout": max(1, int(timeout_segundos)),
             "options": f"-c statement_timeout={timeout_milissegundos}",

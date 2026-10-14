@@ -10,6 +10,7 @@ from app.adaptadores.llm_falso import LLMFalso
 from app.config import obter_configuracao
 from app.comum.log import obter_logger
 from app.fila import repository as fila_repository
+from app.fila import service as fila_service
 from app.modulos.atendimento import service as atendimento_service
 from app.modulos.conversa import service as conversa_service
 from app.modulos.hospedagem import service as hospedagem_service
@@ -38,112 +39,155 @@ def processar_uma_passagem(
     porta_fonte = fonte or FonteFalsa()
     processados = 0
     while processados < limite:
-        trabalho = fila_repository.reclamar_proximo(conexao)
-        if trabalho is None:
-            break
-        logger.info(
-            "trabalho_claim id_trabalho=%s tipo=%s",
-            trabalho["id_trabalho"],
-            trabalho["tipo"],
-        )
-        if trabalho["tipo"] == "enviar_coleta":
-            conversa_service.processar_trabalho_enviar_coleta(
-                conexao, trabalho=trabalho, gateway=gateway
+        trabalho = None
+        savepoint = conexao.begin_nested()
+        try:
+            trabalho = fila_repository.reclamar_proximo(conexao)
+            if trabalho is None:
+                savepoint.rollback()
+                break
+            logger.info(
+                "trabalho_claim id_trabalho=%s tipo=%s",
+                trabalho["id_trabalho"],
+                trabalho["tipo"],
             )
-        elif trabalho["tipo"] == "interpretar_ficha":
-            conversa_service.processar_trabalho_interpretar_ficha(
-                conexao,
-                trabalho=trabalho,
-                llm=porta_llm,
-                consolidar=hospedagem_service.consolidar_ficha_titular,
-            )
-        elif trabalho["tipo"] == "enviar_lembrete":
-            conversa_service.processar_trabalho_enviar_lembrete(
-                conexao, trabalho=trabalho, gateway=gateway
-            )
-        elif trabalho["tipo"] == "enviar_boas_vindas":
-            conversa_service.processar_trabalho_enviar_boas_vindas(
-                conexao, trabalho=trabalho, gateway=gateway
-            )
-        elif trabalho["tipo"] == "classificar_mensagem":
-            conversa_service.processar_trabalho_classificar_mensagem(
-                conexao,
-                trabalho=trabalho,
-                llm=porta_llm,
-                completar_janela=atendimento_service.completar_janela_se_resposta,
-            )
-        elif trabalho["tipo"] == "responder_duvida":
-            conversa_service.processar_trabalho_responder_duvida(
-                conexao,
-                trabalho=trabalho,
-                llm=porta_llm,
-                catalogo=porta_catalogo or CatalogoBanco(conexao),
-                gateway=gateway,
-            )
-        elif trabalho["tipo"] == "registrar_pedido_servico":
-            conversa_service.processar_trabalho_registrar_pedido(
+            _despachar_trabalho(
                 conexao,
                 trabalho=trabalho,
                 gateway=gateway,
-                abrir_servico=atendimento_service.abrir_servico,
-                abrir_consumo=atendimento_service.abrir_consumo,
-                listar_itens_ativos=propriedade_service.listar_itens_vendaveis_ativos,
-                identificar=porta_llm.identificar_item_vendavel,
-                ler_preco=propriedade_service.ler_preco_item_ativo,
+                porta_llm=porta_llm,
+                porta_catalogo=porta_catalogo,
+                porta_fonte=porta_fonte,
+                agora=agora,
             )
-        elif trabalho["tipo"] == "abrir_chamado_reclamacao":
-            conversa_service.processar_trabalho_abrir_chamado(
-                conexao,
-                trabalho=trabalho,
-                gateway=gateway,
-                abrir_reclamacao=atendimento_service.abrir_reclamacao,
-            )
-        elif trabalho["tipo"] == "enviar_confirmacao_resolucao":
-            conversa_service.processar_trabalho_enviar_confirmacao_resolucao(
-                conexao, trabalho=trabalho, gateway=gateway
-            )
-        elif trabalho["tipo"] == "enviar_pulso":
-            conversa_service.processar_trabalho_enviar_pulso(
-                conexao, trabalho=trabalho, gateway=gateway
-            )
-        elif trabalho["tipo"] == "registrar_resposta_pulso":
-            conversa_service.processar_trabalho_registrar_resposta_pulso(
-                conexao,
-                trabalho=trabalho,
-                gateway=gateway,
-                abrir_reclamacao=atendimento_service.abrir_reclamacao,
-            )
-        elif trabalho["tipo"] == "enviar_pesquisa_saida":
-            conversa_service.processar_trabalho_enviar_pesquisa_saida(
-                conexao, trabalho=trabalho, gateway=gateway
-            )
-        elif trabalho["tipo"] == "interpretar_pesquisa_saida":
-            conversa_service.processar_trabalho_interpretar_pesquisa_saida(
-                conexao,
-                trabalho=trabalho,
-                llm=porta_llm,
-            )
-        elif trabalho["tipo"] == "enviar_lista_pedidos_chat":
-            conversa_service.processar_trabalho_enviar_lista_pedidos_chat(
-                conexao, trabalho=trabalho, gateway=gateway
-            )
-        elif trabalho["tipo"] == "coletar_mercado":
-            mercado_service.processar_trabalho_coletar_mercado(
-                conexao, trabalho=trabalho, fonte=porta_fonte, agora=agora
-            )
-        elif trabalho["tipo"] == "enviar_resposta_recepcao":
-            conversa_service.processar_trabalho_enviar_resposta_recepcao(
-                conexao, trabalho=trabalho, gateway=gateway
-            )
-        else:
-            fila_repository.marcar_falha(
+            savepoint.commit()
+        except Exception as exc:
+            savepoint.rollback()
+            if trabalho is None:
+                raise
+            fila_service.registrar_falha_de_envio(
                 conexao,
                 id_trabalho=trabalho["id_trabalho"],
-                tentativas=trabalho["tentativas"] + 1,
-                erro="tipo_desconhecido",
+                id_hotel=trabalho["id_hotel"],
+                tentativas_atuais=trabalho["tentativas"],
+                codigo_erro=type(exc).__name__,
+            )
+            logger.info(
+                "trabalho_falha id_trabalho=%s tipo=%s excecao=%s",
+                trabalho["id_trabalho"],
+                trabalho["tipo"],
+                type(exc).__name__,
             )
         processados += 1
     return processados
+
+
+def _despachar_trabalho(
+    conexao: Connection,
+    *,
+    trabalho: dict,
+    gateway: MensageriaGateway,
+    porta_llm: LLMProvider,
+    porta_catalogo,
+    porta_fonte: FontePublica,
+    agora,
+) -> None:
+    if trabalho["tipo"] == "enviar_coleta":
+        conversa_service.processar_trabalho_enviar_coleta(
+            conexao, trabalho=trabalho, gateway=gateway
+        )
+    elif trabalho["tipo"] == "interpretar_ficha":
+        conversa_service.processar_trabalho_interpretar_ficha(
+            conexao,
+            trabalho=trabalho,
+            llm=porta_llm,
+            consolidar=hospedagem_service.consolidar_ficha_titular,
+        )
+    elif trabalho["tipo"] == "enviar_lembrete":
+        conversa_service.processar_trabalho_enviar_lembrete(
+            conexao, trabalho=trabalho, gateway=gateway
+        )
+    elif trabalho["tipo"] == "enviar_boas_vindas":
+        conversa_service.processar_trabalho_enviar_boas_vindas(
+            conexao, trabalho=trabalho, gateway=gateway
+        )
+    elif trabalho["tipo"] == "classificar_mensagem":
+        conversa_service.processar_trabalho_classificar_mensagem(
+            conexao,
+            trabalho=trabalho,
+            llm=porta_llm,
+            completar_janela=atendimento_service.completar_janela_se_resposta,
+        )
+    elif trabalho["tipo"] == "responder_duvida":
+        conversa_service.processar_trabalho_responder_duvida(
+            conexao,
+            trabalho=trabalho,
+            llm=porta_llm,
+            catalogo=porta_catalogo or CatalogoBanco(conexao),
+            gateway=gateway,
+        )
+    elif trabalho["tipo"] == "registrar_pedido_servico":
+        conversa_service.processar_trabalho_registrar_pedido(
+            conexao,
+            trabalho=trabalho,
+            gateway=gateway,
+            abrir_servico=atendimento_service.abrir_servico,
+            abrir_consumo=atendimento_service.abrir_consumo,
+            listar_itens_ativos=propriedade_service.listar_itens_vendaveis_ativos,
+            identificar=porta_llm.identificar_item_vendavel,
+            ler_preco=propriedade_service.ler_preco_item_ativo,
+        )
+    elif trabalho["tipo"] == "abrir_chamado_reclamacao":
+        conversa_service.processar_trabalho_abrir_chamado(
+            conexao,
+            trabalho=trabalho,
+            gateway=gateway,
+            abrir_reclamacao=atendimento_service.abrir_reclamacao,
+        )
+    elif trabalho["tipo"] == "enviar_confirmacao_resolucao":
+        conversa_service.processar_trabalho_enviar_confirmacao_resolucao(
+            conexao, trabalho=trabalho, gateway=gateway
+        )
+    elif trabalho["tipo"] == "enviar_pulso":
+        conversa_service.processar_trabalho_enviar_pulso(
+            conexao, trabalho=trabalho, gateway=gateway
+        )
+    elif trabalho["tipo"] == "registrar_resposta_pulso":
+        conversa_service.processar_trabalho_registrar_resposta_pulso(
+            conexao,
+            trabalho=trabalho,
+            gateway=gateway,
+            abrir_reclamacao=atendimento_service.abrir_reclamacao,
+        )
+    elif trabalho["tipo"] == "enviar_pesquisa_saida":
+        conversa_service.processar_trabalho_enviar_pesquisa_saida(
+            conexao, trabalho=trabalho, gateway=gateway
+        )
+    elif trabalho["tipo"] == "interpretar_pesquisa_saida":
+        conversa_service.processar_trabalho_interpretar_pesquisa_saida(
+            conexao,
+            trabalho=trabalho,
+            llm=porta_llm,
+        )
+    elif trabalho["tipo"] == "enviar_lista_pedidos_chat":
+        conversa_service.processar_trabalho_enviar_lista_pedidos_chat(
+            conexao, trabalho=trabalho, gateway=gateway
+        )
+    elif trabalho["tipo"] == "coletar_mercado":
+        mercado_service.processar_trabalho_coletar_mercado(
+            conexao, trabalho=trabalho, fonte=porta_fonte, agora=agora
+        )
+    elif trabalho["tipo"] == "enviar_resposta_recepcao":
+        conversa_service.processar_trabalho_enviar_resposta_recepcao(
+            conexao, trabalho=trabalho, gateway=gateway
+        )
+    else:
+        fila_repository.marcar_falha(
+            conexao,
+            id_trabalho=trabalho["id_trabalho"],
+            tentativas=trabalho["tentativas"] + 1,
+            erro="tipo_desconhecido",
+        )
 
 
 def processar_uma_passagem_na_engine(
