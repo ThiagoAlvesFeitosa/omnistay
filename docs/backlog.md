@@ -1147,3 +1147,203 @@ F8.1 → F8.2 → F8.3 → F8.4 → F8.5 → F8.6 → F8.7
 
 **Se o prazo apertar**, o mínimo apresentável é **F8.1 + F8.2 + F8.4**: entrar, operar o turno e
 resolver chamado. As demais telas continuam acessíveis pelo `/docs` durante a demonstração.
+
+---
+
+# Fase 9 — Robustez e identidade do hóspede
+
+**Por que esta fase existe.** Em 18/09/2026 um teste pelo simulador derrubou o worker com uma
+violação de unicidade no documento do hóspede. A investigação achou três defeitos e uma lacuna
+de validação, e as decisões foram registradas no `00-ESTADO-DO-PROJETO.md` e no ADR-009. A
+auditoria da Fase 6 (06/10/2026) acrescentou dois pontos: o erro capturado não pode gravar dado
+pessoal, e o expurgo roda no mesmo laço que as mensagens — quando o worker cai, ele para junto.
+
+**Ela vem antes das integrações, de propósito.** A API do SNRHos separa pessoa de estadia, que é
+o modelo que a F9.3 adota. E um CPF malformado deixa de ser incômodo interno para virar
+submissão recusada por sistema federal.
+
+## Decisões que governam a fase
+
+| Tema | Decisão | Motivo |
+| --- | --- | --- |
+| Erro em um trabalho | Capturado por trabalho, com **uma transação por trabalho**. Volta a ser tentado com espera crescente até o teto da propriedade; depois, `falha` | É a única correção que vale também para os erros que ainda não aconteceram |
+| Registro do erro | Só o nome da exceção, nunca a mensagem | A mensagem do banco traz o valor do campo — o CPF de 18/09 estava nela |
+| Laço do worker | Cada etapa isolada: passagem, verificações agendadas, expurgo | Uma falha numa não suspende as outras — sobretudo o expurgo |
+| Documento | CPF conferido pelo dígito verificador; reprovado sai da extração e a ficha fica parcial | Corta o dígito trocado na origem, antes de virar colisão |
+| Identidade | `hospede` ganha `id_hotel`; único por hotel, tipo e número do documento | ADR-007 e ADR-009: consentimento é por controlador |
+| Reaproveitar ficha | Pelo **telefone**, nunca pelo documento. O sistema pergunta se os dados seguem válidos e nunca os devolve na conversa | Documento puxando ficha entregaria o endereço de alguém a quem soubesse o CPF |
+| Colisão | O worker não decide identidade. Vira pendência no painel, e a recepção vincula | É o mesmo fluxo de exceção do projeto: o humano é a ponte |
+
+---
+
+## F9.1 — O worker não para por causa de um trabalho
+
+**Objetivo:** um trabalho com erro falha sozinho; o resto da fila e as rotinas agendadas seguem.
+
+**Descrição para o `/specify`:**
+> Um erro inesperado ao processar um trabalho da fila não interrompe o worker. O trabalho que
+> falhou é registrado como tal e volta a ser tentado com espera crescente, até o limite de
+> tentativas da propriedade; ao atingir o limite, fica marcado como falha. Os demais trabalhos
+> continuam sendo processados, e o que já foi concluído não é desfeito. As rotinas agendadas —
+> lembretes, boas-vindas, pulso, coleta de mercado e expurgo por retenção — seguem rodando mesmo
+> que o processamento de mensagens falhe, e uma não impede a outra. O registro da falha nunca
+> contém dado pessoal.
+
+**Critérios de aceite:**
+
+- Trabalho cujo processamento lança exceção é reagendado, com uma tentativa a mais e espera
+  crescente, e os seguintes da fila são processados na mesma passagem
+- Trabalho que atinge o limite de tentativas fica com status de falha e não volta a ser reclamado
+- Trabalho concluído antes do erro de outro permanece concluído
+- O caso de 18/09 — violação de unicidade ao consolidar a ficha — não derruba o worker, nem na
+  primeira passagem nem nas seguintes
+- O erro gravado no trabalho e no log é o nome da exceção, sem mensagem e sem parâmetros da
+  consulta — testado com uma exceção cuja mensagem contém um CPF
+- Falha na passagem de mensagens não impede o expurgo nem as verificações agendadas no mesmo
+  ciclo, e falha em uma delas não impede as demais
+- A conexão do worker tem tempo limite por consulta, como a da API, e oculta os parâmetros das
+  consultas nas mensagens de erro
+
+**Depende de:** nenhuma fatia nova — corrige o consumidor existente (F1.2 em diante) e o laço do
+F6.1.
+
+**Referência:** `00-ESTADO-DO-PROJETO.md`, decisões de 18/09; Fase 6, Parte 4, achados 3.2, 3.3 e
+3.12.
+
+---
+
+## F9.2 — Conferir o CPF antes de gravar
+
+**Objetivo:** um CPF com dígito trocado não entra na base.
+
+**Descrição para o `/specify`:**
+> Quando o hóspede informa CPF na ficha, o sistema confere o dígito verificador antes de aceitar
+> o número. CPF reprovado não é gravado: a ficha fica parcial, e a recepção confere o documento
+> com o hóspede, como já faz com qualquer ficha parcial. A mesma conferência vale quando a
+> recepção corrige a ficha no painel, com aviso no momento de salvar. Os outros tipos de
+> documento seguem as regras atuais.
+
+**Critérios de aceite:**
+
+- CPF com dígito verificador válido é aceito, com ou sem pontuação
+- CPF reprovado não é gravado, e a ficha fica parcial
+- Sequências de um só dígito, como 111.111.111-11, são reprovadas
+- No painel, CPF reprovado é recusado ao salvar, com aviso claro
+- RG e passaporte seguem as regras atuais
+- A massa de demonstração usa CPFs que passam na conferência
+- O número reprovado não aparece em log
+
+**Depende de:** F1.3, F8.3. Independente da F9.1.
+
+**Referência:** `00-ESTADO-DO-PROJETO.md`, decisões de 18/09.
+
+---
+
+## F9.3 — Cada hóspede pertence a um hotel
+
+**Objetivo:** identidade, consentimento e expurgo ficam dentro do hotel que é o controlador.
+
+**Descrição para o `/specify`:**
+> Cada hóspede passa a pertencer a um hotel. O mesmo documento pode existir em hotéis diferentes
+> sem conflito, porque cada hotel é o controlador dos dados dos seus hóspedes. Dentro de um mesmo
+> hotel, o documento continua único. Quando a recepção tenta gravar um documento que já pertence
+> a outro hóspede do mesmo hotel, o aviso diz qual é esse hóspede, para que ela possa conferir.
+
+**Critérios de aceite:**
+
+- Dois hotéis cadastram o mesmo CPF sem erro
+- No mesmo hotel, documento repetido é recusado, e o aviso nomeia o hóspede existente
+- O aviso nunca nomeia hóspede de outro hotel
+- Consentimento e expurgo de um hotel não alcançam hóspede de outro
+- A migração atribui cada hóspede existente ao hotel das suas reservas
+- Um teste falha se alguma tabela de domínio não tiver o identificador do hotel (Artigo XIV)
+
+**Depende de:** F0.2, F1.3, F8.3.
+
+**Referência:** ADR-009; `00-ESTADO-DO-PROJETO.md`, decisões de 18/09; Fase 6, Parte 2, lacuna 2.
+
+> O último critério é o primeiro "teste constitucional" proposto na Parte 3 da Fase 6. Ele teria
+> revelado a violação do Artigo XIV antes de 18/09.
+
+---
+
+## F9.4 — Reconhecer quem volta, pelo telefone
+
+**Objetivo:** o hóspede que volta não preenche a ficha de novo, e o conflito do caso comum some.
+
+**Descrição para o `/specify`:**
+> Antes de pedir a ficha, o sistema verifica se aquele telefone já tem cadastro no mesmo hotel.
+> Se tiver, em vez de pedir todos os campos, pergunta se os dados continuam os mesmos da última
+> estadia — sem repeti-los na conversa. Se o hóspede confirmar, a nova reserva usa o cadastro
+> existente; se disser que algo mudou, ou responder de forma ambígua, o sistema pede a ficha
+> completa, como hoje. O documento nunca é usado para localizar cadastro.
+
+**Critérios de aceite:**
+
+- Telefone com cadastro no mesmo hotel recebe a pergunta de confirmação, e não o pedido completo
+- A pergunta não contém nenhum dado do cadastro
+- Confirmar vincula a reserva ao hóspede existente, sem criar outro
+- Resposta negativa ou ambígua leva ao pedido completo da ficha
+- Telefone com cadastro apenas em outro hotel é tratado como hóspede novo
+- Silêncio segue a regra atual de lembrete único
+
+**Depende de:** F9.3, F1.2, F1.4.
+
+**Referência:** `00-ESTADO-DO-PROJETO.md`, decisões de 18/09.
+
+> A pergunta é uma mensagem proativa, fora da janela de 24 horas: precisa de modelo aprovado
+> pela Meta antes de valer em produção (Artigo XV). Na demonstração, o simulador não exige.
+
+---
+
+## F9.5 — "É a mesma pessoa": a recepção resolve a colisão
+
+**Objetivo:** a colisão que escapar da F9.4 vira decisão humana, e não erro.
+
+**Descrição para o `/specify`:**
+> Quando a ficha recebida traz um documento que já pertence a outro hóspede do mesmo hotel, o
+> sistema não decide sozinho: grava a ficha sem o documento e marca a estadia com uma pendência.
+> A recepção vê os dois cadastros lado a lado e escolhe entre três saídas: é a mesma pessoa, e a
+> reserva passa a usar o cadastro existente; o documento desta ficha está errado, e ela o corrige;
+> ou o documento do outro cadastro está errado, e ela vai corrigi-lo. Ao vincular, os campos
+> recebidos atualizam o cadastro existente, e o cadastro provisório é apagado.
+
+**Critérios de aceite:**
+
+- Colisão de documento na ficha vira pendência visível na Fila do dia, e o worker segue
+- A pendência mostra os dois cadastros para comparação, sempre do mesmo hotel
+- Vincular reaponta a reserva, atualiza os campos recebidos e apaga o cadastro provisório
+- Corrigir esta ficha grava o documento corrigido e encerra a pendência
+- Só a recepção vê e resolve a pendência; equipe e gestão recebem recusa
+
+**Depende de:** F9.3, F8.3.
+
+**Referência:** ADR-009; `00-ESTADO-DO-PROJETO.md`, "os cinco casos de colisão, e as três saídas".
+
+> Apagar o provisório não é estético: cadastro sem reserva vinculada nunca seria expurgado pela
+> F6.1, cuja regra conta a partir do checkout da última reserva.
+
+---
+
+## Ordem recomendada da Fase 9
+
+```
+F9.1 → F9.2 → F9.3 → F9.4 → F9.5
+```
+
+F9.1 primeiro porque, sem ela, qualquer erro das outras derruba o sistema. F9.2 não depende de
+nenhuma e pode trocar de lugar. F9.4 e F9.5 dependem da F9.3.
+
+## Perguntas para o `/clarify`
+
+- **Como a falha definitiva de um trabalho aparece para a recepção?** O Artigo V exige que a
+  ausência de ação seja visível, e o Artigo VI que o hóspede nunca espere em silêncio. Uma ficha
+  que falhou cinco vezes não pode simplesmente sumir.
+- **Hóspede ligado a reservas de mais de um hotel na migração da F9.3:** vira um cadastro por
+  hotel? Na base de demonstração há um hotel só, mas a migração precisa decidir.
+- **O texto da pergunta da F9.4**, que vai virar modelo de mensagem na Meta.
+
+## Depois desta fase
+
+Integração com a FNRH (SNRHos), e depois com o PMS. A do PMS exige antes uma emenda ao Artigo I
+da constituição e ao `AGENTS.md`, que hoje dizem que o sistema não se integra ao PMS.

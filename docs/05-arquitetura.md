@@ -337,6 +337,8 @@ requisito.
 
 **Nada se perde se o worker cair.** A mensagem já está gravada quando o processamento
 começa. Um worker que morre no meio deixa a linha na fila, e a próxima execução a retoma.
+**F9.1:** exceção em um trabalho não encerra o processo — savepoint, retentativa com o
+teto da propriedade e ciclo com passagem, rotinas e expurgo isolados.
 
 ---
 
@@ -758,6 +760,47 @@ implantação em nuvem é retomada na próxima entrega**, quando o sistema estiv
 localmente e a escolha de plataforma puder ser feita contra um sistema real, e não contra
 uma previsão. As três opções avaliadas em §12.2 ficam registradas para esse momento — com a
 ressalva de que camadas gratuitas mudam e precisam ser reconferidas.
+
+### ADR-009 — Identidade do hóspede: escopo por hotel, reaproveitamento por telefone
+
+**Contexto.** `hospede` era a única tabela de domínio sem `id_hotel`, e `uq_hospede_documento`
+era um índice global. Ao mesmo tempo, `criar_reserva` insere um `hospede` novo a cada reserva —
+só nome e telefone —, e a ficha grava o documento nesse provisório. Duas regras que não podem
+valer juntas: "documento identifica pessoa" e "cada reserva cria uma pessoa". A segunda
+hospedagem de qualquer hóspede violava o índice e derrubava o worker.
+
+**Decisão.** Três partes.
+
+1. `hospede` ganha `id_hotel`; o índice único passa a ser
+   `(id_hotel, tipo_documento, numero_documento)`.
+2. Reaproveitar a ficha de quem volta é feito **por telefone**, na pré-chegada, antes da
+   primeira mensagem. Documento nunca é chave de busca.
+3. A colisão que escapar disso vira pendência no painel. Quem decide que duas fichas são a
+   mesma pessoa é a recepção, nunca o worker.
+
+**Alternativas.**
+
+- *Derrubar o índice único e aceitar documento repetido.* A mais simples de todas, e equivale
+  à ficha de papel: uma por estadia. Recusada porque elimina a memória do hóspede — que é a
+  promessa do produto — e deixa a retenção sem âncora de identidade.
+- *Reconciliar automaticamente no worker.* Recusada: a ficha vem de uma extração de modelo, com
+  frequência `parcial`. Unir identidades com base nisso funde duas pessoas diferentes, e
+  desfazer depois é pior que uma pendência no balcão.
+- *Usar o documento como chave de reaproveitamento.* Recusada por segurança: qualquer pessoa
+  que soubesse um CPF obteria o endereço do titular mandando mensagem de qualquer número. CPF
+  não é segredo; posse do aparelho é uma barreira real.
+
+**Consequências.** *Aceitas:* uma revisão de Alembic que toca `hospede`; uma tela a mais no
+painel para vincular; e o reaproveitamento por telefone falha para quem trocou de número, que
+cai na pendência. *Ganhas:* `consentimento` e o expurgo da F6.1 param de atravessar hotéis —
+consentimento é por controlador, e a retenção volta a ter relógio; o hóspede que volta não
+digita os oito campos de novo; e o modelo passa a espelhar a API do SNRHos, que separa
+`POST /pessoas` de `POST /reservas/{id}/hospedes` exatamente pela mesma razão.
+
+**Nota operacional.** Ao vincular, o `hospede` provisório é apagado depois de repontar o
+`reserva_hospede`. Não é limpeza estética: `hospede` sem reserva vinculada nunca seria expurgado
+pela F6.1, cuja regra conta a partir do checkout da última reserva vinculada — sem reserva, não
+há relógio.
 
 ---
 

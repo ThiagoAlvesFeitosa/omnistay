@@ -1,7 +1,290 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 09/09/2026
+**Atualizado em:** 14/10/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
+
+---
+
+## Situação em 14/10/2026 — F9.1 implementada, dois ajustes antes de fechar
+
+A F9.1 (`specs/038-worker-isolamento-falha`) está implementada: 25 tarefas, testes verdes segundo o
+relatório do Cursor. A revisão do código achou dois ajustes antes de dar a fatia por fechada:
+
+1. **Uma transação por trabalho, no caminho de produção.** O isolamento ficou por savepoint dentro
+   de uma transação por passagem, de até 100 trabalhos. Se a transação da passagem inteira falhar —
+   conexão caída, commit recusado —, os trabalhos já concluídos voltam para a fila, e as mensagens
+   que eles já enviaram saem de novo. A decisão de 18/09 era uma transação por trabalho, e dá para
+   cumpri-la sem quebrar os testes: a transação por trabalho abre só em
+   `processar_uma_passagem_na_engine`.
+2. **Tempo limite de 1 segundo no worker.** O worker passou a usar `obter_engine()`, cujo
+   `statement_timeout` vem de `health_db_timeout_seconds` (1 s). Com base real, o expurgo pode
+   passar disso e falhar a cada hora, deixando só uma linha de log. O worker precisa de limite
+   próprio, configurável.
+
+Menor: as falhas de trabalho e de etapa são registradas em nível `info`; devem sair como `warning`.
+
+> ⚠️ **O último commit do repositório é de 09/09/2026.** O ADR-009, as seções de 18/09 e de 06/10,
+> a Fase 9 do backlog e a F9.1 inteira estão sem commit, na `master` — a `038` não ganhou branch
+> própria.
+
+---
+
+## Situação em 06/10/2026 — entrega da Fase 6 e a auditoria do código
+
+A entrega da Fase 6 pede cinco partes: revisão do MVP, LGPD, governança de TI (ISO/IEC 38500),
+segurança e auditoria (OWASP e ISO 27000), e divulgação. As cinco estão escritas em
+`../fontes/F6-PARTE1` a `F6-PARTE5`. Nenhuma linha de código mudou desde 18/09 — as cinco fatias
+daquela data continuam pendentes.
+
+**Entrega pronta (06/10/2026).** Documento (53 páginas) e slides (11) em versão final, com o link
+do vídeo; ZIP montado e conferido depois de descompactar.
+
+| Peça | Onde |
+| --- | --- |
+| ZIP para a FIAP ON | `../pacotes/OmniStay_Fase6_Thiago_RM550442.zip` |
+| Documento em PDF | `../documentos/OmniStay_Fase6_Documento_Thiago_RM550442.pdf` |
+| Slides em PDF | `../slides/OmniStay_Fase6_Slides_Thiago_RM550442.pdf` |
+
+Para regerar tudo, `../fontes/gerar_entrega_fase6.sh <link do vídeo>`: refaz documento e slides com
+o link, escreve o `LINKS.txt`, monta o ZIP e o confere depois de descompactar.
+
+**Revisão de consistência antes do PDF.** Um verificador independente cruzou as cinco partes e
+achou 19 contradições internas confirmadas — referência cruzada apontando para a seção errada,
+contagem que não batia com a tabela, ordem do plano trocada — e 13 possíveis. As confirmadas e as
+possíveis relevantes foram corrigidas, e uma segunda passada conferiu as correções.
+
+**A Parte 4 foi uma auditoria real do código**, não uma lista genérica: 63 arquivos do back-end,
+as 49 rotas, o painel e a configuração. Resultado — **13 achados: 2 altos, 6 médios, 5 baixos**:
+
+| Severidade | Achado | Onde |
+| --- | --- | --- |
+| **Alta** | A verificação de fidelidade aceita resposta que cita o catálogo **e inventa** o resto — provado executando a função real | `conversa/fidelidade.py:21-38` |
+| **Alta** | Exceção em um trabalho derruba o worker — e o expurgo da LGPD, que roda no mesmo laço, para junto | **Endereçado na F9.1** (`038-worker-isolamento-falha`): savepoint por trabalho, ciclo isolado, distintivo na Fila do dia. Expurgo permanece no mesmo processo, etapa isolada (Artigo XI). |
+| Média | Erro de banco imprime a ficha (nome, CPF, endereço) — falta `hide_parameters=True` | **Endereçado na F9.1**: `hide_parameters=True` em `obter_engine()`; worker deixou o `create_engine` solto |
+| Média | Coletor de mercado acessa endereços internos (SSRF) | `adaptadores/fonte_http.py:99-110` |
+| Média | Consentimento de marketing decidido pela leitura do modelo; a prova some aos 12 meses | `conversa/service.py:2651-2667` |
+| Média | Login sem limite de tentativas | `acesso/router.py:63-94` |
+| Média | Webhook atribui mensagens ao hotel de menor id se `WHATSAPP_ID_HOTEL` vazio | `conversa/router.py:139-148` |
+| Média | Cookie sem `Secure` atrás de proxy | `acesso/router.py:43` |
+
+Os cinco baixos e o detalhe de todos estão na Parte 4. **O que a auditoria confirmou como sólido**:
+nenhum caminho de um hotel ler dado de outro, SQL todo parametrizado (a f-string de
+`atualizar_hospede_titular` foi investigada e não é explorável), senha e sessão no padrão OWASP,
+saída da IA validada no caminho do item vendável.
+
+**Não verificado:** vulnerabilidades conhecidas nas dependências — a rede do ambiente bloqueou.
+Rodar `uvx pip-audit` e `npm audit` conforme a seção 4.1 da Parte 4.
+
+### A Parte 2 também abriu lacunas de LGPD
+
+Sete, das quais duas graves: a **camada gratuita do Gemini proíbe envio de dado pessoal** pelos
+próprios termos (28/04/2026), e **consentimento e retenção atravessam hotéis** — a tabela de
+hóspedes não tem o identificador do hotel. Outra lacuna com efeito real: o expurgo **depende do
+clique de saída** — reserva sem saída confirmada nunca tem os dados apagados. Encarregado de
+dados: Thiago Alves Feitosa.
+
+### Decisões de 06/10/2026
+
+> **Decisão (06/10/2026):** raça e deficiência, exigidos pela FNRH, são coletados por opção fechada,
+> nunca passam pelo modelo e não são armazenados — vão direto ao SNRHos.
+
+> **Decisão (06/10/2026):** a obrigatoriedade da FNRH é usada como **gancho de captação**, não como
+> diferencial. O conteúdo sobre a FNRH é antecipado para o mês 1 da estratégia comercial,
+> distribuído pelo LinkedIn do fundador desde o início e pela mídia especializada a partir do mês 3;
+> as associações sobem do mês 9 para o mês 6, com palestra sobre a FNRH. Venda direta, indicação e
+> feiras seguem a Fase 5. Reavaliação no sexto mês, comparando custo de aquisição por canal.
+
+---
+
+## Situação em 18/09/2026 — o worker caiu, e o que a investigação achou
+
+Um teste pelo simulador derrubou o worker inteiro:
+
+```
+psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "uq_hospede_documento"
+DETAIL:  Key (tipo_documento, numero_documento)=(cpf, 123.456.789-00) already exists.
+```
+
+A ficha chegou pelo WhatsApp, o modelo extraiu oito campos (`desfecho=parcial`), e o `UPDATE`
+do titular bateu no índice único. O processo morreu.
+
+### Três defeitos, não um
+
+**1. Esse erro já tem tratamento — no painel, não no worker.**
+
+| Caminho | Quem dispara | Tratamento hoje |
+| --- | --- | --- |
+| `registrar_ficha` | recepcionista no painel | `try/except IntegrityError` → `DocumentoEmUso` → **409** |
+| `consolidar_ficha_titular` | worker, ficha vinda do WhatsApp | `UPDATE` cego |
+
+Os dois chamam o mesmo `atualizar_hospede_titular`, no mesmo repositório. A inconsistência entre
+eles é o defeito — não falta inventar tratamento, falta replicar o que já existe.
+
+**2. Nada reconcilia hóspede que volta.** `criar_reserva` insere um `hospede` novo a cada
+reserva (só nome e telefone). O índice diz que documento identifica pessoa. As duas regras não
+podem valer juntas: a segunda hospedagem de qualquer hóspede quebra, e basta um hotel para
+isso acontecer.
+
+**3. Um erro derruba a passagem inteira.** `processar_uma_passagem` não tem `try/except` em
+volta do dispatch, e `processar_uma_passagem_na_engine` abre **uma transação para até 100
+trabalhos**. O rollback desfez também o claim, então o trabalho volta para a fila e derruba o
+worker de novo no próximo `uv run python -m worker`. `marcar_falha` e o campo `tentativas`
+existem — ligados só ao `tipo_desconhecido`, o único caso que nunca acontece em produção.
+
+**Achado lateral:** `validar_campos_extraidos` valida CEP, telefone, data de nascimento e tipo
+de documento. **`numero_documento` é gravado cru**, sem validação nenhuma. Um CPF com dígito
+trocado entra no banco e só é notado se colidir. E `123.456.789-00`, usado no `semear_demo.py`,
+**não é um CPF válido**: os dígitos verificadores não fecham.
+
+### Decisões de 18/09/2026
+
+> **Decisão (18/09/2026):** o worker nunca derruba o processo por causa de um trabalho.
+> `try/except` em volta do dispatch, `marcar_falha` com `tentativas` para qualquer erro, e
+> **uma transação por trabalho** em vez de uma por passagem.
+> Justificativa: é a única correção que vale também para os erros que ainda não aconteceram.
+> Sem ela, qualquer um dos outros defeitos continua derrubando o sistema.
+
+> **Decisão (18/09/2026):** `numero_documento` passa a ser validado. Com `tipo_documento = cpf`,
+> confere o dígito verificador; reprovado, o campo cai fora da extração e a ficha vira
+> `ficha_parcial`, que a recepção confere.
+> Justificativa: corta na origem o dígito trocado pelo modelo ou pelo hóspede, antes de virar
+> colisão. Consequência: o `semear_demo.py` precisa de um CPF falso que passe no cálculo.
+
+> **Decisão (18/09/2026):** `hospede` ganha `id_hotel`, e o índice único passa a ser
+> `(id_hotel, tipo_documento, numero_documento)`.
+> Justificativa: o ADR-007 decidiu multi-tenant desde o MVP, e `hospede` é a única tabela de
+> domínio que ficou de fora. Sem o escopo, `consentimento` e o expurgo da F6.1 atravessam
+> hotéis — e consentimento é por controlador. Detalhado no ADR-009.
+
+> **Decisão (18/09/2026):** reaproveitar ficha é por **telefone**, nunca por documento. Antes da
+> primeira mensagem da pré-chegada, o sistema procura hóspede com aquele telefone naquele hotel;
+> achando, pergunta "seus dados ainda são os mesmos?" em vez de pedir os oito campos.
+> Justificativa: se documento puxasse ficha, qualquer pessoa que soubesse um CPF obteria o
+> endereço do titular mandando mensagem de qualquer número. O sistema nunca devolve os dados na
+> conversa — só pergunta se seguem válidos.
+
+> **Decisão (18/09/2026):** o worker não decide identidade. A colisão que escapar da busca por
+> telefone vira **pendência no painel**, e quem vincula é a recepção.
+> Justificativa: unir duas fichas com base num documento que um modelo leu de uma mensagem —
+> `parcial`, ainda por cima — é como dois hóspedes diferentes viram um só. É o mesmo fluxo de
+> exceção que o projeto já adota quando o hóspede não responde: o humano é a ponte.
+
+> **Decisão (18/09/2026):** o 409 passa a nomear o hóspede conflitante.
+> Justificativa: "documento em uso" não permite navegar até lugar nenhum. Só é seguro depois do
+> escopo por hotel — hoje devolveria o nome de um hóspede de outro cliente.
+
+### Os cinco casos de colisão, e as três saídas
+
+| Caso | O que de fato houve | Saída |
+| --- | --- | --- |
+| Mesma pessoa voltando | nada de errado | **Vincular** |
+| Acompanhante virando titular | nada de errado | **Vincular** — é o mesmo caso |
+| Modelo leu errado | documento **novo** errado | **Corrigir esta ficha** |
+| Hóspede digitou errado | documento **novo** errado | **Corrigir esta ficha** |
+| Ficha antiga errada | documento **antigo** errado | **Ir corrigir a outra ficha** |
+
+Ao vincular: repontar o `reserva_hospede` para o `id_hospede` existente e **apagar o
+provisório**. Só `reserva_hospede` e `consentimento` referenciam `hospede`, e o provisório não
+tem consentimento nenhum. Apagar é obrigatório, não estético: `hospede` sem reserva vinculada
+nunca seria expurgado pela F6.1, cuja regra conta a partir do checkout da última reserva
+vinculada — sem reserva, não há relógio.
+
+Os campos que chegarem na ficha nova sobrescrevem a antiga, porque a pessoa muda de endereço
+entre uma estadia e outra. O MVP não guarda o valor anterior.
+
+O erro de digitação que **não** colide continua entrando sem reclamação. A restrição só pega
+colisão, nunca dado errado — quem ataca isso é a validação de CPF, não o tratamento de erro.
+
+### Por que isso encosta na FNRH
+
+A API do SNRHos separa `POST /pessoas` de `POST /reservas/{id}/hospedes`: pessoa existe
+independente da estadia, e a estadia referencia a pessoa. É o mesmo modelo que estas decisões
+adotam. Uma ficha por estadia obrigaria a repostar a mesma pessoa a cada hospedagem, e um CPF
+malformado deixa de ser incômodo interno para virar submissão recusada por sistema federal.
+
+### Ordem das fatias
+
+1. **Worker não morre** — `try/except`, `marcar_falha`, transação por trabalho. A mais curta, e
+   bloqueia todas as outras
+2. **Validar CPF** — independente da 1
+3. **`id_hotel` em `hospede`** + o 409 com o nome. Revisão nova do Alembic
+4. **Busca por telefone na pré-chegada** — depende da 3, e evita o conflito no caso comum
+5. **Botão "é a mesma pessoa"** no painel — depende da 3
+
+> **Em 08/10/2026 as cinco viraram a Fase 9 do `backlog.md`** — F9.1 a F9.5, com o texto para o
+> `/specify` e os critérios de aceite. A F9.1 incorporou dois pontos da auditoria da Fase 6: o
+> erro gravado nunca leva a mensagem da exceção, e o expurgo deixa de parar junto com as
+> mensagens. Depois da Fase 9: integração com a FNRH, e então com o PMS.
+
+---
+
+## Situação em 10/09/2026 — Fase 6 e o TCC
+
+O TCC vale 100 pontos e tem três entregas. **A nota só é gerada se as três forem feitas.**
+
+| Item | O que é | Prazo | Pontos |
+| --- | --- | --- | --- |
+| (A) | Vídeo-pitch Startup-One — 5 min, abordagem de negócio | 10/09/2026 | 30 |
+| (B) | Vídeo-pitch Enterprise Challenge — até 7 min, abordagem técnica | 17/09/2026 | 40 |
+| (C) | Documentação final em ABNT | 17/11/2026 | 30 |
+
+Os dois vídeos vão para o YouTube **não listados**, com o link entregue em documento convertido
+para PDF. O item (B) concentra **15 pontos só em implementação técnica** — o maior bloco isolado
+dos 100. É onde este repositório vale mais que qualquer discurso: 37 fatias, 25 migrações, 210
+arquivos de teste, banco em nuvem.
+
+### O fato que mudou o projeto: a ficha de hóspede virou lei
+
+A **Portaria MTur nº 41, de 14/11/2025** instituiu a Ficha Nacional de Registro de Hóspedes em
+meio digital, obrigatória para todos os meios de hospedagem do país desde **20/04/2026**. O
+sistema federal que recebe os dados é o **SNRHos**, operado pelo Serpro.
+
+- Mais de **19 mil** meios de hospedagem cadastrados no Cadastur
+- Cerca de **4 mil** já operando com a ficha digital — **~20% de adesão**
+- Descumprir sujeita a processo administrativo, advertência e multa
+
+**O que isso muda:** a ficha preenchida antes da chegada deixou de ser diferencial competitivo e
+virou piso legal. O que sobrevive como diferencial do OmniStay: ser conversa e não formulário,
+acompanhar a estadia inteira, não inventar (verificação contra o catálogo), e transformar a
+conversa em operação.
+
+### O SNRHos tem API pública — e virou item de roadmap
+
+O Art. 31 da Portaria prevê integração por API com credenciais de autenticação, e o Ministério do
+Turismo publica a documentação da **API FNRH v2** (09/03/2026): REST/JSON, HTTP Basic, com
+**ambiente de homologação separado** (`homlowcode.serpro.gov.br`).
+
+Dois caminhos, e nenhum obriga a redigitar:
+
+1. **Padrão** — o OmniStay coleta na conversa e envia por `POST /reservas`, `POST /pessoas`,
+   `POST /reservas/{id}/hospedes`.
+2. **Fallback** — `POST /reservas` devolve `link_precheckin`; o OmniStay manda o link pelo
+   WhatsApp e depois lê o resultado por `GET /hospedes/pre-checkins`.
+
+O fallback substitui, com vantagem, a ficha de papel no balcão do fluxo de exceção atual.
+
+**Por que importa mais que a integração com PMS:** a do PMS exige acordo comercial com cada
+fornecedor. A do SNRHos exige apenas credencial no portal da FNRH. É a única das duas que o
+projeto consegue entregar sozinho.
+
+A referência completa de endpoints está em `../fontes/05-API-FNRH-REFERENCIA.md`, e a pesquisa
+que a originou em `../fontes/04-PESQUISA-FNRH-E-CONCORRENTES.md`.
+
+### Decisões de 10/09/2026
+
+> **A promessa continua sendo "Seu hotel sem fila", no presente.** A fila do hóspede já não
+> existe hoje, porque a ficha chega antes da chegada. O que permanece manual é a digitação
+> interna da recepção — para o PMS e agora também para a FNRH — e é isso que as duas integrações
+> eliminam.
+> **Consequência:** a Parte 2 do documento da Fase 5, que reserva essa frase para uma fase
+> futura, ficou desalinhada e precisa ser ajustada antes da documentação final.
+
+> **Áudio e imagem do hóspede permanecem roadmap**, nunca discurso de produto pronto.
+
+> **Concorrentes nomeados levantados:** Asksuite (BR, atua antes da reserva), HiJiffy (PT),
+> Duve (app próprio) e Guestivo (portal por QR). Três dos quatro concentram-se em hotéis de 100 a
+> 499 quartos, e nenhum publica preço — o que sustenta o recorte de 20 a 150 UH com preço
+> publicado.
 
 ---
 
@@ -16,18 +299,25 @@ ZIP montado.
 | Vídeo (YouTube, não listado) | <https://youtu.be/QXgb0tpWDq8> |
 | Documento, slides, planilha e ZIP | na pasta do projeto, fora do repositório |
 
-### ⚠️ Pendência: o push
+### ✅ O push — resolvido em 09/09/2026
 
-Havia mudanças locais **sem commit** quando a entrega foi montada — entre elas a correção da
-verificação de fidelidade (`app/modulos/conversa/fidelidade.py`), a pasta `scripts/`, a spec
-`033-acesso-painel-perfis` e o `README.md` novo. Confira antes de qualquer outra coisa:
+Havia treze arquivos que nunca tinham virado commit quando a entrega foi montada. Subiram em três
+commits, e `origin/main` terminou em `146238c`:
 
-```bash
-git status
-```
+| Commit | O que levou |
+| --- | --- |
+| `409e7de` | Correção da verificação de fidelidade e o adaptador Gemini |
+| `4034fde` | Scripts de demonstração e o `README.md` |
+| `146238c` | Spec 033 e `docs/ajustes-de-interface.md` |
 
-Se houver arquivo modificado ou não rastreado, commite e envie. O repositório é o link da entrega;
-o que está lá precisa ser o código que o vídeo demonstra.
+Nenhum commit ficou preso: `git log origin/main..HEAD` volta vazio. O repositório é o link da
+entrega, e o que está lá é o código que o vídeo demonstra.
+
+**Duas coisas para lembrar antes do próximo commit:**
+
+1. O branch local se chama **`master`** e rastreia **`origin/main`**. Funciona, mas os nomes não
+   batem — não estranhe.
+2. `git ls-files .env` tem que voltar vazio. A chave do Gemini vive nesse arquivo.
 
 ### A pasta ao redor do repositório foi reorganizada
 
@@ -44,16 +334,19 @@ A pasta que contém este repositório passou a ser organizada **por tipo de arqu
 
 ### Próximos passos do sistema, quando voltar ao código
 
-Estão detalhados mais abaixo, em **Pendências abertas**. Em resumo: integração com PMS, canal de
-e-mail, módulos ligáveis por propriedade, e áudio/foto do hóspede.
+Estão detalhados mais abaixo, em **Pendências abertas**. Em resumo: **integração com o SNRHos**,
+integração com PMS, canal de e-mail, módulos ligáveis por propriedade, e áudio/foto do hóspede.
+
+A integração com o SNRHos entrou em 10/09/2026 e passa à frente da do PMS na ordem de ataque:
+tem documentação pública, ambiente de homologação e não depende de acordo comercial.
 
 ---
 
 ## Onde paramos
 
-**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1–F7.3 feitas em 26–27/08/2026. **F8.1** a **F8.5** feitas em 31/08/2026. **F8.6** (catálogo, itens vendáveis e recado de boas-vindas) feita em 01/09/2026. **F8.7** (painel da gestão, mercado, usuários e retenção) feita em 02/09/2026.
+**Documentação concluída** — seis artefatos. **Implementação das 24 fatias do backlog original concluída.** F7.1–F7.3 feitas em 26–27/08/2026. **F8.1** a **F8.5** feitas em 31/08/2026. **F8.6** (catálogo, itens vendáveis e recado de boas-vindas) feita em 01/09/2026. **F8.7** (painel da gestão, mercado, usuários e retenção) feita em 02/09/2026. **F7.6** (a recepção responde ao hóspede) e o **redesenho da casca do painel** feitos em 02–04/09/2026.
 
-**Progresso:** 24 de 24 do backlog original; F7.1, F7.2, F7.3, **F8.1**, **F8.2**, **F8.3**, **F8.4**, **F8.5**, **F8.6** e **F8.7** do plano de uma semana concluídas.
+**Progresso:** 24 de 24 do backlog original; F7.1, F7.2, F7.3, **F7.6**, **F8.1**, **F8.2**, **F8.3**, **F8.4**, **F8.5**, **F8.6**, **F8.7** e o **redesenho da casca** do plano de uma semana concluídas. As specs vão até a `037`.
 
 | Fatia | Estado |
 | --- | --- |
@@ -91,6 +384,8 @@ e-mail, módulos ligáveis por propriedade, e áudio/foto do hóspede.
 | F8.5 Consumos a lançar e saída do hóspede | ✅ Concluída — `TelaConsumos` (`GET /consumos/pendentes`, **Marcar lançado**, **Dispensar**, **Ver ficha**, sem nome na linha) e `TelaSaida` (`/saida/:idReserva?`, **Pedidos feitos pelo chat**, aviso de pendência da casa, **Confirmar saída**). Fila do dia: link **Saída** no hospedado e destaque `saida_nao_confirmada`. Sem status por item na lista da saída (fica para depois da semana). Sem Playwright, sem PMS, sem migração, sem operação nova |
 | F8.6 Catálogo, itens vendáveis e recado | ✅ Concluída — `TelaCatalogo` (cinco abas, POST na categoria visível, PATCH sem `categoria`, desativar sem apagar), `TelaVendaveis` (nome e preço em campos próprios, sem descrição), `TelaBoasVindas` (quatro campos, PUT atômico, `422` da API). Gestão lê; staff redirecionado sem GET. Proxy `/itens-vendaveis`. Sem `GET /catalogo/ativo`, sem `DELETE`, sem migração, sem operação nova |
 | F8.7 Painel da gestão, mercado e administração | ✅ Concluída — `GET /indicadores` com quatro números (chegadas hoje, hospedados, chamados abertos, soma de consumo pendente); `GET /indicadores/chegadas-do-dia` intacto. Mercado só leitura (`GET /mercado` + histórico no clique). `GET /usuarios` lista ativos e desativados; POST/DELETE reusados; sem reativar; sem desativar a si. `GET /retencao` passa a incluir prazos (`null` se inválidos). Recepção/staff redirecionados sem esses GET. Sem PMS, sem gráfico, sem tarifa da casa, sem migração, sem operação nova |
+| F7.6 A recepção responde ao hóspede | ✅ Concluída — spec `036-resposta-recepcao`, 49 tarefas. Revisão `0025_resposta_recepcao`; módulo `conversa` ganha `origem_e_entrega.py`, `anti_duplo.py` e `janela.py`; `worker/consumidor.py` e a política de acesso atualizados; `TelaEstadia.tsx` no painel — o item de menu "Ficha" passa a se chamar **Estadia** |
+| F8 Redesenho da casca do painel | ✅ Concluída — spec `037-redesenho-casca-painel`, 32 tarefas. `Casca.tsx` com menu **lateral** agrupado em Operação · Propriedade · Gestão; nome do hotel no topo (`GET /sessoes/atual` passa a devolver `nome_hotel`) e marca OmniStay discreta abaixo; "Nova reserva" sai do menu (`noMenu`) e fica só como botão na fila; `apresentacao.ts` centraliza `R$ 0,00` e `dd/mm/aaaa`; simulador com `BolhaConversa.tsx`, horário por mensagem e **Enter envia / Shift+Enter quebra linha** |
 | Demais fatias | Nenhuma pendente no backlog original. Não há F2.3 nem F3.9 |
 
 ## Banco em nuvem — feito em 02/09/2026
@@ -601,6 +896,29 @@ enviável por template. Conteúdo assim pertence à janela de 24h, que é texto 
 Nome completo · Profissão · Data de nascimento · Tipo de documento · Número do documento ·
 Endereço · CEP · Cidade · Telefone
 
+### Lacuna para a FNRH — registrada em 10/09/2026
+
+A ficha acima **não atende** ao Anexo I da Portaria MTur nº 41/2025. Para alimentar o SNRHos
+faltam coletar:
+
+nacionalidade (ISO 3166-1 alpha-2) · e-mail · gênero · raça · país e estado de residência ·
+município por código IBGE · motivo da viagem · meio de transporte · dados de acompanhantes
+menores ou incapazes
+
+E **"profissão", que a ficha coleta hoje, não é exigida pela norma.**
+
+**Nota de proteção de dados:** `raca_id` é campo obrigatório da API, e há também
+`deficiencia_id` — ambos dado pessoal sensível na LGPD. A coleta exige base legal explícita
+(cumprimento de obrigação legal) e continua sujeita à minimização. A decisão já tomada de
+**recusar foto de documento** permanece coerente com essa postura: a conferência documental é
+presencial, no balcão, como a própria norma exige.
+
+**Nota técnica:** mapear texto livre para as tabelas de domínio da API é o mesmo trabalho que a
+camada de classificação já executa. Não é capacidade nova — é a mesma extração estruturada
+apontada para outro destino.
+
+Endpoints e formatos em `../fontes/05-API-FNRH-REFERENCIA.md`.
+
 ## Regra de reenvio na pré-chegada
 
 Um único reenvio com mensagem explicando que o cadastro antecipado é opcional. Persistindo
@@ -639,6 +957,38 @@ proativa for Utility. A oferta de retorno é Marketing e ficaria fora da conta.
 também passam a ser cobradas. Não afeta o MVP; muda a projeção do produto comercial.
 
 ## Pendências abertas
+
+Abertas em 06/10/2026 — **condição de entrada em produção**, das Partes 2 e 4 da Fase 6. Nenhum
+hotel real antes delas:
+
+- [ ] **Gemini na camada paga** — a gratuita proíbe dado pessoal nos próprios termos
+- [x] **Worker resiliente (F9.1, 14/10/2026)** — savepoint por trabalho; rotinas e expurgo isolados no ciclo. Expurgo **não** ganhou processo próprio (recusado na spec)
+- [x] **`hide_parameters=True`** em `obter_engine()` (API e worker, F9.1)
+- [ ] **Resposta de dúvida composta pelo sistema** a partir dos trechos do catálogo, como no item
+      vendável — fecha o achado de fidelidade
+- [ ] **Expurgo que não depende da confirmação de saída** — conta da saída prevista + margem
+- [ ] **`id_hotel` em `hospede`** — fatia 3 de 18/09, ADR-009
+- [ ] **Limite de tentativas de login**
+- [ ] **Cookie `Secure` obrigatório, cabeçalhos de segurança, `/docs` desligado em produção**
+- [ ] **Varredura de dependências** (`pip-audit`, `npm audit`)
+- [ ] **Contrato de tratamento de dados** com o hotel e **aviso de privacidade** completo na
+      primeira mensagem
+
+Nos primeiros 90 dias: SSRF no coletor, consentimento por botão com evidência guardada,
+`phone_number_id` → hotel, registros técnicos no expurgo, eliminação a pedido do titular, trilha de
+acesso a fichas, integração contínua com teste "toda rota exige permissão". Detalhe nas Partes 2 e 4.
+
+Abertas em 18/09/2026, da investigação do worker. Justificativa de cada uma na seção de
+18/09/2026, no topo:
+
+- [ ] **Worker não morre** — `try/except` no dispatch, `marcar_falha` para qualquer erro, uma
+      transação por trabalho. Bloqueia todo o resto
+- [ ] **Validar `numero_documento`** — dígito verificador do CPF. Ajustar o `semear_demo.py`,
+      que usa um CPF inválido
+- [ ] **`id_hotel` em `hospede`** — índice `(id_hotel, tipo_documento, numero_documento)`,
+      revisão nova do Alembic, e o 409 passa a nomear o hóspede conflitante
+- [ ] **Busca por telefone na pré-chegada** — reaproveita a ficha antes de pedir os oito campos
+- [ ] **Botão "é a mesma pessoa"** no painel — repontar `reserva_hospede` e apagar o provisório
 
 Resolvidas pelo Artefato 4 — estrutura pronta, faltam apenas os valores:
 
@@ -679,6 +1029,19 @@ Lacunas encontradas no backlog (agosto/2026) — nenhuma tem fatia dedicada:
       publicado). Precisa entrar antes de qualquer exposição contínua; a sessão longa do staff
       amplifica a consequência
 
+Abertas a partir de 10/09/2026 — a ficha digital obrigatória:
+
+- [ ] **Confirmar a emissão de credencial para sistema que não é PMS.** A documentação da API não
+      declara exclusividade para fornecedores de PMS, mas está publicada na seção "meios de
+      hospedagem com PMS" e a Portaria menciona a integração do PMS. **Como fechar:** pedir
+      credencial de homologação e rodar um `POST /reservas` contra `homlowcode.serpro.gov.br`.
+      Sem custo, sem hotel real. É a única pendência técnica que separa a integração de virar fatia
+- [ ] **Especificar a fatia de coleta dos campos ausentes da FNRH** na conversa do WhatsApp —
+      ver a lacuna registrada em "Ficha de cadastro do hóspede"
+- [ ] **Desenhar o `SNRHosGateway`** pelo mesmo mecanismo de porta das outras quatro interfaces
+      trocáveis, e decidir a topologia: envio direto ao SNRHos, ou via PMS quando a integração de
+      PMS existir
+
 Ainda abertas:
 
 - [ ] **A recepção não tem como responder ao hóspede.** Descoberto em 02/09/2026 testando o
@@ -709,8 +1072,9 @@ Ainda abertas:
       tratou. Exige revisão do artefato de retenção antes de implementar.
       **Foto genérica** — hóspede fotografando um problema no quarto para abrir chamado. Mais leve
       que documento e resolve caso real: "o chuveiro está assim". Vale antes da foto de documento
-- [ ] **Caixa de mensagem do simulador** — não envia com Enter e o visual destoa. Entra no
-      redesenho do painel
+- [x] ~~**Caixa de mensagem do simulador**~~ resolvido no redesenho da casca (spec `037`):
+      `aoTecla` em `TelaSimulacao.tsx` envia com Enter e quebra linha com Shift+Enter; a conversa
+      ganhou `BolhaConversa.tsx` com horário por mensagem
 
 - [x] ~~**Adaptador real de `LLMProvider`**~~ F7.1: `LLMGemini` + `construir_llm`; worker usa a
       fábrica; suíte sem rede. Aviso de assistente virtual no recado de boas-vindas
@@ -724,10 +1088,10 @@ Ainda abertas:
       no topo. Custa ~1 dia: a checagem de módulo desligado em cada ponto do sistema, mais teste
       de cada módulo ligado e desligado. Sairia do dia 6 (ficha e checkout), troca recusada
       porque ligar chavinha não tem momento visual e o ciclo completo da estadia tem
-- [ ] **Painel de operação** — Fase 8 do backlog, sete fatias. Wireframes em
-      `docs/wireframes-painel.html`
-- [ ] **Fase 7 — personalização e canais** — F7.1, F7.2 e F7.3 feitas; restam módulos por
-      propriedade (F7.4) e canal de e-mail (F7.5)
+- [x] ~~**Painel de operação**~~ Fase 8 do backlog, sete fatias — F8.1 a F8.7 concluídas, mais o
+      redesenho da casca (spec `037`). Wireframes em `docs/wireframes-painel.html`
+- [ ] **Fase 7 — personalização e canais** — F7.1, F7.2, F7.3 e **F7.6** feitas; restam módulos
+      por propriedade (F7.4) e canal de e-mail (F7.5)
 - [ ] **Perguntas que só o teste responde** (registradas ao fim da Fase 7 no backlog): se o tom
       configurado muda mesmo a percepção do hóspede · onde o aviso de IA incomoda menos · quantos
       hóspedes respondem por e-mail tendo as duas opções · se o convite do recado é usado · se

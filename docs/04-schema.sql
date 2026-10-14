@@ -848,7 +848,28 @@ SELECT r.id_hotel,
                  AND mh.classificacao_bruta->>'desfecho'
                      IN ('irreconhecivel', 'indisponivel',
                          'formato_invalido', 'prazo_ausente')
-            ) AS pesquisa_saida_leitura_humana
+            ) AS pesquisa_saida_leitura_humana,
+       CASE
+           WHEN r.status = 'encerrado' THEN '[]'::json
+           ELSE COALESCE(
+               (
+                   SELECT json_agg(
+                              json_build_object('tipo', falhas.tipo, 'n', falhas.n)
+                              ORDER BY falhas.tipo
+                          )
+                     FROM (
+                          SELECT t.tipo, COUNT(*)::int AS n
+                            FROM trabalho t
+                           WHERE t.id_hotel = r.id_hotel
+                             AND t.status = 'falha'
+                             AND t.payload ? 'id_reserva'
+                             AND (t.payload->>'id_reserva')::bigint = r.id_reserva
+                           GROUP BY t.tipo
+                     ) falhas
+               ),
+               '[]'::json
+           )
+       END AS omissoes_brutas
   FROM reserva r
   LEFT JOIN reserva_hospede rh
          ON rh.id_reserva = r.id_reserva AND rh.titular
@@ -891,4 +912,6 @@ COMMENT ON VIEW vw_fila_do_dia IS
     'saida_nao_confirmada '
     '(hospedado com checkout previsto anterior a hoje) e '
     'pesquisa_saida_leitura_humana (resposta da pesquisa irreconhecivel, '
-    'indisponivel, formato invalido ou prazo ausente).';
+    'indisponivel, formato invalido ou prazo ausente) e omissoes_brutas '
+    '(JSON de trabalhos em falha definitiva ligados a id_reserva; vazio se '
+    'encerrado ou se so houver coleta de mercado).';
