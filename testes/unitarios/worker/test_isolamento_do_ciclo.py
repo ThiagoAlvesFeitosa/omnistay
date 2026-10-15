@@ -114,7 +114,7 @@ def test_log_da_etapa_falha_nao_repete_cpf(monkeypatch):
     def _info(msg, *args, **kwargs):
         registros.append(msg % args if args else msg)
 
-    monkeypatch.setattr(worker_main.logger, "info", _info)
+    monkeypatch.setattr(worker_main.logger, "warning", _info)
     monkeypatch.setattr(
         worker_main,
         "processar_uma_passagem_na_engine",
@@ -132,3 +132,4 @@ def test_log_da_etapa_falha_nao_repete_cpf(monkeypatch):
     assert CPF_NA_MENSAGEM not in texto
     assert "IntegrityError" in texto
     assert "passagem" in texto
+    assert "ciclo_etapa_falha" in texto

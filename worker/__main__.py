@@ -7,7 +7,7 @@ from datetime import timedelta
 from app.adaptadores.fabrica_llm import construir_llm
 from app.adaptadores.fabrica_mensageria import construir_mensageria
 from app.config import obter_configuracao
-from app.database import obter_engine
+from app.database import obter_engine_do_worker
 from app.comum import relogio
 from app.comum.log import configurar_log, obter_logger
 from worker.agendador import (
@@ -63,7 +63,7 @@ def _etapa_isolada(nome: str, acao) -> None:
     try:
         acao()
     except Exception as exc:
-        logger.info(
+        logger.warning(
             "ciclo_etapa_falha etapa=%s excecao=%s",
             nome,
             type(exc).__name__,
@@ -129,7 +129,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     configurar_log()
     configuracao = obter_configuracao()
-    engine = obter_engine()
+    engine = obter_engine_do_worker()
     gateway = construir_mensageria(configuracao)
     llm = construir_llm(configuracao)
     if args.uma_passagem:

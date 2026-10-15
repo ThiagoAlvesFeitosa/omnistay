@@ -41,6 +41,11 @@ Mesmo contrato da falha de envio:
 
 ## Tempo por consulta
 
-Conexão do worker = `obter_engine()`: `statement_timeout` igual ao da
-API. Estouro é exceção: mesmo ciclo de tentativa, registro pelo nome
-da classe, sem parâmetros.
+Conexão do worker = `obter_engine_do_worker()`:
+`worker_statement_timeout_seconds` (padrão 30). A API permanece em
+`obter_engine()` com `health_db_timeout_seconds` (padrão 1). As duas
+escondem parâmetros. Estouro é exceção: mesmo ciclo de tentativa,
+registro pelo nome da classe, sem parâmetros.
+
+`processar_uma_passagem_na_engine` abre **uma transação por
+trabalho** (`limite=1`); o savepoint permanece dentro de cada uma.

@@ -5,27 +5,23 @@
 
 ---
 
-## Situação em 14/10/2026 — F9.1 implementada, dois ajustes antes de fechar
+## Situação em 14/10/2026 — F9.1 fechada
 
-A F9.1 (`specs/038-worker-isolamento-falha`) está implementada: 25 tarefas, testes verdes segundo o
-relatório do Cursor. A revisão do código achou dois ajustes antes de dar a fatia por fechada:
+A F9.1 (`specs/038-worker-isolamento-falha`) está implementada, com os três
+ajustes da revisão:
 
-1. **Uma transação por trabalho, no caminho de produção.** O isolamento ficou por savepoint dentro
-   de uma transação por passagem, de até 100 trabalhos. Se a transação da passagem inteira falhar —
-   conexão caída, commit recusado —, os trabalhos já concluídos voltam para a fila, e as mensagens
-   que eles já enviaram saem de novo. A decisão de 18/09 era uma transação por trabalho, e dá para
-   cumpri-la sem quebrar os testes: a transação por trabalho abre só em
-   `processar_uma_passagem_na_engine`.
-2. **Tempo limite de 1 segundo no worker.** O worker passou a usar `obter_engine()`, cujo
-   `statement_timeout` vem de `health_db_timeout_seconds` (1 s). Com base real, o expurgo pode
-   passar disso e falhar a cada hora, deixando só uma linha de log. O worker precisa de limite
-   próprio, configurável.
+1. **Uma transação por trabalho** em `processar_uma_passagem_na_engine`: laço
+   com `engine.begin()` e `processar_uma_passagem(..., limite=1)` até não
+   haver trabalho ou atingir o limite da passagem. O savepoint permanece
+   dentro. Cada trabalho concluído fica gravado antes do próximo começar
+   (decisão de 18/09).
+2. **Timeout próprio do worker.** `obter_engine_do_worker()` usa
+   `worker_statement_timeout_seconds` (padrão 30). A API continua em
+   `obter_engine()` com `health_db_timeout_seconds` (1 s). As duas engines
+   têm `hide_parameters=True`.
+3. **`trabalho_falha` e `ciclo_etapa_falha` em `warning`.**
 
-Menor: as falhas de trabalho e de etapa são registradas em nível `info`; devem sair como `warning`.
-
-> ⚠️ **O último commit do repositório é de 09/09/2026.** O ADR-009, as seções de 18/09 e de 06/10,
-> a Fase 9 do backlog e a F9.1 inteira estão sem commit, na `master` — a `038` não ganhou branch
-> própria.
+A F9.1 original está em `4270ee1`; os três ajustes fecham a fatia.
 
 ---
 
@@ -60,7 +56,7 @@ as 49 rotas, o painel e a configuração. Resultado — **13 achados: 2 altos, 6
 | --- | --- | --- |
 | **Alta** | A verificação de fidelidade aceita resposta que cita o catálogo **e inventa** o resto — provado executando a função real | `conversa/fidelidade.py:21-38` |
 | **Alta** | Exceção em um trabalho derruba o worker — e o expurgo da LGPD, que roda no mesmo laço, para junto | **Endereçado na F9.1** (`038-worker-isolamento-falha`): savepoint por trabalho, ciclo isolado, distintivo na Fila do dia. Expurgo permanece no mesmo processo, etapa isolada (Artigo XI). |
-| Média | Erro de banco imprime a ficha (nome, CPF, endereço) — falta `hide_parameters=True` | **Endereçado na F9.1**: `hide_parameters=True` em `obter_engine()`; worker deixou o `create_engine` solto |
+| Média | Erro de banco imprime a ficha (nome, CPF, endereço) — falta `hide_parameters=True` | **Endereçado na F9.1**: `hide_parameters=True` em `obter_engine()` e em `obter_engine_do_worker()` |
 | Média | Coletor de mercado acessa endereços internos (SSRF) | `adaptadores/fonte_http.py:99-110` |
 | Média | Consentimento de marketing decidido pela leitura do modelo; a prova some aos 12 meses | `conversa/service.py:2651-2667` |
 | Média | Login sem limite de tentativas | `acesso/router.py:63-94` |
@@ -962,8 +958,8 @@ Abertas em 06/10/2026 — **condição de entrada em produção**, das Partes 2 
 hotel real antes delas:
 
 - [ ] **Gemini na camada paga** — a gratuita proíbe dado pessoal nos próprios termos
-- [x] **Worker resiliente (F9.1, 14/10/2026)** — savepoint por trabalho; rotinas e expurgo isolados no ciclo. Expurgo **não** ganhou processo próprio (recusado na spec)
-- [x] **`hide_parameters=True`** em `obter_engine()` (API e worker, F9.1)
+- [x] **Worker resiliente (F9.1, 14/10/2026)** — transação e savepoint por trabalho; rotinas e expurgo isolados no ciclo; timeout próprio (`worker_statement_timeout_seconds`, 30 s). Expurgo **não** ganhou processo próprio (recusado na spec)
+- [x] **`hide_parameters=True`** em `obter_engine()` (API) e `obter_engine_do_worker()` (F9.1)
 - [ ] **Resposta de dúvida composta pelo sistema** a partir dos trechos do catálogo, como no item
       vendável — fecha o achado de fidelidade
 - [ ] **Expurgo que não depende da confirmação de saída** — conta da saída prevista + margem

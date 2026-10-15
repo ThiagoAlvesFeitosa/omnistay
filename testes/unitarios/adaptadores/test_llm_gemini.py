@@ -1,7 +1,6 @@
 """Adaptador real: parseia JSON do candidato; nunca abre a rede."""
 
 import json
-import logging
 
 import httpx
 import pytest
@@ -387,9 +386,10 @@ def test_demais_metodos_mapeiam_falha_do_contrato():
     assert pesquisa.value.codigo == "llm_tempo_esgotado"
 
 
-def test_log_nao_traz_chave_nem_texto_do_hospede(caplog):
+def test_log_nao_traz_chave_nem_texto_do_hospede(monkeypatch):
     chave = "secret-test-key"
     marca = "MARCA-HOSPEDE-XYZ"
+    registros = []
 
     def handler(_pedido: httpx.Request) -> httpx.Response:
         return httpx.Response(
@@ -404,27 +404,38 @@ def test_log_nao_traz_chave_nem_texto_do_hospede(caplog):
             ),
         )
 
-    with caplog.at_level(logging.DEBUG, logger="app.adaptadores.llm_gemini"):
-        _porta(handler, chave=chave).classificar(marca)
+    from app.adaptadores import llm_gemini
 
-    conjunto = " ".join(registro.getMessage() for registro in caplog.records)
+    def _info(msg, *args, **kwargs):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(llm_gemini.logger, "info", _info)
+    _porta(handler, chave=chave).classificar(marca)
+
+    conjunto = " ".join(registros)
     assert chave not in conjunto
     assert marca not in conjunto
     assert "classificar" in conjunto
 
 
-def test_log_de_quota_nao_traz_chave_nem_texto(caplog):
+def test_log_de_quota_nao_traz_chave_nem_texto(monkeypatch):
     chave = "secret-test-key"
     marca = "MARCA-HOSPEDE-XYZ"
+    registros = []
 
     def handler(_pedido: httpx.Request) -> httpx.Response:
         return httpx.Response(429, json={"error": {"message": marca}})
 
-    with caplog.at_level(logging.DEBUG, logger="app.adaptadores.llm_gemini"):
-        with pytest.raises(FalhaDeClassificacao):
-            _porta(handler, chave=chave).classificar(marca)
+    from app.adaptadores import llm_gemini
 
-    conjunto = " ".join(registro.getMessage() for registro in caplog.records)
+    def _info(msg, *args, **kwargs):
+        registros.append(msg % args if args else msg)
+
+    monkeypatch.setattr(llm_gemini.logger, "info", _info)
+    with pytest.raises(FalhaDeClassificacao):
+        _porta(handler, chave=chave).classificar(marca)
+
+    conjunto = " ".join(registros)
     assert chave not in conjunto
     assert marca not in conjunto
     assert "llm_quota" in conjunto

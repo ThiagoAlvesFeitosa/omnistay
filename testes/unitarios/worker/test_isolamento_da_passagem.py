@@ -12,7 +12,7 @@ from testes.suporte.isolamento_falha import (
     excecao_com_cpf,
     trabalho_minimo,
 )
-from worker.consumidor import processar_uma_passagem
+from worker.consumidor import processar_uma_passagem, processar_uma_passagem_na_engine
 
 
 def _reserva(conexao, id_hotel: int) -> int:
@@ -151,7 +151,7 @@ def test_registro_da_falha_nao_repete_cpf_da_mensagem(ambiente, monkeypatch):
         "worker.consumidor.conversa_service.processar_trabalho_interpretar_ficha",
         _estoura_com_cpf,
     )
-    monkeypatch.setattr("worker.consumidor.logger.info", _info)
+    monkeypatch.setattr("worker.consumidor.logger.warning", _info)
     id_hotel = ambiente.propriedade_a.id_hotel
     with ambiente.engine.begin() as conexao:
         id_reserva = _reserva(conexao, id_hotel)
@@ -168,3 +168,41 @@ def test_registro_da_falha_nao_repete_cpf_da_mensagem(ambiente, monkeypatch):
     texto_log = " ".join(registros)
     assert CPF_NA_MENSAGEM not in texto_log
     assert "IntegrityError" in texto_log
+    assert "trabalho_falha" in texto_log
+
+
+@pytest.mark.postgres
+def test_passagem_na_engine_grava_cada_trabalho_antes_do_proximo(
+    ambiente, monkeypatch
+):
+    monkeypatch.setattr(
+        "worker.consumidor.conversa_service.processar_trabalho_enviar_lembrete",
+        _conclui,
+    )
+    monkeypatch.setattr(
+        "worker.consumidor.conversa_service.processar_trabalho_interpretar_ficha",
+        _conclui,
+    )
+    id_hotel = ambiente.propriedade_a.id_hotel
+    with ambiente.engine.begin() as conexao:
+        a = _reserva(conexao, id_hotel)
+        b = _reserva(conexao, id_hotel)
+        trabalho_minimo(
+            conexao, "enviar_lembrete", id_hotel=id_hotel, id_reserva=a
+        )
+        trabalho_minimo(
+            conexao, "interpretar_ficha", id_hotel=id_hotel, id_reserva=b
+        )
+    transacoes = {"n": 0}
+    original = ambiente.engine.begin
+
+    def _begin(*args, **kwargs):
+        transacoes["n"] += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(ambiente.engine, "begin", _begin)
+    processados = processar_uma_passagem_na_engine(
+        ambiente.engine, gateway=MensageriaFalsa()
+    )
+    assert processados == 2
+    assert transacoes["n"] == 3

@@ -321,6 +321,41 @@ intocadas.
 
 ---
 
+## Phase 8: Ajustes 14/10 (transação, timeout, log)
+
+**Purpose**: gravar cada trabalho antes do próximo; timeout do
+worker distinto do ping da API; falha em `warning`. Sem mudar o
+comportamento já coberto pelas US1–US4.
+
+- [X] T026 [P] Estender
+  `testes/unitarios/worker/test_isolamento_da_passagem.py`:
+  `processar_uma_passagem_na_engine` com dois trabalhos abre **três**
+  transações (uma por trabalho + a vazia que encerra). Rodar e
+  **ver falhar**; em `worker/consumidor.py`, laço com
+  `engine.begin()` e `processar_uma_passagem(..., limite=1)`. Savepoint
+  permanece. Verde.
+
+- [X] T027 [P] Estender
+  `testes/unitarios/test_engine_esconde_parametros.py` e
+  `testes/unitarios/worker/test_cli_worker.py`: timeout do worker
+  padrão 30; `obter_engine_do_worker` com `hide_parameters`; API
+  continua em `health_db_timeout_seconds`. Implementar em
+  `app/config.py`, `app/database.py`, `worker/__main__.py` e
+  `.env.example`. Verde.
+
+- [X] T028 [P] `trabalho_falha` e `ciclo_etapa_falha` em
+  `logger.warning` (`worker/consumidor.py`, `worker/__main__.py`);
+  testes de CPF capturam `warning`. Verde.
+
+- [X] T029 Suíte completa back-end (`uv run pytest`) e front-end
+  (`npm --prefix frontend test`). Back-end: 1002 verdes na primeira
+  passagem; os dois testes de log do Gemini falharam porque o
+  `caplog` chegou vazio depois da integração — captura alinhada ao
+  espião de `logger.info` já usado no worker; reexecutados verdes.
+  Front-end: 214 verdes. Sem rede externa.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -336,6 +371,8 @@ intocadas.
 - **US4 (Phase 6)**: independente da US3 no código da tela; depende
   de trabalhos em `falha` (US1) para o cenário ponta a ponta
 - **Polish**: depois das histórias desejadas
+- **Ajustes 14/10 (Phase 8)**: depois do Polish — transação por
+  trabalho, timeout do worker, log em `warning`
 
 ### User Story Dependencies
 

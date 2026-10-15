@@ -8,6 +8,7 @@ class Configuracao(BaseSettings):
 
     database_url: str
     health_db_timeout_seconds: float = 1.0
+    worker_statement_timeout_seconds: float = 30.0
     log_level: str = "INFO"
 
     # Parametro de seguranca de plataforma, nao de propriedade: nao pertence a

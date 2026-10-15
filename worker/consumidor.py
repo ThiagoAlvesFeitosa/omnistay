@@ -72,7 +72,7 @@ def processar_uma_passagem(
                 tentativas_atuais=trabalho["tentativas"],
                 codigo_erro=type(exc).__name__,
             )
-            logger.info(
+            logger.warning(
                 "trabalho_falha id_trabalho=%s tipo=%s excecao=%s",
                 trabalho["id_trabalho"],
                 trabalho["tipo"],
@@ -201,12 +201,20 @@ def processar_uma_passagem_na_engine(
 ) -> int:
     porta = gateway or construir_mensageria(obter_configuracao())
     porta_llm = llm if llm is not None else construir_llm(obter_configuracao())
-    with engine.begin() as conexao:
-        return processar_uma_passagem(
-            conexao,
-            gateway=porta,
-            llm=porta_llm,
-            catalogo=catalogo,
-            fonte=fonte,
-            agora=agora,
-        )
+    processados = 0
+    limite = 100
+    while processados < limite:
+        with engine.begin() as conexao:
+            reclamados = processar_uma_passagem(
+                conexao,
+                gateway=porta,
+                llm=porta_llm,
+                catalogo=catalogo,
+                fonte=fonte,
+                agora=agora,
+                limite=1,
+            )
+        if reclamados == 0:
+            break
+        processados += reclamados
+    return processados

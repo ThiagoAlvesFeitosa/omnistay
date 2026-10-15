@@ -73,13 +73,15 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 @pytest.fixture
 def limpar_caches_de_configuracao():
     from app.config import obter_configuracao
-    from app.database import obter_engine
+    from app.database import obter_engine, obter_engine_do_worker
 
     obter_configuracao.cache_clear()
     obter_engine.cache_clear()
+    obter_engine_do_worker.cache_clear()
     yield
     obter_configuracao.cache_clear()
     obter_engine.cache_clear()
+    obter_engine_do_worker.cache_clear()
 
 
 @pytest.fixture
@@ -113,9 +115,11 @@ def app_sobre_ambiente(ambiente, limpar_caches_de_configuracao, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", ambiente.url)
     obter_configuracao.cache_clear()
     modulo_banco.obter_engine.cache_clear()
+    modulo_banco.obter_engine_do_worker.cache_clear()
 
     with TestClient(app, base_url="https://testserver") as cliente_de_teste:
         yield cliente_de_teste, ambiente
 
     obter_configuracao.cache_clear()
     modulo_banco.obter_engine.cache_clear()
+    modulo_banco.obter_engine_do_worker.cache_clear()

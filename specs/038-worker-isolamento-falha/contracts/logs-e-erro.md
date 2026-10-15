@@ -23,8 +23,11 @@ CPF, `str(exc)`, `params` de cursor, corpo de webhook.
 
 ## Engine
 
-`hide_parameters=True` em `obter_engine()` (API e worker passam a
-compartilhar). O `create_engine` direto do worker some.
+`hide_parameters=True` em `obter_engine()` (API) e
+`obter_engine_do_worker()` (timeout próprio). O `create_engine`
+direto do worker some.
+
+`trabalho_falha` e `ciclo_etapa_falha` são `warning`, não `info`.
 
 ## Tratador
 

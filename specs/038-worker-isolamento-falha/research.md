@@ -6,22 +6,24 @@
 (`begin_nested`). Exceção inesperada faz rollback só desse savepoint,
 grava a falha no trabalho via `registrar_falha_de_envio` já existente
 (nome da classe da exceção como código) e a passagem segue no
-próximo. Não se introduz fila externa, processo extra nem Celery.
+próximo. No caminho de produção, `processar_uma_passagem_na_engine`
+abre **uma transação por trabalho** (`engine.begin()` +
+`processar_uma_passagem(..., limite=1)`). O savepoint permanece
+dentro. Testes que já passam `conexao` continuam chamando
+`processar_uma_passagem` direto. Não se introduz fila externa,
+processo extra nem Celery.
 
-**Rationale**: Hoje `processar_uma_passagem` despacha sem `try` e
-`processar_uma_passagem_na_engine` usa **uma** transação para todos
-os claims. `IntegrityError` (caso 18/09) aborta a transação inteira:
-trabalhos já `concluido` na mesma passagem voltam atrás e o laço do
-worker morre. Savepoint preserva o concluído (FR-005), esvazia efeito
-parcial do que estourou (idempotência do banco na retentativa) e
-continua testável com a conexão que os testes de integração já
-passam.
+**Rationale**: Sem o savepoint, `IntegrityError` (caso 18/09) aborta a
+transação e o worker morre. Sem a transação por trabalho, um crash
+depois do savepoint (conexão caída, commit recusado) devolve ao
+pendente os trabalhos já concluídos na mesma passagem — e as
+mensagens que eles já enviaram saem de novo. A combinação cumpre a
+decisão de 18/09 e preserva os testes existentes (ajuste 14/10).
 
-**Alternatives considered**: Uma transação por trabalho via
-`engine.begin()` — também isola, mas quebra dezenas de testes que
-chamam `processar_uma_passagem(conexao)` e duplica o ciclo de
-conexão. Deixar a transação única e só logar — viola FR-005 e o
-Artigo IX (o banco já abortou).
+**Alternatives considered**: Uma transação única para até 100
+trabalhos com savepoint interno — isola a exceção, mas não grava o
+concluído antes do próximo. Deixar a transação única e só logar —
+viola FR-005 e o Artigo IX.
 
 ## 2. Teto e espera crescente
 
@@ -44,10 +46,12 @@ envio.
 
 **Decision**: `erro_ultima_tentativa` e o log recebem **somente**
 `type(exc).__name__`. Nunca `str(exc)`, nunca `orig`, nunca
-parâmetros da consulta. Os dois `create_engine` (API em
-`app/database.py` e o do worker) passam a `hide_parameters=True`.
-Worker deixa de abrir engine “nu”: usa `obter_engine()` (já traz
-`statement_timeout` no espírito da API, FR-011).
+parâmetros da consulta. `obter_engine()` (API) e
+`obter_engine_do_worker()` passam a `hide_parameters=True`. Worker
+deixa de abrir engine “nu”: usa `obter_engine_do_worker()` com
+`worker_statement_timeout_seconds` (padrão 30). A API permanece em
+`health_db_timeout_seconds` (padrão 1). `trabalho_falha` e
+`ciclo_etapa_falha` são `warning`.
 
 **Rationale**: Auditoria de 18/09 (achado médio: ficha no erro de
 banco) e FR-007. `hide_parameters` está explícito no estado do

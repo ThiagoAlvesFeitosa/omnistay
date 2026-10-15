@@ -31,9 +31,9 @@ def test_uma_passagem_usa_engine_da_aplicacao(monkeypatch):
         engines.append("obter")
         return object()
 
-    monkeypatch.setattr("app.database.obter_engine", _obter)
-    if hasattr(worker_main, "obter_engine"):
-        monkeypatch.setattr(worker_main, "obter_engine", _obter)
+    monkeypatch.setattr("app.database.obter_engine_do_worker", _obter)
+    if hasattr(worker_main, "obter_engine_do_worker"):
+        monkeypatch.setattr(worker_main, "obter_engine_do_worker", _obter)
     worker_main.main(["--uma-passagem"])
     assert engines == ["obter"]
 
@@ -48,7 +48,7 @@ def test_uma_passagem_em_demonstracao_usa_mensageria_simulada(monkeypatch):
     monkeypatch.setattr(
         worker_main, "processar_uma_passagem_na_engine", _capturar
     )
-    monkeypatch.setattr(worker_main, "obter_engine", lambda: object())
+    monkeypatch.setattr(worker_main, "obter_engine_do_worker", lambda: object())
     monkeypatch.setattr(worker_main, "obter_configuracao", lambda: _cfg())
     worker_main.main(["--uma-passagem"])
     from app.adaptadores.llm_falso import LLMFalso
@@ -68,7 +68,7 @@ def test_uma_passagem_sem_llm_modo_nao_processa(monkeypatch):
         "processar_uma_passagem_na_engine",
         lambda *args, **kwargs: chamadas.append(1) or 0,
     )
-    monkeypatch.setattr(worker_main, "obter_engine", lambda: object())
+    monkeypatch.setattr(worker_main, "obter_engine_do_worker", lambda: object())
     monkeypatch.setattr(
         worker_main, "obter_configuracao", lambda: _cfg(llm_modo="")
     )
@@ -110,7 +110,7 @@ def test_uma_passagem_nao_chama_agendador(monkeypatch):
         "_rodar_verificacao_retencao",
         lambda engine: retencao.append("r") or 0,
     )
-    monkeypatch.setattr(worker_main, "obter_engine", lambda: object())
+    monkeypatch.setattr(worker_main, "obter_engine_do_worker", lambda: object())
     monkeypatch.setattr(worker_main, "obter_configuracao", lambda: _cfg())
     worker_main.main(["--uma-passagem"])
     assert verificacoes == []
@@ -126,7 +126,7 @@ def test_verificar_cadastros_chama_agendador(monkeypatch):
         "_rodar_verificacao",
         lambda engine: verificacoes.append("v") or 0,
     )
-    monkeypatch.setattr(worker_main, "obter_engine", lambda: object())
+    monkeypatch.setattr(worker_main, "obter_engine_do_worker", lambda: object())
     monkeypatch.setattr(worker_main, "obter_configuracao", lambda: _cfg())
     worker_main.main(["--verificar-cadastros"])
     assert verificacoes == ["v"]
@@ -139,7 +139,7 @@ def test_verificar_boas_vindas_chama_varredura_e_encerra(monkeypatch):
         "_rodar_verificacao_boas_vindas",
         lambda engine: chamadas.append("b") or 0,
     )
-    monkeypatch.setattr(worker_main, "obter_engine", lambda: object())
+    monkeypatch.setattr(worker_main, "obter_engine_do_worker", lambda: object())
     monkeypatch.setattr(worker_main, "obter_configuracao", lambda: _cfg())
     worker_main.main(["--verificar-boas-vindas"])
     assert chamadas == ["b"]
@@ -152,7 +152,7 @@ def test_verificar_pulsos_chama_varredura_e_encerra(monkeypatch):
         "_rodar_verificacao_pulsos",
         lambda engine: chamadas.append("p") or 0,
     )
-    monkeypatch.setattr(worker_main, "obter_engine", lambda: object())
+    monkeypatch.setattr(worker_main, "obter_engine_do_worker", lambda: object())
     monkeypatch.setattr(worker_main, "obter_configuracao", lambda: _cfg())
     worker_main.main(["--verificar-pulsos"])
     assert chamadas == ["p"]
@@ -165,7 +165,7 @@ def test_verificar_mercado_chama_varredura_e_encerra(monkeypatch):
         "_rodar_verificacao_mercado",
         lambda engine: chamadas.append("m") or 0,
     )
-    monkeypatch.setattr(worker_main, "obter_engine", lambda: object())
+    monkeypatch.setattr(worker_main, "obter_engine_do_worker", lambda: object())
     monkeypatch.setattr(worker_main, "obter_configuracao", lambda: _cfg())
     worker_main.main(["--verificar-mercado"])
     assert chamadas == ["m"]
@@ -193,7 +193,7 @@ def test_loop_continuo_varre_mercado(monkeypatch):
     monkeypatch.setattr(
         worker_main, "_rodar_verificacao_retencao", lambda engine: 0
     )
-    monkeypatch.setattr(worker_main, "obter_engine", lambda: object())
+    monkeypatch.setattr(worker_main, "obter_engine_do_worker", lambda: object())
     monkeypatch.setattr(worker_main, "obter_configuracao", lambda: _cfg())
 
     def _sleep(_segundos):
@@ -214,7 +214,7 @@ def test_verificar_retencao_chama_varredura_e_encerra(monkeypatch):
         "_rodar_verificacao_retencao",
         lambda engine: chamadas.append("r") or 0,
     )
-    monkeypatch.setattr(worker_main, "obter_engine", lambda: object())
+    monkeypatch.setattr(worker_main, "obter_engine_do_worker", lambda: object())
     monkeypatch.setattr(worker_main, "obter_configuracao", lambda: _cfg())
     worker_main.main(["--verificar-retencao"])
     assert chamadas == ["r"]
@@ -242,7 +242,7 @@ def test_loop_continuo_varre_retencao(monkeypatch):
         "_rodar_verificacao_retencao",
         lambda engine: retencao.append("r") or 0,
     )
-    monkeypatch.setattr(worker_main, "obter_engine", lambda: object())
+    monkeypatch.setattr(worker_main, "obter_engine_do_worker", lambda: object())
     monkeypatch.setattr(worker_main, "obter_configuracao", lambda: _cfg())
 
     def _sleep(_segundos):
