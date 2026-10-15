@@ -8,6 +8,7 @@ import {
   CAMPOS_FICHA,
   camposAusentes,
   formatarDataVisivel,
+  formatarNumeroDocumentoVisivel,
   idadeDerivada,
   montarTextoCopia,
   type CamposFicha,
@@ -44,14 +45,25 @@ function hojeIso(): string {
   return `${hoje.getFullYear()}-${mes}-${dia}`;
 }
 
-function valorVisivel(chave: string, valor: string): string {
+function valorVisivel(
+  chave: string,
+  valor: string,
+  tipoDocumento?: string | null,
+): string {
   if (chave === "data_nascimento") {
     return formatarDataVisivel(valor);
   }
   if (chave === "tipo_documento") {
     return valor.toUpperCase();
   }
+  if (chave === "numero_documento") {
+    return formatarNumeroDocumentoVisivel(tipoDocumento, valor);
+  }
   return valor;
+}
+
+function recadoDeCpf(aviso: string): boolean {
+  return /CPF/i.test(aviso) && /confere/i.test(aviso);
 }
 
 function rascunhoDe(ficha: FichaResposta): Rascunho {
@@ -310,9 +322,14 @@ export function TelaFicha({ embutida = false }: Props) {
                       autoComplete="off"
                     />
                   )}
+                  {campo.chave === "numero_documento" && recadoDeCpf(avisoGravacao) ? (
+                    <p role="status">{avisoGravacao}</p>
+                  ) : null}
                 </div>
               ))}
-              {avisoGravacao ? <p role="status">{avisoGravacao}</p> : null}
+              {avisoGravacao && !recadoDeCpf(avisoGravacao) ? (
+                <p role="status">{avisoGravacao}</p>
+              ) : null}
               <div className="flex gap-2">
                 <Button type="submit">Gravar</Button>
                 <Button
@@ -333,7 +350,9 @@ export function TelaFicha({ embutida = false }: Props) {
                   <div key={campo.chave}>
                     <dt className="text-xs text-zinc-500">{campo.rotulo}</dt>
                     <dd>
-                      {preenchido ? valorVisivel(campo.chave, bruto) : "—"}
+                      {preenchido
+                        ? valorVisivel(campo.chave, bruto, ficha.tipo_documento)
+                        : "—"}
                       {campo.chave === "data_nascimento" && idade != null
                         ? ` (${idade} anos)`
                         : null}

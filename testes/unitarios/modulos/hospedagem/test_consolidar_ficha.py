@@ -1,6 +1,9 @@
 """Consolidacao da ficha do titular."""
 
+from app.modulos.conversa.validacao_ficha import refinar_resultado
 from app.modulos.hospedagem import service as hospedagem
+from app.portas.llm import CAMPOS_FICHA_CHAVE, ResultadoExtracao
+from testes.suporte.cpf_ficha import CPF_REPROVADO, CPF_VALIDO, CPF_VALIDO_PONTUADO
 
 
 class RepoFake:
@@ -56,6 +59,71 @@ def test_consolidacao_completa_marca_ficha_recebida():
     assert repo.status == "ficha_recebida"
     assert repo.completa is True
     assert "idade" not in repo.atualizacoes[0]["campos"]
+
+
+def test_cpf_reprovado_nao_vai_ao_titular_e_fica_parcial():
+    bruto = {
+        "nome_completo": "Maria Silva",
+        "profissao": "Engenheira",
+        "data_nascimento": "1990-05-12",
+        "tipo_documento": "cpf",
+        "numero_documento": CPF_REPROVADO,
+        "endereco": "Rua A",
+        "cep": "01310100",
+        "cidade": "Sao Paulo",
+        "telefone": "5511987654321",
+    }
+    refinado = refinar_resultado(
+        ResultadoExtracao(
+            desfecho="completa",
+            campos=bruto,
+            campos_reconhecidos=tuple(CAMPOS_FICHA_CHAVE),
+        )
+    )
+    repo = RepoFake()
+    hospedagem.consolidar_ficha_titular(
+        object(),
+        id_hotel=1,
+        id_reserva=10,
+        campos=refinado.campos,
+        desfecho=refinado.desfecho,
+        repositorio=repo,
+    )
+    assert "numero_documento" not in repo.atualizacoes[0]["campos"]
+    assert repo.status == "ficha_parcial"
+    assert repo.completa is False
+
+
+def test_cpf_pontuado_valido_grava_onze_digitos_no_titular():
+    bruto = {
+        "nome_completo": "Maria Silva",
+        "profissao": "Engenheira",
+        "data_nascimento": "1990-05-12",
+        "tipo_documento": "cpf",
+        "numero_documento": CPF_VALIDO_PONTUADO,
+        "endereco": "Rua A",
+        "cep": "01310100",
+        "cidade": "Sao Paulo",
+        "telefone": "5511987654321",
+    }
+    refinado = refinar_resultado(
+        ResultadoExtracao(
+            desfecho="completa",
+            campos=bruto,
+            campos_reconhecidos=tuple(CAMPOS_FICHA_CHAVE),
+        )
+    )
+    repo = RepoFake()
+    hospedagem.consolidar_ficha_titular(
+        object(),
+        id_hotel=1,
+        id_reserva=10,
+        campos=refinado.campos,
+        desfecho=refinado.desfecho,
+        repositorio=repo,
+    )
+    assert repo.atualizacoes[0]["campos"]["numero_documento"] == CPF_VALIDO
+    assert repo.status == "ficha_recebida"
 
 
 def test_consolidacao_parcial_marca_ficha_parcial():

@@ -1,0 +1,20 @@
+"""Constantes de CPF para testes da ficha.
+
+Uso so em teste. Sem validacao de producao, sem log, sem canal.
+"""
+
+CPF_VALIDO = "52998224725"
+CPF_VALIDO_PONTUADO = "529.982.247-25"
+CPF_REPROVADO = "12345678900"
+CPF_REPROVADO_PONTUADO = "123.456.789-00"
+CPF_ONZE_IGUAIS = "11111111111"
+CPF_ONZE_IGUAIS_PONTUADO = "111.111.111-11"
+
+__all__ = [
+    "CPF_VALIDO",
+    "CPF_VALIDO_PONTUADO",
+    "CPF_REPROVADO",
+    "CPF_REPROVADO_PONTUADO",
+    "CPF_ONZE_IGUAIS",
+    "CPF_ONZE_IGUAIS_PONTUADO",
+]

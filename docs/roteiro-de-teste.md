@@ -130,7 +130,7 @@ Aba 2 → escreva como se fosse a Marina, numa mensagem só:
 
 ```
 Marina Duarte Fonseca, gerente de contas, nasci em 14/03/1992,
-CPF 123.456.789-00, moro na Rua das Acacias 220 apto 71,
+CPF 529.982.247-25, moro na Rua das Acacias 220 apto 71,
 CEP 04567-000, Sao Paulo
 ```
 

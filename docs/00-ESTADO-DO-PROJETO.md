@@ -1,7 +1,19 @@
 # OmniStay — Estado do Projeto
 
-**Atualizado em:** 14/10/2026
+**Atualizado em:** 15/10/2026
 **Para que serve:** ponto de retomada. Leia este arquivo antes de continuar o trabalho.
+
+---
+
+## Situação em 15/10/2026 — F9.2 fechada
+
+A F9.2 (`specs/039-conferir-cpf`) confere o CPF antes de gravar, num único sítio
+(`validar_campos_extraidos`): onze dígitos, rejeita sequência de um só dígito, dígitos
+verificadores da Receita. Coleta não persiste número reprovado (ficha parcial, sem mensagem
+nova). PUT recusa o salvamento inteiro com `CPF não confere.`, sem eco do número. Painel
+formata `000.000.000-00` na leitura e na cópia. Revisão Alembic `0027` converte CPF isolado
+para onze dígitos e pula pares que colidiriam; `uq_hospede_documento` permanece. Identidade
+de cadastros que colidem continua F9.3 / F9.5.
 
 ---
 
@@ -128,9 +140,12 @@ worker de novo no próximo `uv run python -m worker`. `marcar_falha` e o campo `
 existem — ligados só ao `tipo_desconhecido`, o único caso que nunca acontece em produção.
 
 **Achado lateral:** `validar_campos_extraidos` valida CEP, telefone, data de nascimento e tipo
-de documento. **`numero_documento` é gravado cru**, sem validação nenhuma. Um CPF com dígito
-trocado entra no banco e só é notado se colidir. E `123.456.789-00`, usado no `semear_demo.py`,
-**não é um CPF válido**: os dígitos verificadores não fecham.
+de documento. **`numero_documento` era gravado cru**, sem validação nenhuma. Um CPF com dígito
+trocado entrava no banco e só era notado se colidir. E `123.456.789-00`, usado no roteiro de
+demonstração, **não é um CPF válido**: os dígitos verificadores não fecham. **Fechado na F9.2
+(15/10/2026):** a conferência mora no validador; persistência canônica é onze dígitos; o roteiro
+e o wireframe usam `529.982.247-25`. `semear_demo.py` não cria ficha. Pares antigos que
+colidiriam na forma de onze dígitos ficam com a escrita original (F9.3 / F9.5).
 
 ### Decisões de 18/09/2026
 
@@ -977,10 +992,11 @@ acesso a fichas, integração contínua com teste "toda rota exige permissão". 
 Abertas em 18/09/2026, da investigação do worker. Justificativa de cada uma na seção de
 18/09/2026, no topo:
 
-- [ ] **Worker não morre** — `try/except` no dispatch, `marcar_falha` para qualquer erro, uma
-      transação por trabalho. Bloqueia todo o resto
-- [ ] **Validar `numero_documento`** — dígito verificador do CPF. Ajustar o `semear_demo.py`,
-      que usa um CPF inválido
+- [x] **Worker não morre** — `try/except` no dispatch, `marcar_falha` para qualquer erro, uma
+      transação por trabalho. Bloqueia todo o resto. Fechado na F9.1
+- [x] **Validar `numero_documento`** — dígito verificador do CPF. Fechado na F9.2
+      (`specs/039-conferir-cpf`); roteiro e wireframe com CPF que fecha; `semear_demo.py` não
+      cria ficha
 - [ ] **`id_hotel` em `hospede`** — índice `(id_hotel, tipo_documento, numero_documento)`,
       revisão nova do Alembic, e o 409 passa a nomear o hóspede conflitante
 - [ ] **Busca por telefone na pré-chegada** — reaproveita a ficha antes de pedir os oito campos

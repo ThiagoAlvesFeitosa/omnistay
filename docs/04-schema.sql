@@ -212,7 +212,9 @@ COMMENT ON COLUMN hospede.data_nascimento IS
     'para evitar inconsistencia no dia seguinte a cada aniversario.';
 COMMENT ON COLUMN hospede.numero_documento IS
     'LGPD: dado pessoal sensivel (DPS). Somente campos digitados; foto do documento '
-    'nao e aceita, por minimizacao de dados.';
+    'nao e aceita, por minimizacao de dados. Quando tipo_documento = cpf e o numero '
+    'foi aceito, a forma gravada e onze digitos; pares que colidiriam na migracao '
+    'conservam a escrita original. O indice uq_hospede_documento permanece.';
 COMMENT ON COLUMN hospede.telefone IS
     'LGPD: DP. Chave de correlacao com as mensagens do WhatsApp.';
 

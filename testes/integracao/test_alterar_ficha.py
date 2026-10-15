@@ -7,6 +7,7 @@ from sqlalchemy import text
 
 from testes.integracao.test_confirmar_saida import _tornar
 from testes.integracao.test_reservas import _corpo_valido, _login
+from testes.suporte.cpf_ficha import CPF_REPROVADO, CPF_VALIDO, CPF_VALIDO_PONTUADO
 
 
 NOVE = {
@@ -127,3 +128,61 @@ def test_documento_duplicado_nao_funde(app_sobre_ambiente):
     assert recusa.status_code == 409
     lida = cliente.get(f"/reservas/{segunda}/ficha").json()
     assert lida["numero_documento"] in (None, "")
+
+
+@pytest.mark.postgres
+def test_put_cpf_reprovado_nao_altera_nenhum_campo(app_sobre_ambiente):
+    cliente, ambiente = app_sobre_ambiente
+    id_reserva = _criar_parcial(cliente, ambiente, telefone="11987654328")
+    ruim = {
+        **NOVE,
+        "tipo_documento": "cpf",
+        "numero_documento": CPF_REPROVADO,
+        "endereco": "Rua Nova, 9",
+    }
+    recusa = cliente.put(f"/reservas/{id_reserva}/ficha", json=ruim)
+    assert recusa.status_code == 422
+    assert CPF_REPROVADO not in recusa.text
+    lida = cliente.get(f"/reservas/{id_reserva}/ficha").json()
+    assert lida["endereco"] in (None, "")
+    assert lida["numero_documento"] in (None, "")
+
+
+@pytest.mark.postgres
+def test_put_cpf_valido_pontuado_persiste_onze_digitos(app_sobre_ambiente):
+    cliente, ambiente = app_sobre_ambiente
+    id_reserva = _criar_parcial(cliente, ambiente, telefone="11987654329")
+    corpo = {
+        **NOVE,
+        "tipo_documento": "cpf",
+        "numero_documento": CPF_VALIDO_PONTUADO,
+    }
+    resposta = cliente.put(f"/reservas/{id_reserva}/ficha", json=corpo)
+    assert resposta.status_code == 200
+    assert resposta.json()["numero_documento"] == CPF_VALIDO
+
+
+@pytest.mark.postgres
+def test_put_cpf_reprovado_log_nao_traz_numero(app_sobre_ambiente, caplog, monkeypatch):
+    cliente, ambiente = app_sobre_ambiente
+    id_reserva = _criar_parcial(cliente, ambiente, telefone="11987654330")
+    linhas: list[str] = []
+
+    def _info(msg, *args, **kwargs):
+        linhas.append(msg % args if args else str(msg))
+
+    monkeypatch.setattr(
+        "app.modulos.hospedagem.service.logger.info", _info
+    )
+    caplog.set_level(logging.INFO)
+    ruim = {
+        **NOVE,
+        "tipo_documento": "cpf",
+        "numero_documento": CPF_REPROVADO,
+    }
+    assert cliente.put(f"/reservas/{id_reserva}/ficha", json=ruim).status_code == 422
+    texto = "\n".join(linhas) + caplog.text
+    assert "ficha_alterada_recusada" in texto
+    assert "422" in texto
+    assert CPF_REPROVADO not in texto
+    assert str(id_reserva) in texto

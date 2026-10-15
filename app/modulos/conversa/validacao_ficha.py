@@ -39,6 +39,26 @@ def _telefone(valor: str) -> str | None:
         return None
 
 
+def _digitos(valor: str) -> str:
+    return "".join(c for c in valor if c.isdigit())
+
+
+def _digito_verificador(base: str, pesos: range) -> str:
+    soma = sum(int(digito) * peso for digito, peso in zip(base, pesos))
+    resto = soma % 11
+    return "0" if resto < 2 else str(11 - resto)
+
+
+def _cpf_confere(digitos: str) -> bool:
+    if len(digitos) != 11:
+        return False
+    if len(set(digitos)) == 1:
+        return False
+    primeiro = _digito_verificador(digitos[:9], range(10, 1, -1))
+    segundo = _digito_verificador(digitos[:10], range(11, 1, -1))
+    return digitos[9] == primeiro and digitos[10] == segundo
+
+
 def validar_campos_extraidos(campos: dict[str, str]) -> dict[str, str]:
     """Devolve so campos utilizaveis. Nunca inclui idade."""
     saida: dict[str, str] = {}
@@ -71,6 +91,15 @@ def validar_campos_extraidos(campos: dict[str, str]) -> dict[str, str]:
             if normalizado:
                 saida[chave] = normalizado
             continue
+        if chave == "numero_documento":
+            tipo = saida.get("tipo_documento")
+            if tipo is None and campos.get("tipo_documento"):
+                tipo = _tipo_documento(str(campos["tipo_documento"]))
+            if tipo == "cpf":
+                digitos = _digitos(bruto)
+                if _cpf_confere(digitos):
+                    saida[chave] = digitos
+                continue
         saida[chave] = bruto
     return saida
 

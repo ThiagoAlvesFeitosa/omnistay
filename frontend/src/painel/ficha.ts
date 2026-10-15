@@ -50,6 +50,17 @@ export function formatarDataVisivel(iso: string): string {
   return formatarDataCalendario(iso);
 }
 
+export function formatarNumeroDocumentoVisivel(
+  tipo: string | null | undefined,
+  numero: string | null | undefined,
+): string {
+  const bruto = (numero ?? "").trim();
+  if ((tipo ?? "").trim().toLowerCase() === "cpf" && /^\d{11}$/.test(bruto)) {
+    return `${bruto.slice(0, 3)}.${bruto.slice(3, 6)}.${bruto.slice(6, 9)}-${bruto.slice(9)}`;
+  }
+  return bruto;
+}
+
 export function montarTextoCopia(ficha: CamposFicha): string {
   return CAMPOS_FICHA.map((campo) => {
     const bruto = ficha[campo.chave];
@@ -61,6 +72,8 @@ export function montarTextoCopia(ficha: CamposFicha): string {
       valor = formatarDataVisivel(valor);
     } else if (campo.chave === "tipo_documento") {
       valor = valor.toUpperCase();
+    } else if (campo.chave === "numero_documento") {
+      valor = formatarNumeroDocumentoVisivel(ficha.tipo_documento, valor);
     }
     return `${campo.rotulo}: ${valor}`;
   }).join("\n");

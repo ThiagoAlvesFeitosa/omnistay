@@ -2,7 +2,8 @@
 
 from app.adaptadores.llm_falso import LLMFalso
 from app.modulos.conversa import service as conversa
-from app.portas.llm import ResultadoExtracao
+from app.portas.llm import CAMPOS_FICHA_CHAVE, ResultadoExtracao
+from testes.suporte.cpf_ficha import CPF_REPROVADO, CPF_VALIDO, CPF_VALIDO_PONTUADO
 
 
 class RepoFake:
@@ -43,6 +44,55 @@ def test_campos_invalidos_reduzem_desfecho():
     assert resultado.desfecho == "parcial"
     assert resultado.campos == {"nome_completo": "Maria"}
     assert repo.classificacao["desfecho"] == "parcial"
+
+
+def _nove(*, numero: str, tipo: str = "cpf") -> dict[str, str]:
+    return {
+        "nome_completo": "Maria Silva",
+        "profissao": "Engenheira",
+        "data_nascimento": "1990-05-12",
+        "tipo_documento": tipo,
+        "numero_documento": numero,
+        "endereco": "Rua A, 100",
+        "cep": "01310100",
+        "cidade": "Sao Paulo",
+        "telefone": "5511987654321",
+    }
+
+
+def test_cpf_reprovado_na_extracao_fica_parcial_sem_numero():
+    repo = RepoFake()
+    llm = LLMFalso()
+    llm.configurar(
+        ResultadoExtracao(
+            desfecho="completa",
+            campos=_nove(numero=CPF_REPROVADO),
+            campos_reconhecidos=tuple(CAMPOS_FICHA_CHAVE),
+        )
+    )
+    resultado = conversa.extrair_campos_via_llm(
+        object(), id_mensagem=1, llm=llm, repositorio=repo
+    )
+    assert resultado.desfecho == "parcial"
+    assert "numero_documento" not in resultado.campos
+    assert resultado.campos["tipo_documento"] == "cpf"
+
+
+def test_cpf_pontuado_valido_na_extracao_sai_em_onze_digitos():
+    repo = RepoFake()
+    llm = LLMFalso()
+    llm.configurar(
+        ResultadoExtracao(
+            desfecho="completa",
+            campos=_nove(numero=CPF_VALIDO_PONTUADO),
+            campos_reconhecidos=tuple(CAMPOS_FICHA_CHAVE),
+        )
+    )
+    resultado = conversa.extrair_campos_via_llm(
+        object(), id_mensagem=1, llm=llm, repositorio=repo
+    )
+    assert resultado.desfecho == "completa"
+    assert resultado.campos["numero_documento"] == CPF_VALIDO
 
 
 def test_irreconhecivel_grava_desfecho_sem_campos():

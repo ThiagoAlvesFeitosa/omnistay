@@ -230,6 +230,42 @@ describe("TelaFicha", () => {
     ).toBe(false);
   });
 
+  it("422 de CPF avisa no campo e conserva o rascunho", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      const metodo = (init?.method ?? "GET").toUpperCase();
+      if (metodo === "PUT") {
+        return json({ detail: "CPF não confere." }, 422);
+      }
+      if (String(url).includes("/consentimento")) {
+        return json(consentimentoNunca);
+      }
+      return json(fichaParcial);
+    });
+    renderFicha("/app/ficha/1042", fetchMock);
+    fireEvent.click(await screen.findByRole("button", { name: "Editar" }));
+    fireEvent.change(screen.getByLabelText("Nome completo"), {
+      target: { value: "Nome digitado agora" },
+    });
+    fireEvent.change(screen.getByLabelText("Tipo de documento"), {
+      target: { value: "cpf" },
+    });
+    fireEvent.change(screen.getByLabelText("Número do documento"), {
+      target: { value: "12345678900" },
+    });
+    fireEvent.change(screen.getByLabelText("Endereço"), {
+      target: { value: "Rua nova, 9" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Gravar" }));
+    const recado = await screen.findByText(/CPF não confere/i);
+    expect(
+      screen.getByLabelText("Número do documento").closest("div"),
+    ).toContainElement(recado);
+    expect(screen.getByLabelText("Nome completo")).toHaveValue("Nome digitado agora");
+    expect(screen.getByLabelText("Endereço")).toHaveValue("Rua nova, 9");
+    expect(screen.getByLabelText("Número do documento")).toHaveValue("12345678900");
+    expect(screen.getByRole("button", { name: "Gravar" })).toBeInTheDocument();
+  });
+
   it("422 mostra o detalhe e não afirma completa", async () => {
     const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
       const metodo = (init?.method ?? "GET").toUpperCase();

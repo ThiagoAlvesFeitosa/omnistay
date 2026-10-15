@@ -441,6 +441,14 @@ def completar_ficha_titular(
     validos = validar_campos_extraidos(informados)
     invalidos = [chave for chave in informados if chave not in validos]
     if invalidos:
+        tipo = validos.get("tipo_documento") or informados.get("tipo_documento", "")
+        if "numero_documento" in invalidos and tipo.strip().lower() == "cpf":
+            logger.info(
+                "ficha_alterada_recusada id_reserva=%s id_hospede=%s codigo=422",
+                id_reserva,
+                titular["id_hospede"],
+            )
+            raise DadosInvalidos("CPF não confere.")
         raise DadosInvalidos(f"Campo {invalidos[0]} invalido.")
 
     for chave, valor in validos.items():

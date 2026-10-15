@@ -65,7 +65,7 @@ describe("montarTextoCopia", () => {
         "Profissão: Gerente de contas",
         "Data de nascimento: 14/03/1992",
         "Tipo de documento: CPF",
-        "Número do documento: 12345678900",
+        "Número do documento: 123.456.789-00",
         "Endereço: Rua das Acácias, 220",
         "CEP: 04567000",
         "Cidade: São Paulo",
@@ -74,6 +74,24 @@ describe("montarTextoCopia", () => {
     );
     expect(texto).not.toMatch(/^Idade:/m);
     expect(texto).not.toMatch(/e-mail/i);
+  });
+
+  it("com tipo CPF e onze dígitos, a cópia usa a forma pontuada", () => {
+    const texto = montarTextoCopia({
+      ...novePreenchidos,
+      tipo_documento: "cpf",
+      numero_documento: "52998224725",
+    });
+    expect(texto).toContain("Número do documento: 529.982.247-25");
+  });
+
+  it("RG não pontua o número", () => {
+    const texto = montarTextoCopia({
+      ...novePreenchidos,
+      tipo_documento: "rg",
+      numero_documento: "1234567",
+    });
+    expect(texto).toContain("Número do documento: 1234567");
   });
 
   it("campo vazio entra só com o rótulo, sem valor inventado", () => {

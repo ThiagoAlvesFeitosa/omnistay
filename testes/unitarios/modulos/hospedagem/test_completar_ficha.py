@@ -1,6 +1,9 @@
 """Completar a ficha do titular no balcao — sem mensagem."""
 
+import pytest
+
 from app.modulos.hospedagem import service as hospedagem
+from testes.suporte.cpf_ficha import CPF_REPROVADO, CPF_VALIDO, CPF_VALIDO_PONTUADO
 
 
 NOVE = {
@@ -102,3 +105,54 @@ def test_idade_no_corpo_e_ignorada():
         repositorio=repo,
     )
     assert "idade" not in repo.atualizacoes[0]["campos"]
+
+
+def test_cpf_reprovado_nao_grava_e_recado_nao_repete_numero():
+    repo = RepoFake("ficha_parcial")
+    with pytest.raises(hospedagem.DadosInvalidos) as captura:
+        hospedagem.completar_ficha_titular(
+            object(),
+            id_hotel=1,
+            id_reserva=10,
+            campos={
+                **NOVE,
+                "tipo_documento": "cpf",
+                "numero_documento": CPF_REPROVADO,
+                "endereco": "Rua Nova, 9",
+            },
+            repositorio=repo,
+        )
+    recado = str(captura.value)
+    assert "CPF" in recado
+    assert "confere" in recado.lower()
+    assert CPF_REPROVADO not in recado
+    assert repo.atualizacoes == []
+
+
+def test_cpf_valido_pontuado_grava_onze_digitos():
+    repo = RepoFake("ficha_parcial")
+    hospedagem.completar_ficha_titular(
+        object(),
+        id_hotel=1,
+        id_reserva=10,
+        campos={
+            **NOVE,
+            "tipo_documento": "cpf",
+            "numero_documento": CPF_VALIDO_PONTUADO,
+        },
+        repositorio=repo,
+    )
+    assert repo.atualizacoes[0]["campos"]["numero_documento"] == CPF_VALIDO
+
+
+def test_cep_invalido_continua_recusando():
+    repo = RepoFake("ficha_parcial")
+    with pytest.raises(hospedagem.DadosInvalidos, match="cep"):
+        hospedagem.completar_ficha_titular(
+            object(),
+            id_hotel=1,
+            id_reserva=10,
+            campos={**NOVE, "cep": "12"},
+            repositorio=repo,
+        )
+    assert repo.atualizacoes == []

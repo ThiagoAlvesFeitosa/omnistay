@@ -6,6 +6,14 @@ from app.modulos.conversa.validacao_ficha import (
     validar_campos_extraidos,
 )
 from app.portas.llm import CAMPOS_FICHA_CHAVE, ResultadoExtracao
+from testes.suporte.cpf_ficha import (
+    CPF_ONZE_IGUAIS,
+    CPF_ONZE_IGUAIS_PONTUADO,
+    CPF_REPROVADO,
+    CPF_REPROVADO_PONTUADO,
+    CPF_VALIDO,
+    CPF_VALIDO_PONTUADO,
+)
 
 
 def test_data_nascimento_valida_e_aceita():
@@ -44,6 +52,47 @@ def test_nove_campos_validos_sao_completos():
     validos = validar_campos_extraidos(campos)
     assert len(validos) == len(CAMPOS_FICHA_CHAVE)
     assert classificar_desfecho(validos) == "completa"
+
+
+def test_cpf_pontuado_valido_grava_onze_digitos():
+    saida = validar_campos_extraidos(
+        {"tipo_documento": "cpf", "numero_documento": CPF_VALIDO_PONTUADO}
+    )
+    assert saida["numero_documento"] == CPF_VALIDO
+
+
+def test_cpf_sem_pontuacao_valido_grava_onze_digitos():
+    saida = validar_campos_extraidos(
+        {"tipo_documento": "cpf", "numero_documento": CPF_VALIDO}
+    )
+    assert saida["numero_documento"] == CPF_VALIDO
+
+
+def test_cpf_onze_iguais_nao_entra():
+    saida = validar_campos_extraidos(
+        {"tipo_documento": "cpf", "numero_documento": CPF_ONZE_IGUAIS}
+    )
+    assert "numero_documento" not in saida
+    assert saida.get("tipo_documento") == "cpf"
+
+
+def test_cpf_onze_iguais_pontuado_nao_entra():
+    saida = validar_campos_extraidos(
+        {"tipo_documento": "cpf", "numero_documento": CPF_ONZE_IGUAIS_PONTUADO}
+    )
+    assert "numero_documento" not in saida
+
+
+def test_cpf_reprovado_nao_entra_e_tipo_permanece():
+    saida = validar_campos_extraidos(
+        {
+            "tipo_documento": "cpf",
+            "numero_documento": CPF_REPROVADO_PONTUADO,
+        }
+    )
+    assert saida.get("tipo_documento") == "cpf"
+    assert "numero_documento" not in saida
+    assert CPF_REPROVADO not in saida.values()
 
 
 def test_refinar_parcial_quando_faltam_campos():

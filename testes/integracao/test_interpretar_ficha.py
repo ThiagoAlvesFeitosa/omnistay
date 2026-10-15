@@ -12,6 +12,7 @@ from app.adaptadores.mensageria_falsa import MensageriaFalsa
 from app.portas.llm import CAMPOS_FICHA_CHAVE, ResultadoExtracao
 from worker.consumidor import processar_uma_passagem_na_engine
 from testes.integracao.test_reservas import _corpo_valido, _login
+from testes.suporte.cpf_ficha import CPF_REPROVADO
 
 SEGREDO = "segredo-teste-webhook"
 
@@ -161,6 +162,56 @@ def test_parcial_nao_cobra_campos(cenario):
             ).scalar_one()
             == 1
         )
+
+
+@pytest.mark.postgres
+def test_cpf_reprovado_nao_dispara_mensagem_nova_e_fica_parcial(cenario):
+    cliente, ambiente, id_reserva = cenario
+    _post_webhook(
+        cliente,
+        {
+            "id_externo": "evt-cpf-ruim",
+            "telefone_origem": "11987654321",
+            "texto": "ficha com cpf",
+            "tem_texto_utilizavel": True,
+        },
+    )
+    llm = LLMFalso()
+    campos = _campos_completos()
+    campos["tipo_documento"] = "cpf"
+    campos["numero_documento"] = CPF_REPROVADO
+    llm.configurar(
+        ResultadoExtracao(
+            desfecho="completa",
+            campos=campos,
+            campos_reconhecidos=tuple(CAMPOS_FICHA_CHAVE),
+        )
+    )
+    porta = MensageriaFalsa()
+    processar_uma_passagem_na_engine(ambiente.engine, gateway=porta, llm=llm)
+    item = cliente.get("/fila-do-dia").json()["itens"][0]
+    assert item["status"] == "ficha_parcial"
+    ficha = cliente.get(f"/reservas/{id_reserva}/ficha").json()
+    assert ficha["numero_documento"] in (None, "")
+    with ambiente.conexao() as conexao:
+        coletas = conexao.execute(
+            text(
+                "SELECT COUNT(*) FROM trabalho"
+                " WHERE tipo = 'enviar_coleta'"
+                " AND (payload->>'id_reserva')::bigint = :r"
+            ),
+            {"r": id_reserva},
+        ).scalar_one()
+        enviadas = conexao.execute(
+            text(
+                "SELECT COUNT(*) FROM mensagem"
+                " WHERE id_reserva = :r AND direcao = 'enviada'"
+            ),
+            {"r": id_reserva},
+        ).scalar_one()
+    assert coletas == 1
+    assert enviadas == 1
+    assert porta.envios == []
 
 
 @pytest.mark.postgres
