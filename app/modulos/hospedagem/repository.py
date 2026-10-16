@@ -6,13 +6,15 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.engine import Connection
 
 
-def inserir_hospede(conexao: Connection, *, nome_completo: str, telefone: str) -> int:
+def inserir_hospede(
+    conexao: Connection, *, id_hotel: int, nome_completo: str, telefone: str
+) -> int:
     return conexao.execute(
         text(
-            "INSERT INTO hospede (nome_completo, telefone) "
-            "VALUES (:nome, :telefone) RETURNING id_hospede"
+            "INSERT INTO hospede (id_hotel, nome_completo, telefone) "
+            "VALUES (:id_hotel, :nome, :telefone) RETURNING id_hospede"
         ),
-        {"nome": nome_completo, "telefone": telefone},
+        {"id_hotel": id_hotel, "nome": nome_completo, "telefone": telefone},
     ).scalar_one()
 
 
@@ -118,8 +120,43 @@ def ler_titular_da_reserva(
             " JOIN reserva_hospede rh ON rh.id_reserva = r.id_reserva AND rh.titular"
             " JOIN hospede h ON h.id_hospede = rh.id_hospede"
             " WHERE r.id_reserva = :id_reserva AND r.id_hotel = :id_hotel"
+            " AND h.id_hotel = r.id_hotel"
         ),
         {"id_reserva": id_reserva, "id_hotel": id_hotel},
+    ).mappings().first()
+    return dict(linha) if linha else None
+
+
+def titular_do_documento(
+    conexao: Connection,
+    *,
+    id_hotel: int,
+    tipo_documento: str,
+    numero_documento: str,
+    id_hospede: int,
+) -> dict | None:
+    linha = conexao.execute(
+        text(
+            "SELECT h.nome_completo AS nome, r.id_reserva"
+            " FROM hospede h"
+            " JOIN reserva_hospede rh"
+            "   ON rh.id_hospede = h.id_hospede AND rh.titular"
+            " JOIN reserva r"
+            "   ON r.id_reserva = rh.id_reserva AND r.id_hotel = h.id_hotel"
+            " WHERE h.id_hotel = :id_hotel"
+            " AND h.tipo_documento = :tipo"
+            " AND h.numero_documento = :numero"
+            " AND h.id_hospede <> :id_hospede"
+            " ORDER BY CASE WHEN r.status = 'cancelada' THEN 1 ELSE 0 END ASC,"
+            " r.id_reserva DESC"
+            " LIMIT 1"
+        ),
+        {
+            "id_hotel": id_hotel,
+            "tipo": tipo_documento,
+            "numero": numero_documento,
+            "id_hospede": id_hospede,
+        },
     ).mappings().first()
     return dict(linha) if linha else None
 
@@ -393,11 +430,9 @@ def hospede_do_hotel(
     return bool(
         conexao.execute(
             text(
-                "SELECT 1 FROM reserva_hospede rh"
-                " JOIN reserva r ON r.id_reserva = rh.id_reserva"
-                " WHERE rh.id_hospede = :id_hospede"
-                " AND r.id_hotel = :id_hotel"
-                " LIMIT 1"
+                "SELECT 1 FROM hospede"
+                " WHERE id_hospede = :id_hospede"
+                " AND id_hotel = :id_hotel"
             ),
             {"id_hospede": id_hospede, "id_hotel": id_hotel},
         ).scalar()
@@ -477,22 +512,20 @@ def apagar_fichas_vencidas(
     ids = list(
         conexao.execute(
             text(
-                "SELECT DISTINCT rh_hotel.id_hospede"
-                " FROM reserva_hospede rh_hotel"
-                " JOIN reserva r_hotel"
-                "   ON r_hotel.id_reserva = rh_hotel.id_reserva"
-                " WHERE r_hotel.id_hotel = :id_hotel"
+                "SELECT DISTINCT h.id_hospede"
+                " FROM hospede h"
+                " WHERE h.id_hotel = :id_hotel"
                 " AND NOT EXISTS ("
                 "   SELECT 1 FROM reserva_hospede rh2"
                 "   JOIN reserva r2 ON r2.id_reserva = rh2.id_reserva"
-                "   WHERE rh2.id_hospede = rh_hotel.id_hospede"
+                "   WHERE rh2.id_hospede = h.id_hospede"
                 "     AND r2.checkout_em IS NULL"
                 " )"
                 " AND ("
                 "   SELECT MAX(r3.checkout_em)"
                 "   FROM reserva_hospede rh3"
                 "   JOIN reserva r3 ON r3.id_reserva = rh3.id_reserva"
-                "   WHERE rh3.id_hospede = rh_hotel.id_hospede"
+                "   WHERE rh3.id_hospede = h.id_hospede"
                 " ) + make_interval(years => :anos) <= :agora"
             ),
             {"id_hotel": id_hotel, "anos": anos, "agora": agora},

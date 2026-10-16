@@ -230,6 +230,46 @@ describe("TelaFicha", () => {
     ).toBe(false);
   });
 
+  it("409 de documento avisa com nome e liga para a ficha desta casa", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      const metodo = (init?.method ?? "GET").toUpperCase();
+      if (metodo === "PUT") {
+        return json(
+          {
+            detail: {
+              codigo: "documento_em_uso",
+              recado: "Documento já cadastrado para Ana.",
+              nome: "Ana",
+              id_reserva: 12,
+            },
+          },
+          409,
+        );
+      }
+      if (String(url).includes("/consentimento")) {
+        return json(consentimentoNunca);
+      }
+      return json(fichaParcial);
+    });
+    renderFicha("/app/ficha/1042", fetchMock);
+    fireEvent.click(await screen.findByRole("button", { name: "Editar" }));
+    fireEvent.change(screen.getByLabelText("Nome completo"), {
+      target: { value: "Nome digitado agora" },
+    });
+    fireEvent.change(screen.getByLabelText("Número do documento"), {
+      target: { value: "1234567" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Gravar" }));
+    expect(await screen.findByText(/Documento já cadastrado para Ana/i)).toBeInTheDocument();
+    const ligacao = screen.getByRole("link", { name: /abrir ficha/i });
+    expect(ligacao).toHaveAttribute("href", "/app/ficha/12");
+    expect(screen.getByLabelText("Nome completo")).toHaveValue("Nome digitado agora");
+    expect(screen.getByLabelText("Número do documento")).toHaveValue("1234567");
+    const aviso = screen.getByText(/Documento já cadastrado para Ana/i).closest("p");
+    expect(aviso?.textContent).not.toMatch(/1234567/);
+    expect(screen.getByRole("button", { name: "Gravar" })).toBeInTheDocument();
+  });
+
   it("422 de CPF avisa no campo e conserva o rascunho", async () => {
     const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
       const metodo = (init?.method ?? "GET").toUpperCase();

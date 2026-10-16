@@ -153,7 +153,10 @@ class HospedeNaoEncontrado(Exception):
 
 
 class DocumentoEmUso(Exception):
-    pass
+    def __init__(self, *, nome: str, id_reserva: int) -> None:
+        self.nome = nome
+        self.id_reserva = id_reserva
+        super().__init__(f"Documento já cadastrado para {nome}.")
 
 
 STATUS_CICLO_FICHA = frozenset(
@@ -162,7 +165,9 @@ STATUS_CICLO_FICHA = frozenset(
 
 
 class RepositorioDeHospedagem(Protocol):
-    def inserir_hospede(self, conexao, *, nome_completo: str, telefone: str) -> int: ...
+    def inserir_hospede(
+        self, conexao, *, id_hotel: int, nome_completo: str, telefone: str
+    ) -> int: ...
 
     def inserir_reserva(
         self,
@@ -235,7 +240,10 @@ def criar_reserva(
         raise DadosInvalidos(str(erro)) from erro
 
     id_hospede = repositorio.inserir_hospede(
-        conexao, nome_completo=nome_limpo, telefone=telefone_contato
+        conexao,
+        id_hotel=id_hotel,
+        nome_completo=nome_limpo,
+        telefone=telefone_contato,
     )
     id_reserva = repositorio.inserir_reserva(
         conexao,
@@ -458,6 +466,24 @@ def completar_ficha_titular(
     completa = desfecho == "completa"
     novo_status = "ficha_recebida" if completa else "ficha_parcial"
 
+    tipo = gravados.get("tipo_documento")
+    numero = gravados.get("numero_documento")
+    if tipo and numero:
+        outro = repositorio.titular_do_documento(
+            conexao,
+            id_hotel=id_hotel,
+            tipo_documento=tipo,
+            numero_documento=numero,
+            id_hospede=titular["id_hospede"],
+        )
+        if outro:
+            logger.info(
+                "ficha_alterada_recusada id_reserva=%s id_hospede=%s codigo=409",
+                id_reserva,
+                titular["id_hospede"],
+            )
+            raise DocumentoEmUso(nome=outro["nome"], id_reserva=outro["id_reserva"])
+
     try:
         repositorio.atualizar_hospede_titular(
             conexao, id_hospede=titular["id_hospede"], campos=gravados
@@ -469,7 +495,9 @@ def completar_ficha_titular(
             titular["id_hospede"],
         )
         if "uq_hospede_documento" in str(erro.orig or erro):
-            raise DocumentoEmUso from erro
+            raise DocumentoEmUso(
+                nome="outro hóspede", id_reserva=id_reserva
+            ) from erro
         raise
 
     repositorio.marcar_ficha_completa(

@@ -188,6 +188,7 @@ CREATE UNIQUE INDEX uq_item_vendavel_hotel_nome_ativo
 
 CREATE TABLE hospede (
     id_hospede       BIGSERIAL    PRIMARY KEY,
+    id_hotel         BIGINT       NOT NULL REFERENCES hotel (id_hotel),
     nome_completo    VARCHAR(160) NOT NULL,
     profissao        VARCHAR(80),
     data_nascimento  DATE,
@@ -207,6 +208,8 @@ CREATE TABLE hospede (
 
 COMMENT ON TABLE hospede IS
     'Ficha cadastral. Retencao: 5 anos apos o checkout da ultima reserva vinculada.';
+COMMENT ON COLUMN hospede.id_hotel IS
+    'Controlador dos dados deste cadastro. Artigo XIV: o hospede pertence a um hotel.';
 COMMENT ON COLUMN hospede.data_nascimento IS
     'LGPD: DP. A idade e derivada deste campo em exibicao e NAO e persistida, '
     'para evitar inconsistencia no dia seguinte a cada aniversario.';
@@ -214,12 +217,12 @@ COMMENT ON COLUMN hospede.numero_documento IS
     'LGPD: dado pessoal sensivel (DPS). Somente campos digitados; foto do documento '
     'nao e aceita, por minimizacao de dados. Quando tipo_documento = cpf e o numero '
     'foi aceito, a forma gravada e onze digitos; pares que colidiriam na migracao '
-    'conservam a escrita original. O indice uq_hospede_documento permanece.';
+    'conservam a escrita original. O indice uq_hospede_documento e por hotel.';
 COMMENT ON COLUMN hospede.telefone IS
     'LGPD: DP. Chave de correlacao com as mensagens do WhatsApp.';
 
 CREATE UNIQUE INDEX uq_hospede_documento
-    ON hospede (tipo_documento, numero_documento)
+    ON hospede (id_hotel, tipo_documento, numero_documento)
     WHERE tipo_documento IS NOT NULL AND numero_documento IS NOT NULL;
 
 CREATE INDEX ix_hospede_telefone ON hospede (telefone);

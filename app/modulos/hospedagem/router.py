@@ -125,7 +125,12 @@ def alterar_ficha(
     except hospedagem.DocumentoEmUso as erro:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Documento ja cadastrado para outro hospede.",
+            detail={
+                "codigo": "documento_em_uso",
+                "recado": str(erro),
+                "nome": erro.nome,
+                "id_reserva": erro.id_reserva,
+            },
         ) from erro
     except hospedagem.DadosInvalidos as erro:
         raise HTTPException(

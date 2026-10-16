@@ -21,9 +21,9 @@ class RepoHospedagem:
         self, conexao, *, id_hotel, agora, anos, marca_telefone
     ):
         visiveis = {
-            vinculo["id_hospede"]
-            for vinculo in self.vinculos
-            if self.reservas[vinculo["id_reserva"]]["id_hotel"] == id_hotel
+            hospede["id_hospede"]
+            for hospede in self.hospedes
+            if hospede.get("id_hotel") == id_hotel
         }
         apagados = 0
         for id_hospede in list(visiveis):
@@ -59,9 +59,45 @@ class RepoHospedagem:
         return apagados
 
 
+def test_passagem_nao_apaga_hospede_de_outro_hotel():
+    repo = RepoHospedagem(
+        hospedes=[
+            {"id_hospede": 1, "id_hotel": 10, "nome_completo": "Ana"},
+            {"id_hospede": 2, "id_hotel": 20, "nome_completo": "Bia"},
+        ],
+        vinculos=[
+            {"id_reserva": 9, "id_hospede": 1},
+            {"id_reserva": 8, "id_hospede": 2},
+        ],
+        reservas={
+            9: {
+                "id_hotel": 10,
+                "checkout_em": CHECKOUT_SEIS_ANOS,
+                "telefone_contato": "5511910000099",
+            },
+            8: {
+                "id_hotel": 10,
+                "checkout_em": CHECKOUT_SEIS_ANOS,
+                "telefone_contato": "5511910000088",
+            },
+        },
+        consentimentos=[
+            {"id_hospede": 1, "concedido": True},
+            {"id_hospede": 2, "concedido": True},
+        ],
+    )
+
+    n = hospedagem.apagar_fichas_vencidas(
+        object(), id_hotel=10, agora=AGORA, anos=5, repositorio=repo
+    )
+
+    assert n == 1
+    assert [h["id_hospede"] for h in repo.hospedes] == [2]
+
+
 def test_ficha_elegivel_some_e_telefone_da_reserva_orfao_vira_marca():
     repo = RepoHospedagem(
-        hospedes=[{"id_hospede": 1, "nome_completo": "Ana"}],
+        hospedes=[{"id_hospede": 1, "id_hotel": 10, "nome_completo": "Ana"}],
         vinculos=[{"id_reserva": 9, "id_hospede": 1}],
         reservas={
             9: {
@@ -86,7 +122,7 @@ def test_ficha_elegivel_some_e_telefone_da_reserva_orfao_vira_marca():
 
 def test_reserva_mais_nova_dentro_do_prazo_nao_apaga():
     repo = RepoHospedagem(
-        hospedes=[{"id_hospede": 1, "nome_completo": "Ana"}],
+        hospedes=[{"id_hospede": 1, "id_hotel": 10, "nome_completo": "Ana"}],
         vinculos=[
             {"id_reserva": 9, "id_hospede": 1},
             {"id_reserva": 8, "id_hospede": 1},
@@ -111,12 +147,12 @@ def test_reserva_mais_nova_dentro_do_prazo_nao_apaga():
     )
 
     assert n == 0
-    assert repo.hospedes == [{"id_hospede": 1, "nome_completo": "Ana"}]
+    assert repo.hospedes == [{"id_hospede": 1, "id_hotel": 10, "nome_completo": "Ana"}]
 
 
 def test_reserva_sem_checkout_nao_apaga():
     repo = RepoHospedagem(
-        hospedes=[{"id_hospede": 1, "nome_completo": "Ana"}],
+        hospedes=[{"id_hospede": 1, "id_hotel": 10, "nome_completo": "Ana"}],
         vinculos=[
             {"id_reserva": 9, "id_hospede": 1},
             {"id_reserva": 8, "id_hospede": 1},

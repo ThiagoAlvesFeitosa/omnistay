@@ -48,10 +48,10 @@ def montar_hospedado_para_pulso(
     ).scalar_one()
     id_hospede = conexao.execute(
         text(
-            "INSERT INTO hospede (nome_completo, telefone) "
-            "VALUES (:nome, :tel) RETURNING id_hospede"
+            "INSERT INTO hospede (id_hotel, nome_completo, telefone) "
+            "VALUES (:h, :nome, :tel) RETURNING id_hospede"
         ),
-        {"nome": nome, "tel": telefone},
+        {"h": id_hotel, "nome": nome, "tel": telefone},
     ).scalar_one()
     conexao.execute(
         text(

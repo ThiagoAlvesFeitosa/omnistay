@@ -16,11 +16,16 @@ class Repositorio:
     proximo_hospede: int = 1
     proximo_reserva: int = 1
 
-    def inserir_hospede(self, conexao, *, nome_completo, telefone):
+    def inserir_hospede(self, conexao, *, nome_completo, telefone, id_hotel=None):
         id_hospede = self.proximo_hospede
         self.proximo_hospede += 1
         self.hospedes.append(
-            {"id_hospede": id_hospede, "nome_completo": nome_completo, "telefone": telefone}
+            {
+                "id_hospede": id_hospede,
+                "nome_completo": nome_completo,
+                "telefone": telefone,
+                "id_hotel": id_hotel,
+            }
         )
         return id_hospede
 
@@ -89,6 +94,13 @@ def _criar(repo, agendador=None, **kwargs):
     }
     padrao.update(kwargs)
     return hospedagem.criar_reserva(**padrao), agendador
+
+
+def test_inserir_hospede_recebe_id_hotel_da_reserva():
+    repo = Repositorio()
+    criada, _ = _criar(repo)
+    assert repo.hospedes[0]["id_hotel"] == 10
+    assert criada.id_hotel == 10
 
 
 def test_criacao_valida_grava_hospede_reserva_e_titular():

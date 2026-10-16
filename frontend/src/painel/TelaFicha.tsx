@@ -80,11 +80,44 @@ function detalheHttp(corpo: unknown): string {
     if (typeof detalhe === "string") {
       return detalhe;
     }
+    if (
+      detalhe &&
+      typeof detalhe === "object" &&
+      "recado" in detalhe &&
+      typeof (detalhe as { recado: unknown }).recado === "string"
+    ) {
+      return (detalhe as { recado: string }).recado;
+    }
     if (Array.isArray(detalhe) && detalhe[0] && typeof detalhe[0].msg === "string") {
       return detalhe[0].msg;
     }
   }
   return "Não foi possível gravar a ficha.";
+}
+
+function documentoEmUso(corpo: unknown): { recado: string; idReserva: number } | null {
+  if (!corpo || typeof corpo !== "object" || !("detail" in corpo)) {
+    return null;
+  }
+  const detalhe = (corpo as { detail: unknown }).detail;
+  if (!detalhe || typeof detalhe !== "object") {
+    return null;
+  }
+  const objeto = detalhe as {
+    codigo?: unknown;
+    recado?: unknown;
+    id_reserva?: unknown;
+  };
+  if (objeto.codigo !== "documento_em_uso") {
+    return null;
+  }
+  if (typeof objeto.recado !== "string") {
+    return null;
+  }
+  if (typeof objeto.id_reserva !== "number") {
+    return null;
+  }
+  return { recado: objeto.recado, idReserva: objeto.id_reserva };
 }
 
 function dataDoMomento(iso: string): string {
@@ -102,6 +135,10 @@ export function TelaFicha({ embutida = false }: Props) {
   const [editando, setEditando] = useState(false);
   const [rascunho, setRascunho] = useState<Rascunho | null>(null);
   const [avisoGravacao, setAvisoGravacao] = useState("");
+  const [avisoDocumento, setAvisoDocumento] = useState<{
+    recado: string;
+    idReserva: number;
+  } | null>(null);
   const [textoCopia, setTextoCopia] = useState<string | null>(null);
   const [consentimento, setConsentimento] = useState<ConsentimentoResposta | null>(null);
 
@@ -116,6 +153,7 @@ export function TelaFicha({ embutida = false }: Props) {
     setEditando(false);
     setTextoCopia(null);
     setAvisoGravacao("");
+    setAvisoDocumento(null);
     try {
       const resposta = await pedirAutenticado(`/reservas/${idReserva}/ficha`);
       if (!resposta.ok) {
@@ -182,7 +220,15 @@ export function TelaFicha({ embutida = false }: Props) {
     if (!resposta.ok) {
       let detalhe = "Não foi possível gravar a ficha.";
       try {
-        detalhe = detalheHttp(await resposta.json());
+        const corpoErro = await resposta.json();
+        const emUso = documentoEmUso(corpoErro);
+        if (emUso) {
+          setAvisoDocumento(emUso);
+          setAvisoGravacao("");
+          return;
+        }
+        setAvisoDocumento(null);
+        detalhe = detalheHttp(corpoErro);
       } catch {
         /* corpo ilegível */
       }
@@ -194,6 +240,7 @@ export function TelaFicha({ embutida = false }: Props) {
     setRascunho(rascunhoDe(atualizada));
     setEditando(false);
     setAvisoGravacao("");
+    setAvisoDocumento(null);
   }
 
   function cancelar(): void {
@@ -202,6 +249,7 @@ export function TelaFicha({ embutida = false }: Props) {
     }
     setEditando(false);
     setAvisoGravacao("");
+    setAvisoDocumento(null);
   }
 
   async function copiarTudo(): Promise<void> {
@@ -327,7 +375,12 @@ export function TelaFicha({ embutida = false }: Props) {
                   ) : null}
                 </div>
               ))}
-              {avisoGravacao && !recadoDeCpf(avisoGravacao) ? (
+              {avisoDocumento ? (
+                <p role="status">
+                  {avisoDocumento.recado}{" "}
+                  <Link to={`/ficha/${avisoDocumento.idReserva}`}>Abrir ficha</Link>
+                </p>
+              ) : avisoGravacao && !recadoDeCpf(avisoGravacao) ? (
                 <p role="status">{avisoGravacao}</p>
               ) : null}
               <div className="flex gap-2">

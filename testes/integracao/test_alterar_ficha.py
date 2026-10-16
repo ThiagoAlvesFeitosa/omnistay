@@ -116,6 +116,35 @@ def test_campo_invalido_nao_grava(app_sobre_ambiente):
 
 
 @pytest.mark.postgres
+def test_dois_hoteis_gravam_o_mesmo_documento(app_sobre_ambiente):
+    cliente, ambiente = app_sobre_ambiente
+    primeira = _criar_parcial(cliente, ambiente, telefone="11987654340", nome="Ana")
+    assert cliente.put(f"/reservas/{primeira}/ficha", json=NOVE).status_code == 200
+
+    cliente.cookies.clear()
+    _login(cliente, ambiente.propriedade_b.usuarios["recepcao"])
+    segunda = cliente.post(
+        "/reservas", json=_corpo_valido(telefone="11987654341", nome="Bia")
+    ).json()["id_reserva"]
+    _tornar(ambiente, segunda, "ficha_parcial")
+    corpo_b = {**NOVE, "nome_completo": "Bia Costa", "telefone": "11987654341"}
+    resposta = cliente.put(f"/reservas/{segunda}/ficha", json=corpo_b)
+    assert resposta.status_code == 200
+    assert resposta.json()["numero_documento"] == NOVE["numero_documento"]
+
+
+@pytest.mark.postgres
+def test_hotel_b_nao_le_ficha_do_hotel_a(app_sobre_ambiente):
+    cliente, ambiente = app_sobre_ambiente
+    primeira = _criar_parcial(cliente, ambiente, telefone="11987654342", nome="Ana")
+    assert cliente.put(f"/reservas/{primeira}/ficha", json=NOVE).status_code == 200
+
+    cliente.cookies.clear()
+    _login(cliente, ambiente.propriedade_b.usuarios["recepcao"])
+    assert cliente.get(f"/reservas/{primeira}/ficha").status_code == 404
+
+
+@pytest.mark.postgres
 def test_documento_duplicado_nao_funde(app_sobre_ambiente):
     cliente, ambiente = app_sobre_ambiente
     primeira = _criar_parcial(cliente, ambiente, telefone="11987654326", nome="Ana")
@@ -128,6 +157,58 @@ def test_documento_duplicado_nao_funde(app_sobre_ambiente):
     assert recusa.status_code == 409
     lida = cliente.get(f"/reservas/{segunda}/ficha").json()
     assert lida["numero_documento"] in (None, "")
+
+
+@pytest.mark.postgres
+def test_put_documento_duplicado_nomeia_ficha_desta_casa(
+    app_sobre_ambiente, caplog, monkeypatch
+):
+    cliente, ambiente = app_sobre_ambiente
+    primeira = _criar_parcial(cliente, ambiente, telefone="11987654343", nome="Ana")
+    corpo_ana = {**NOVE, "nome_completo": "Ana Souza"}
+    assert cliente.put(f"/reservas/{primeira}/ficha", json=corpo_ana).status_code == 200
+
+    cliente.cookies.clear()
+    _login(cliente, ambiente.propriedade_b.usuarios["recepcao"])
+    da_b = cliente.post(
+        "/reservas", json=_corpo_valido(telefone="11987654344", nome="Carla")
+    ).json()["id_reserva"]
+    _tornar(ambiente, da_b, "ficha_parcial")
+    corpo_carla = {**NOVE, "nome_completo": "Carla Mendes", "telefone": "11987654344"}
+    assert cliente.put(f"/reservas/{da_b}/ficha", json=corpo_carla).status_code == 200
+
+    cliente.cookies.clear()
+    _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
+    segunda = cliente.post(
+        "/reservas", json=_corpo_valido(telefone="11987654345", nome="Bia")
+    ).json()["id_reserva"]
+    _tornar(ambiente, segunda, "ficha_parcial")
+
+    linhas: list[str] = []
+
+    def _info(msg, *args, **kwargs):
+        linhas.append(msg % args if args else str(msg))
+
+    monkeypatch.setattr("app.modulos.hospedagem.service.logger.info", _info)
+    caplog.set_level(logging.INFO)
+    recusa = cliente.put(f"/reservas/{segunda}/ficha", json=corpo_ana)
+    assert recusa.status_code == 409
+    detalhe = recusa.json()["detail"]
+    assert detalhe["codigo"] == "documento_em_uso"
+    assert detalhe["nome"] == "Ana Souza"
+    assert detalhe["id_reserva"] == primeira
+    assert "Ana Souza" in detalhe["recado"]
+    assert NOVE["numero_documento"] not in recusa.text
+    assert "Carla" not in recusa.text
+
+    lida = cliente.get(f"/reservas/{segunda}/ficha").json()
+    assert lida["numero_documento"] in (None, "")
+
+    texto = "\n".join(linhas) + caplog.text
+    assert "ficha_alterada_recusada" in texto
+    assert "409" in texto
+    assert NOVE["numero_documento"] not in texto
+    assert "Carla" not in texto
 
 
 @pytest.mark.postgres

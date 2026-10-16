@@ -1,6 +1,7 @@
 """Completar a ficha do titular no balcao — sem mensagem."""
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.modulos.hospedagem import service as hospedagem
 from testes.suporte.cpf_ficha import CPF_REPROVADO, CPF_VALIDO, CPF_VALIDO_PONTUADO
@@ -50,6 +51,9 @@ class RepoFake:
 
     def estado_cadastro_da_reserva(self, conexao, *, id_hotel, id_reserva):
         return "completa" if self.completa else "parcial"
+
+    def titular_do_documento(self, conexao, *, id_hotel, tipo_documento, numero_documento, id_hospede):
+        return None
 
 
 def test_nove_campos_em_ficha_parcial_viram_ficha_recebida():
@@ -143,6 +147,36 @@ def test_cpf_valido_pontuado_grava_onze_digitos():
         repositorio=repo,
     )
     assert repo.atualizacoes[0]["campos"]["numero_documento"] == CPF_VALIDO
+
+
+def test_colisao_de_documento_nomeia_e_nao_repete_numero():
+    repo = RepoFake("ficha_parcial")
+
+    def _colidir(conexao, *, id_hospede, campos):
+        orig = Exception(
+            'duplicate key value violates unique constraint "uq_hospede_documento"'
+        )
+        raise IntegrityError("UPDATE hospede", {}, orig)
+
+    repo.atualizar_hospede_titular = _colidir
+    repo.titular_do_documento = lambda conexao, **_kwargs: {
+        "nome": "Ana",
+        "id_reserva": 12,
+    }
+    with pytest.raises(hospedagem.DocumentoEmUso) as captura:
+        hospedagem.completar_ficha_titular(
+            object(),
+            id_hotel=1,
+            id_reserva=10,
+            campos=NOVE,
+            repositorio=repo,
+        )
+    erro = captura.value
+    assert erro.nome == "Ana"
+    assert erro.id_reserva == 12
+    recado = str(erro)
+    assert "Ana" in recado
+    assert NOVE["numero_documento"] not in recado
 
 
 def test_cep_invalido_continua_recusando():

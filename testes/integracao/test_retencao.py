@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import text
 
 from app.comum.retencao import MARCA_PAYLOAD, MARCA_TELEFONE, MARCA_TEXTO
+from app.modulos.hospedagem import service as hospedagem
 from testes.suporte.retencao import AGORA_RETENCAO, gravar_estadia_encerrada
 from worker.agendador import verificar_retencao
 
@@ -254,6 +255,54 @@ def test_ficha_de_seis_anos_some_e_reserva_permanece(ambiente):
         assert reserva["id_reserva"] == id_reserva
         assert reserva["telefone_contato"] == MARCA_TELEFONE
         assert execucao["fichas_apagadas"] >= 1
+
+
+@pytest.mark.postgres
+def test_expurgo_do_hotel_a_nao_apaga_ficha_do_hotel_b(ambiente):
+    hotel_a = ambiente.propriedade_a.id_hotel
+    hotel_b = ambiente.propriedade_b.id_hotel
+    with ambiente.engine.begin() as conexao:
+        ids_a = gravar_estadia_encerrada(
+            conexao,
+            hotel_a,
+            checkout_em=CHECKOUT_SEIS_ANOS,
+            texto="texto a",
+            id_externo="evt-ficha-a",
+            incluir_consentimento=True,
+        )
+        ids_b = gravar_estadia_encerrada(
+            conexao,
+            hotel_b,
+            checkout_em=CHECKOUT_SEIS_ANOS,
+            texto="texto b",
+            id_externo="evt-ficha-b",
+            incluir_consentimento=True,
+        )
+        conexao.execute(
+            text(
+                "INSERT INTO reserva_hospede (id_reserva, id_hospede, titular,"
+                " ficha_completa) VALUES (:r, :h, false, false)"
+            ),
+            {"r": ids_a["id_reserva"], "h": ids_b["id_hospede"]},
+        )
+        hospedagem.apagar_fichas_vencidas(
+            conexao, id_hotel=hotel_a, agora=AGORA_RETENCAO, anos=5
+        )
+        do_a = conexao.execute(
+            text("SELECT 1 FROM hospede WHERE id_hospede = :id"),
+            {"id": ids_a["id_hospede"]},
+        ).scalar()
+        do_b = conexao.execute(
+            text("SELECT 1 FROM hospede WHERE id_hospede = :id"),
+            {"id": ids_b["id_hospede"]},
+        ).scalar()
+        consentimento_b = conexao.execute(
+            text("SELECT 1 FROM consentimento WHERE id_hospede = :id"),
+            {"id": ids_b["id_hospede"]},
+        ).scalar()
+    assert do_a is None
+    assert do_b is not None
+    assert consentimento_b is not None
 
 
 @pytest.mark.postgres

@@ -978,7 +978,9 @@ hotel real antes delas:
 - [ ] **Resposta de dúvida composta pelo sistema** a partir dos trechos do catálogo, como no item
       vendável — fecha o achado de fidelidade
 - [ ] **Expurgo que não depende da confirmação de saída** — conta da saída prevista + margem
-- [ ] **`id_hotel` em `hospede`** — fatia 3 de 18/09, ADR-009
+- [x] **`id_hotel` em `hospede`** — fatia 3 de 18/09, ADR-009. Fechado na F9.3
+      (`specs/040-hospede-por-hotel`); UNIQUE por hotel; 409 nomeia e liga para a ficha
+      desta casa
 - [ ] **Limite de tentativas de login**
 - [ ] **Cookie `Secure` obrigatório, cabeçalhos de segurança, `/docs` desligado em produção**
 - [ ] **Varredura de dependências** (`pip-audit`, `npm audit`)
@@ -997,8 +999,9 @@ Abertas em 18/09/2026, da investigação do worker. Justificativa de cada uma na
 - [x] **Validar `numero_documento`** — dígito verificador do CPF. Fechado na F9.2
       (`specs/039-conferir-cpf`); roteiro e wireframe com CPF que fecha; `semear_demo.py` não
       cria ficha
-- [ ] **`id_hotel` em `hospede`** — índice `(id_hotel, tipo_documento, numero_documento)`,
-      revisão nova do Alembic, e o 409 passa a nomear o hóspede conflitante
+- [x] **`id_hotel` em `hospede`** — índice `(id_hotel, tipo_documento, numero_documento)`,
+      revisão `0028`, e o 409 nomeia o hóspede conflitante. Fechado na F9.3
+      (`specs/040-hospede-por-hotel`)
 - [ ] **Busca por telefone na pré-chegada** — reaproveita a ficha antes de pedir os oito campos
 - [ ] **Botão "é a mesma pessoa"** no painel — repontar `reserva_hospede` e apagar o provisório
 

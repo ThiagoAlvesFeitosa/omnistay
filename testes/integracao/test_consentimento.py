@@ -3,8 +3,8 @@
 import pytest
 from sqlalchemy import text
 
-from testes.integracao.test_confirmar_saida import _criar_hospedada
-from testes.integracao.test_reservas import _login
+from testes.integracao.test_confirmar_saida import _criar_hospedada, _tornar
+from testes.integracao.test_reservas import _corpo_valido, _login
 
 
 def _id_titular(ambiente, id_reserva: int) -> int:
@@ -101,3 +101,66 @@ def test_staff_nao_registra_e_outro_hotel_e_404(app_sobre_ambiente):
         f"/hospedes/{id_hospede}/consentimento",
         json={"concedido": False, "origem": "painel"},
     ).status_code == 404
+
+
+@pytest.mark.postgres
+def test_revogar_no_hotel_a_nao_muda_consentimento_do_b(app_sobre_ambiente):
+    cliente, ambiente = app_sobre_ambiente
+    id_a = _criar_hospedada(cliente, ambiente, telefone="11987654401")
+    id_hospede_a = _id_titular(ambiente, id_a)
+    assert cliente.post(
+        f"/hospedes/{id_hospede_a}/consentimento",
+        json={"concedido": True, "origem": "painel"},
+    ).status_code == 201
+
+    cliente.cookies.clear()
+    _login(cliente, ambiente.propriedade_b.usuarios["recepcao"])
+    id_b = cliente.post(
+        "/reservas", json=_corpo_valido(telefone="11987654402", nome="Bia")
+    ).json()["id_reserva"]
+    _tornar(ambiente, id_b, "ficha_recebida")
+    _tornar(ambiente, id_b, "hospedado")
+    id_hospede_b = _id_titular(ambiente, id_b)
+    assert cliente.post(
+        f"/hospedes/{id_hospede_b}/consentimento",
+        json={"concedido": True, "origem": "painel"},
+    ).status_code == 201
+
+    cliente.cookies.clear()
+    _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
+    assert cliente.get(f"/hospedes/{id_hospede_b}/consentimento").status_code == 404
+    assert cliente.post(
+        f"/hospedes/{id_hospede_a}/consentimento",
+        json={"concedido": False, "origem": "painel"},
+    ).status_code == 201
+
+    cliente.cookies.clear()
+    _login(cliente, ambiente.propriedade_b.usuarios["recepcao"])
+    vigente_b = cliente.get(f"/hospedes/{id_hospede_b}/consentimento").json()
+    assert vigente_b["concedido"] is True
+
+
+@pytest.mark.postgres
+def test_vinculo_cruzado_nao_abre_consentimento_do_outro_hotel(app_sobre_ambiente):
+    cliente, ambiente = app_sobre_ambiente
+    id_a = _criar_hospedada(cliente, ambiente, telefone="11987654403")
+    cliente.cookies.clear()
+    _login(cliente, ambiente.propriedade_b.usuarios["recepcao"])
+    id_b = cliente.post(
+        "/reservas", json=_corpo_valido(telefone="11987654404", nome="Bia")
+    ).json()["id_reserva"]
+    _tornar(ambiente, id_b, "ficha_recebida")
+    _tornar(ambiente, id_b, "hospedado")
+    id_hospede_b = _id_titular(ambiente, id_b)
+    with ambiente.engine.begin() as conexao:
+        conexao.execute(
+            text(
+                "INSERT INTO reserva_hospede (id_reserva, id_hospede, titular,"
+                " ficha_completa) VALUES (:r, :h, false, false)"
+            ),
+            {"r": id_a, "h": id_hospede_b},
+        )
+
+    cliente.cookies.clear()
+    _login(cliente, ambiente.propriedade_a.usuarios["recepcao"])
+    assert cliente.get(f"/hospedes/{id_hospede_b}/consentimento").status_code == 404
